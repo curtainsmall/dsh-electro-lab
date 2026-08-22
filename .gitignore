@@ -1,0 +1,25 @@
+# --- dependencies ---
+node_modules/
+.pnpm-store/
+
+# --- build output ---
+lib/
+dist/
+registry/
+*.tsbuildinfo
+
+# --- session recovery artifacts (agent session, not project content) ---
+session-recovered.jsonl
+assistant-summary.txt
+
+# --- local env / secrets ---
+.env
+.env.*
+!.env.example
+*.local
+
+# --- logs & misc ---
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

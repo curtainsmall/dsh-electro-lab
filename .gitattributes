@@ -1,0 +1,32 @@
+# Line endings: normalize all text files to LF in the repository.
+# Checkout behavior stays per-platform (auto), but the stored form is LF.
+* text=auto
+
+# Shell scripts must remain LF even on Windows checkouts — CRLF breaks
+# them on GitHub Actions / Linux runners.
+*.sh text eol=lf
+*.bash text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+
+# Binary formats — never touch content, never diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.zip binary
+*.7z binary
+*.tgz binary
