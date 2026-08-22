@@ -85,9 +85,9 @@ export const circuitTools = [
       const capacitance = parseScalar(args.capacitance, Unit.Capacitance)
       const resistance = args.resistance === undefined ? undefined : parseScalar(args.resistance, Unit.Resistance)
       const mode = args.mode === 'parallel' ? 'parallel' : 'series'
-      const { f0, q, bandwidth } = resonance(inductance, capacitance, resistance, mode)
-      const out: Record<string, JsonValue> = { f0: fmtQ(f0, BaseUnit.Hertz), mode }
-      if (q !== undefined) out.q = q
+      const { resonantFrequency, qualityFactor, bandwidth } = resonance(inductance, capacitance, resistance, mode)
+      const out: Record<string, JsonValue> = { resonantFrequency: fmtQ(resonantFrequency, BaseUnit.Hertz), mode }
+      if (qualityFactor !== undefined) out.qualityFactor = qualityFactor
       if (bandwidth !== undefined) out.bandwidth = fmtQ(bandwidth, BaseUnit.Hertz)
       return out
     },
@@ -133,8 +133,8 @@ export const circuitTools = [
       const initialVoltage = args.initialVoltage === undefined ? 0 : parseScalar(args.initialVoltage, Unit.Voltage)
       if (mode === 'charge' && args.sourceVoltage === undefined) throw new Error('charge mode requires vs')
       if (mode === 'discharge' && args.initialVoltage === undefined) throw new Error('discharge mode requires v0')
-      const { voltage, current, tau } = rcTransient(mode, sourceVoltage, initialVoltage, resistance, capacitance, time)
-      return { voltage: fmtQ(voltage, BaseUnit.Volt), current: fmtQ(current, BaseUnit.Ampere), timeConstant: fmtQ(tau, BaseUnit.Second), mode }
+      const { voltage, current, timeConstant } = rcTransient(mode, sourceVoltage, initialVoltage, resistance, capacitance, time)
+      return { voltage: fmtQ(voltage, BaseUnit.Volt), current: fmtQ(current, BaseUnit.Ampere), timeConstant: fmtQ(timeConstant, BaseUnit.Second), mode }
     },
   }),
   defineJsonTool({
@@ -157,8 +157,8 @@ export const circuitTools = [
       const initialCurrent = args.initialCurrent === undefined ? 0 : parseScalar(args.initialCurrent, Unit.Current)
       if (mode === 'charge' && args.sourceVoltage === undefined) throw new Error('charge mode requires vs')
       if (mode === 'discharge' && args.initialCurrent === undefined) throw new Error('discharge mode requires i0')
-      const { current, voltage, tau } = rlTransient(mode, sourceVoltage, initialCurrent, resistance, inductance, time)
-      return { current: fmtQ(current, BaseUnit.Ampere), voltage: fmtQ(voltage, BaseUnit.Volt), timeConstant: fmtQ(tau, BaseUnit.Second), mode }
+      const { current, voltage, timeConstant } = rlTransient(mode, sourceVoltage, initialCurrent, resistance, inductance, time)
+      return { current: fmtQ(current, BaseUnit.Ampere), voltage: fmtQ(voltage, BaseUnit.Volt), timeConstant: fmtQ(timeConstant, BaseUnit.Second), mode }
     },
   }),
 ]

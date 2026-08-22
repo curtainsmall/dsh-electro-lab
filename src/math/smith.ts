@@ -31,22 +31,22 @@ export function quarterWaveImpedance(lineImpedance: number, loadImpedance: numbe
 }
 
 /**
- * L-network matching between two real Resistances.
+ * L-network matching between two real resistances.
  * Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the SMALLER, shunt element (X = Rl/Q) next to the LARGER one.
  * Two conjugate solutions (low-pass / high-pass variants) are returned.
  */
 export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, frequency: number): {
   matched: boolean
-  q?: number
+  qualityFactor?: number
   seriesSide: 'source' | 'load'
   shuntSide: 'source' | 'load'
   solutions?: {
-    xSeries: number
-    xShunt: number
-    lSeries?: number
-    cSeries?: number
-    lShunt?: number
-    cShunt?: number
+    seriesReactance: number
+    shuntReactance: number
+    seriesInductance?: number
+    seriesCapacitance?: number
+    shuntInductance?: number
+    shuntCapacitance?: number
   }[]
 } {
   if (sourceImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
@@ -56,24 +56,24 @@ export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, fr
   const larger = Math.max(sourceImpedance, loadImpedance)
   const seriesSide = sourceImpedance < loadImpedance ? 'source' : 'load'
   const shuntSide = sourceImpedance < loadImpedance ? 'load' : 'source'
-  const q = Math.sqrt(larger / smaller - 1)
-  const xSeries = q * smaller
-  const xShunt = larger / q
+  const qualityFactor = Math.sqrt(larger / smaller - 1)
+  const seriesReactance = qualityFactor * smaller
+  const shuntReactance = larger / qualityFactor
   const w = 2 * Math.PI * frequency
   const elements = (xs: number, xp: number) => ({
-    lSeries: xs > 0 ? xs / w : undefined,
-    cSeries: xs < 0 ? -1 / (w * xs) : undefined,
-    lShunt: xp > 0 ? xp / w : undefined,
-    cShunt: xp < 0 ? -1 / (w * xp) : undefined,
+    seriesInductance: xs > 0 ? xs / w : undefined,
+    seriesCapacitance: xs < 0 ? -1 / (w * xs) : undefined,
+    shuntInductance: xp > 0 ? xp / w : undefined,
+    shuntCapacitance: xp < 0 ? -1 / (w * xp) : undefined,
   })
   return {
     matched: false,
-    q,
+    qualityFactor,
     seriesSide,
     shuntSide,
     solutions: [
-      { xSeries, xShunt: -xShunt, ...elements(xSeries, -xShunt) },
-      { xSeries: -xSeries, xShunt, ...elements(-xSeries, xShunt) },
+      { seriesReactance, shuntReactance: -shuntReactance, ...elements(seriesReactance, -shuntReactance) },
+      { seriesReactance: -seriesReactance, shuntReactance, ...elements(-seriesReactance, shuntReactance) },
     ],
   }
 }

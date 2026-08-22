@@ -6,10 +6,10 @@ import { BaseUnit } from './units.ts'
 describe('serializeComplex', () => {
   it('always exposes both rectangular and polar forms', () => {
     const json = serializeComplex(new Complex(50, 50), BaseUnit.Ohm)
-    expect(json.re).toBeCloseTo(50, 12)
-    expect(json.im).toBeCloseTo(50, 12)
+    expect(json.real).toBeCloseTo(50, 12)
+    expect(json.imaginary).toBeCloseTo(50, 12)
     expect(json.magnitude).toBeCloseTo(70.7107, 4)
-    expect(json.phiDeg).toBeCloseTo(45, 6)
+    expect(json.phaseAngleDegrees).toBeCloseTo(45, 6)
     expect(json.display).toContain('Ω')
     expect(json.displayPolar).toContain('∠')
     expect(json.unit).toBe('Ω')

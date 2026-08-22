@@ -53,22 +53,22 @@ describe('L-network match', () => {
   it('50 Ω → 100 Ω at 1 MHz: Q = 1, Xs = 50, Xp = 100', () => {
     const result = lNetworkMatch(50, 100, 1e6)
     expect(result.matched).toBe(false)
-    expect(result.q).toBeCloseTo(1, 6)
+    expect(result.qualityFactor).toBeCloseTo(1, 6)
     expect(result.seriesSide).toBe('source') // smaller R (50) on source side
     expect(result.shuntSide).toBe('load')
     const solutions = result.solutions!
     const a = solutions[0]!
     const b = solutions[1]!
     // Solution A: Xs = +50 (L = 7.96 µH), Xp = −100 (C = 1.59 nF)
-    expect(a.xSeries).toBeCloseTo(50, 6)
-    expect(a.xShunt).toBeCloseTo(-100, 6)
-    expect(a.lSeries).toBeCloseTo(50 / (2 * Math.PI * 1e6), 8)
-    expect(a.cShunt).toBeCloseTo(1 / (2 * Math.PI * 1e6 * 100), 12)
+    expect(a.seriesReactance).toBeCloseTo(50, 6)
+    expect(a.shuntReactance).toBeCloseTo(-100, 6)
+    expect(a.seriesInductance).toBeCloseTo(50 / (2 * Math.PI * 1e6), 8)
+    expect(a.shuntCapacitance).toBeCloseTo(1 / (2 * Math.PI * 1e6 * 100), 12)
     // Solution B: mirror image
-    expect(b.xSeries).toBeCloseTo(-50, 6)
-    expect(b.xShunt).toBeCloseTo(100, 6)
-    expect(b.cSeries).toBeCloseTo(1 / (2 * Math.PI * 1e6 * 50), 12)
-    expect(b.lShunt).toBeCloseTo(100 / (2 * Math.PI * 1e6), 8)
+    expect(b.seriesReactance).toBeCloseTo(-50, 6)
+    expect(b.shuntReactance).toBeCloseTo(100, 6)
+    expect(b.seriesCapacitance).toBeCloseTo(1 / (2 * Math.PI * 1e6 * 50), 12)
+    expect(b.shuntInductance).toBeCloseTo(100 / (2 * Math.PI * 1e6), 8)
   })
 
   it('reports matched when equal', () => {

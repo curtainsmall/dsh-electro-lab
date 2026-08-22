@@ -75,20 +75,20 @@ export const smithTools = [
       if (result.matched) return { matched: true, note: 'source and load are already equal — no network needed' }
       const out: Record<string, JsonValue> = {
         matched: false,
-        q: result.q as number,
+        qualityFactor: result.qualityFactor as number,
         seriesSide: result.seriesSide,
         shuntSide: result.shuntSide,
       }
       if (result.solutions !== undefined) {
         out.solutions = result.solutions.map((s) => {
           const sol: Record<string, JsonValue> = {
-            xSeries: fmtReactance(s.xSeries),
-            xShunt: fmtReactance(s.xShunt),
+            xSeries: fmtReactance(s.seriesReactance),
+            xShunt: fmtReactance(s.shuntReactance),
           }
-          if (s.lSeries !== undefined) sol.lSeries = fmtQ(s.lSeries, BaseUnit.Henry)
-          if (s.cSeries !== undefined) sol.cSeries = fmtQ(s.cSeries, BaseUnit.Farad)
-          if (s.lShunt !== undefined) sol.lShunt = fmtQ(s.lShunt, BaseUnit.Henry)
-          if (s.cShunt !== undefined) sol.cShunt = fmtQ(s.cShunt, BaseUnit.Farad)
+          if (s.seriesInductance !== undefined) sol.lSeries = fmtQ(s.seriesInductance, BaseUnit.Henry)
+          if (s.seriesCapacitance !== undefined) sol.cSeries = fmtQ(s.seriesCapacitance, BaseUnit.Farad)
+          if (s.shuntInductance !== undefined) sol.lShunt = fmtQ(s.shuntInductance, BaseUnit.Henry)
+          if (s.shuntCapacitance !== undefined) sol.cShunt = fmtQ(s.shuntCapacitance, BaseUnit.Farad)
           return sol
         })
       }
