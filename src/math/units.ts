@@ -36,20 +36,20 @@ export enum Prefix {
 
 /** The physical category a base unit belongs to (drives prefix table + zero threshold). */
 export enum Unit {
-  Frequency = 'Frequency',
-  Resistance = 'Resistance',
-  Capacitance = 'Capacitance',
-  Inductance = 'Inductance',
-  Voltage = 'Voltage',
-  Current = 'Current',
-  Power = 'Power',
-  TIME = 'time',
-  Dimensionless = 'Dimensionless',
-  Angle = 'Angle',
-  LOG = 'log',
+  Frequency = 'frequency',
+  Resistance = 'resistance',
+  Capacitance = 'capacitance',
+  Inductance = 'inductance',
+  Voltage = 'voltage',
+  Current = 'current',
+  Power = 'power',
+  Time = 'time',
+  Dimensionless = 'dimensionless',
+  Angle = 'angle',
+  Log = 'log',
 }
 
-/** Explicit unit → Unit mapping (derived units like VA/VAR share the Power Unit). */
+/** Explicit unit → Unit mapping (derived units like VA/VAR share the Power unit). */
 export const UNIT_BY_BASE: Record<BaseUnit, Unit> = {
   [BaseUnit.Hertz]: Unit.Frequency,
   [BaseUnit.Ohm]: Unit.Resistance,
@@ -60,10 +60,10 @@ export const UNIT_BY_BASE: Record<BaseUnit, Unit> = {
   [BaseUnit.Watt]: Unit.Power,
   [BaseUnit.VoltAmpere]: Unit.Power,
   [BaseUnit.VoltAmpereReactive]: Unit.Power,
-  [BaseUnit.Second]: Unit.TIME,
+  [BaseUnit.Second]: Unit.Time,
   [BaseUnit.Dimensionless]: Unit.Dimensionless,
   [BaseUnit.Degree]: Unit.Angle,
-  [BaseUnit.Decibel]: Unit.LOG,
+  [BaseUnit.Decibel]: Unit.Log,
 }
 
 export interface UnitDef {
@@ -114,7 +114,7 @@ export const UNIT_DEFS: Record<Unit, UnitDef> = {
     prefixes: [Prefix.Nano, Prefix.Micro, Prefix.Milli, Prefix.Kilo, Prefix.Mega],
     zeroThreshold: 1e-12,
   },
-  [Unit.TIME]: {
+  [Unit.Time]: {
     base: BaseUnit.Second,
     prefixes: [Prefix.Nano, Prefix.Micro, Prefix.Milli],
     zeroThreshold: 1e-12,
@@ -129,7 +129,7 @@ export const UNIT_DEFS: Record<Unit, UnitDef> = {
     prefixes: [],
     zeroThreshold: 1e-9,
   },
-  [Unit.LOG]: {
+  [Unit.Log]: {
     base: BaseUnit.Decibel,
     prefixes: [],
     zeroThreshold: 0,

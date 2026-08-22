@@ -32,11 +32,10 @@ export function quarterWaveImpedance(lineImpedance: number, loadImpedance: numbe
 
 /**
  * L-network matching between two real Resistances.
- * Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the SMALLER
- * Resistance, shunt element (X = Rl/Q) next to the LARGER one.
+ * Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the SMALLER, shunt element (X = Rl/Q) next to the LARGER one.
  * Two conjugate solutions (low-pass / high-pass variants) are returned.
  */
-export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, Frequency: number): {
+export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, frequency: number): {
   matched: boolean
   q?: number
   seriesSide: 'source' | 'load'
@@ -51,7 +50,7 @@ export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, Fr
   }[]
 } {
   if (sourceImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
-  if (Frequency <= 0) throw new Error('Frequency must be positive (Hz)')
+  if (frequency <= 0) throw new Error('frequency must be positive (Hz)')
   if (sourceImpedance === loadImpedance) return { matched: true, seriesSide: 'source', shuntSide: 'load' }
   const smaller = Math.min(sourceImpedance, loadImpedance)
   const larger = Math.max(sourceImpedance, loadImpedance)
@@ -60,7 +59,7 @@ export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, Fr
   const q = Math.sqrt(larger / smaller - 1)
   const xSeries = q * smaller
   const xShunt = larger / q
-  const w = 2 * Math.PI * Frequency
+  const w = 2 * Math.PI * frequency
   const elements = (xs: number, xp: number) => ({
     lSeries: xs > 0 ? xs / w : undefined,
     cSeries: xs < 0 ? -1 / (w * xs) : undefined,

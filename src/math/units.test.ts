@@ -34,7 +34,7 @@ describe('isNegligible — unit-aware zero thresholds', () => {
 describe('unit tokens', () => {
   it('recognizes bases, aliases, and prefixed tokens', () => {
     expect(unitFromToken(BaseUnit.Hertz)).toBe(Unit.Frequency)
-    expect(unitFromToken('Ohm')).toBe(Unit.Resistance)
+    expect(unitFromToken('ohm')).toBe(Unit.Resistance)
     expect(unitFromToken(BaseUnit.Farad)).toBe(Unit.Capacitance)
     expect(splitUnitToken('kHz')?.factor).toBeCloseTo(1e3, 12)
     expect(splitUnitToken('nF')?.factor).toBeCloseTo(1e-9, 18)

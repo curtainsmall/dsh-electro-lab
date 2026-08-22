@@ -61,17 +61,17 @@ export const smithTools = [
   }),
   defineJsonTool({
     name: 'l_network_match',
-    description: 'L-network matching two real Resistances at Frequency f. Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the smaller Resistance, shunt element (X = Rl/Q) next to the larger. Returns both conjugate solutions (low-pass / high-pass) with L/C values.',
+    description: 'L-network matching two real resistances at frequency f. Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the smaller resistance, shunt element (X = Rl/Q) next to the larger. Returns both conjugate solutions (low-pass / high-pass) with L/C values.',
     parameters: {
       sourceImpedance: { ...quantityParam('source impedance'), required: true },
       loadImpedance: { ...quantityParam('load impedance'), required: true },
-      Frequency: { ...quantityParam('Frequency'), required: true },
+      frequency: { ...quantityParam('frequency'), required: true },
     },
     execute: (args) => {
       const sourceImpedance = parseScalar(args.sourceImpedance, Unit.Resistance)
       const loadImpedance = parseScalar(args.loadImpedance, Unit.Resistance)
-      const Frequency = parseScalar(args.Frequency, Unit.Frequency)
-      const result = lNetworkMatch(sourceImpedance, loadImpedance, Frequency)
+      const frequency = parseScalar(args.frequency, Unit.Frequency)
+      const result = lNetworkMatch(sourceImpedance, loadImpedance, frequency)
       if (result.matched) return { matched: true, note: 'source and load are already equal — no network needed' }
       const out: Record<string, JsonValue> = {
         matched: false,
