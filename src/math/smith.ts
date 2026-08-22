@@ -4,30 +4,30 @@
 import { Complex } from 'complex.js'
 
 /** Reflection coefficient: Γ = (Z − Z0) / (Z + Z0). */
-export function zToGamma(z: Complex, z0: number): Complex {
-  if (!Number.isFinite(z0) || z0 <= 0) throw new Error('reference impedance must be a positive number (Ω)')
-  return z.sub(z0).div(z.add(z0))
+export function zToGamma(impedanceOhm: Complex, referenceImpedanceOhm: number): Complex {
+  if (!Number.isFinite(referenceImpedanceOhm) || referenceImpedanceOhm <= 0) throw new Error('reference impedance must be a positive number (Ω)')
+  return impedanceOhm.sub(referenceImpedanceOhm).div(impedanceOhm.add(referenceImpedanceOhm))
 }
 
 /** VSWR = (1 + |Γ|) / (1 − |Γ|); |Γ| = 1 (open/short) yields Infinity. */
-export function gammaToVswr(g: Complex): number {
-  const m = g.abs()
-  if (m === 1) return Number.POSITIVE_INFINITY
-  if (m > 1) throw new Error(`|Γ| = ${m} > 1 — passive load reflection cannot exceed unity`)
-  return (1 + m) / (1 - m)
+export function gammaToVswr(reflectionCoefficient: Complex): number {
+  const magnitude = reflectionCoefficient.abs()
+  if (magnitude === 1) return Number.POSITIVE_INFINITY
+  if (magnitude > 1) throw new Error(`|Γ| = ${magnitude} > 1 — passive load reflection cannot exceed unity`)
+  return (1 + magnitude) / (1 - magnitude)
 }
 
 /** Return loss in dB: −20·log10(|Γ|). |Γ| = 0 yields +Infinity (no reflection). */
-export function returnLossDb(g: Complex): number {
-  const m = g.abs()
-  if (m === 0) return Number.POSITIVE_INFINITY
-  return -20 * Math.log10(m)
+export function returnLossDb(reflectionCoefficient: Complex): number {
+  const magnitude = reflectionCoefficient.abs()
+  if (magnitude === 0) return Number.POSITIVE_INFINITY
+  return -20 * Math.log10(magnitude)
 }
 
 /** Quarter-wave transformer: Z1 = √(Z0·ZL). ZL must be real and positive. */
-export function quarterWaveImpedance(z0: number, zl: number): number {
-  if (z0 <= 0 || zl <= 0) throw new Error('impedances must be positive (Ω)')
-  return Math.sqrt(z0 * zl)
+export function quarterWaveImpedance(lineImpedanceOhm: number, loadImpedanceOhm: number): number {
+  if (lineImpedanceOhm <= 0 || loadImpedanceOhm <= 0) throw new Error('impedances must be positive (Ω)')
+  return Math.sqrt(lineImpedanceOhm * loadImpedanceOhm)
 }
 
 /**
@@ -36,7 +36,7 @@ export function quarterWaveImpedance(z0: number, zl: number): number {
  * resistance, shunt element (X = Rl/Q) next to the LARGER one.
  * Two conjugate solutions (low-pass / high-pass variants) are returned.
  */
-export function lNetworkMatch(zs: number, zl: number, f: number): {
+export function lNetworkMatch(sourceImpedanceOhm: number, loadImpedanceOhm: number, frequencyHz: number): {
   matched: boolean
   q?: number
   seriesSide: 'source' | 'load'
@@ -50,17 +50,17 @@ export function lNetworkMatch(zs: number, zl: number, f: number): {
     cShunt?: number
   }[]
 } {
-  if (zs <= 0 || zl <= 0) throw new Error('impedances must be positive (Ω)')
-  if (f <= 0) throw new Error('frequency must be positive (Hz)')
-  if (zs === zl) return { matched: true, seriesSide: 'source', shuntSide: 'load' }
-  const smaller = Math.min(zs, zl)
-  const larger = Math.max(zs, zl)
-  const seriesSide = zs < zl ? 'source' : 'load'
-  const shuntSide = zs < zl ? 'load' : 'source'
+  if (sourceImpedanceOhm <= 0 || loadImpedanceOhm <= 0) throw new Error('impedances must be positive (Ω)')
+  if (frequencyHz <= 0) throw new Error('frequency must be positive (Hz)')
+  if (sourceImpedanceOhm === loadImpedanceOhm) return { matched: true, seriesSide: 'source', shuntSide: 'load' }
+  const smaller = Math.min(sourceImpedanceOhm, loadImpedanceOhm)
+  const larger = Math.max(sourceImpedanceOhm, loadImpedanceOhm)
+  const seriesSide = sourceImpedanceOhm < loadImpedanceOhm ? 'source' : 'load'
+  const shuntSide = sourceImpedanceOhm < loadImpedanceOhm ? 'load' : 'source'
   const q = Math.sqrt(larger / smaller - 1)
   const xSeries = q * smaller
   const xShunt = larger / q
-  const w = 2 * Math.PI * f
+  const w = 2 * Math.PI * frequencyHz
   const elements = (xs: number, xp: number) => ({
     lSeries: xs > 0 ? xs / w : undefined,
     cSeries: xs < 0 ? -1 / (w * xs) : undefined,

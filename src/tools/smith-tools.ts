@@ -14,35 +14,35 @@ export const smithTools = [
     name: 'z_to_gamma',
     description: 'Reflection coefficient Γ = (Z − Z0) / (Z + Z0) for impedance Z on a Z0 line (default 50 Ω).',
     parameters: {
-      z: { ...complexParam('load impedance'), required: true },
-      z0: { ...quantityParam('reference impedance (default 50)') },
+      impedance_ohm: { ...complexParam('load impedance'), required: true },
+      reference_impedance_ohm: { ...quantityParam('reference impedance (default 50)') },
     },
     execute: (args) => {
-      const z = parseComplex(args.z, UnitFamily.RESISTANCE)
-      const z0 = args.z0 === undefined ? 50 : parseScalar(args.z0, UnitFamily.RESISTANCE)
-      return serializeComplex(zToGamma(z, z0), BaseUnit.DIMENSIONLESS)
+      const impedanceOhm = parseComplex(args.impedance_ohm, UnitFamily.RESISTANCE)
+      const referenceImpedanceOhm = args.reference_impedance_ohm === undefined ? 50 : parseScalar(args.reference_impedance_ohm, UnitFamily.RESISTANCE)
+      return serializeComplex(zToGamma(impedanceOhm, referenceImpedanceOhm), BaseUnit.DIMENSIONLESS)
     },
   }),
   defineJsonTool({
     name: 'gamma_to_vswr',
     description: 'Voltage standing wave ratio from reflection coefficient: VSWR = (1+|Γ|)/(1−|Γ|). |Γ| = 1 (open/short) yields infinity.',
     parameters: {
-      gamma: { ...complexParam('reflection coefficient'), required: true },
+      reflection_coefficient: { ...complexParam('reflection coefficient'), required: true },
     },
     execute: (args) => {
-      const g = parseComplex(args.gamma)
-      return { vswr: gammaToVswr(g), display: gammaToVswr(g) === Number.POSITIVE_INFINITY ? '∞' : String(gammaToVswr(g)) }
+      const reflectionCoefficient = parseComplex(args.reflection_coefficient)
+      return { vswr: gammaToVswr(reflectionCoefficient), display: gammaToVswr(reflectionCoefficient) === Number.POSITIVE_INFINITY ? '∞' : String(gammaToVswr(reflectionCoefficient)) }
     },
   }),
   defineJsonTool({
     name: 'return_loss',
     description: 'Return loss in dB: −20·log10(|Γ|). |Γ| = 0 (perfect match) yields +∞ dB.',
     parameters: {
-      gamma: { ...complexParam('reflection coefficient'), required: true },
+      reflection_coefficient: { ...complexParam('reflection coefficient'), required: true },
     },
     execute: (args) => {
-      const g = parseComplex(args.gamma)
-      const db = returnLossDb(g)
+      const reflectionCoefficient = parseComplex(args.reflection_coefficient)
+      const db = returnLossDb(reflectionCoefficient)
       return { return_loss_db: db, display: db === Number.POSITIVE_INFINITY ? '∞ dB' : `${db.toFixed(2)} dB` }
     },
   }),
@@ -50,28 +50,28 @@ export const smithTools = [
     name: 'quarter_wave_transformer',
     description: 'Quarter-wave transformer characteristic impedance: Z1 = √(Z0·ZL), matching a real load ZL to line Z0.',
     parameters: {
-      z0: { ...quantityParam('line impedance'), required: true },
-      zl: { ...quantityParam('real load impedance'), required: true },
+      line_impedance_ohm: { ...quantityParam('line impedance'), required: true },
+      load_impedance_ohm: { ...quantityParam('real load impedance'), required: true },
     },
     execute: (args) => {
-      const z0 = parseScalar(args.z0, UnitFamily.RESISTANCE)
-      const zl = parseScalar(args.zl, UnitFamily.RESISTANCE)
-      return serializeComplex(new Complex(quarterWaveImpedance(z0, zl), 0), BaseUnit.OHM)
+      const lineImpedanceOhm = parseScalar(args.line_impedance_ohm, UnitFamily.RESISTANCE)
+      const loadImpedanceOhm = parseScalar(args.load_impedance_ohm, UnitFamily.RESISTANCE)
+      return serializeComplex(new Complex(quarterWaveImpedance(lineImpedanceOhm, loadImpedanceOhm), 0), BaseUnit.OHM)
     },
   }),
   defineJsonTool({
     name: 'l_network_match',
     description: 'L-network matching two real resistances at frequency f. Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the smaller resistance, shunt element (X = Rl/Q) next to the larger. Returns both conjugate solutions (low-pass / high-pass) with L/C values.',
     parameters: {
-      zs: { ...quantityParam('source impedance'), required: true },
-      zl: { ...quantityParam('load impedance'), required: true },
-      f: { ...quantityParam('frequency'), required: true },
+      source_impedance_ohm: { ...quantityParam('source impedance'), required: true },
+      load_impedance_ohm: { ...quantityParam('load impedance'), required: true },
+      frequency_hz: { ...quantityParam('frequency'), required: true },
     },
     execute: (args) => {
-      const zs = parseScalar(args.zs, UnitFamily.RESISTANCE)
-      const zl = parseScalar(args.zl, UnitFamily.RESISTANCE)
-      const f = parseScalar(args.f, UnitFamily.FREQUENCY)
-      const result = lNetworkMatch(zs, zl, f)
+      const sourceImpedanceOhm = parseScalar(args.source_impedance_ohm, UnitFamily.RESISTANCE)
+      const loadImpedanceOhm = parseScalar(args.load_impedance_ohm, UnitFamily.RESISTANCE)
+      const frequencyHz = parseScalar(args.frequency_hz, UnitFamily.FREQUENCY)
+      const result = lNetworkMatch(sourceImpedanceOhm, loadImpedanceOhm, frequencyHz)
       if (result.matched) return { matched: true, note: 'source and load are already equal — no network needed' }
       const out: Record<string, JsonValue> = {
         matched: false,

@@ -23,11 +23,11 @@ export const atomicTools = [
     name: 'complex_add',
     description: `Add two complex numbers. ${LOW_LEVEL_HINT}`,
     parameters: {
-      a: { ...complexParam('first operand'), required: true },
-      b: { ...complexParam('second operand'), required: true },
+      first_complex: { ...complexParam('first operand'), required: true },
+      second_complex: { ...complexParam('second operand'), required: true },
     },
     execute: (args) => {
-      const z = parseComplex(args.a).add(parseComplex(args.b))
+      const z = parseComplex(args.first_complex).add(parseComplex(args.second_complex))
       guardFinite(z, 'complex_add')
       return serializeComplex(z, BaseUnit.DIMENSIONLESS)
     },
@@ -36,10 +36,10 @@ export const atomicTools = [
     name: 'complex_opposite',
     description: `Negate a complex number (z → −z). ${LOW_LEVEL_HINT}`,
     parameters: {
-      a: { ...complexParam('operand'), required: true },
+      operand: { ...complexParam('operand'), required: true },
     },
     execute: (args) => {
-      const z = parseComplex(args.a).neg()
+      const z = parseComplex(args.operand).neg()
       guardFinite(z, 'complex_opposite')
       return serializeComplex(z, BaseUnit.DIMENSIONLESS)
     },
@@ -48,11 +48,11 @@ export const atomicTools = [
     name: 'complex_multiply',
     description: `Multiply two complex numbers. ${LOW_LEVEL_HINT}`,
     parameters: {
-      a: { ...complexParam('first factor'), required: true },
-      b: { ...complexParam('second factor'), required: true },
+      first_complex: { ...complexParam('first factor'), required: true },
+      second_complex: { ...complexParam('second factor'), required: true },
     },
     execute: (args) => {
-      const z = parseComplex(args.a).mul(parseComplex(args.b))
+      const z = parseComplex(args.first_complex).mul(parseComplex(args.second_complex))
       guardFinite(z, 'complex_mul')
       return serializeComplex(z, BaseUnit.DIMENSIONLESS)
     },
@@ -61,10 +61,10 @@ export const atomicTools = [
     name: 'complex_reciprocal',
     description: `Take the reciprocal of a complex number (z → 1/z). ${LOW_LEVEL_HINT}`,
     parameters: {
-      a: { ...complexParam('operand, must be non-zero'), required: true },
+      operand: { ...complexParam('operand, must be non-zero'), required: true },
     },
     execute: (args) => {
-      const a = parseComplex(args.a)
+      const a = parseComplex(args.operand)
       if (a.abs() === 0) throw new Error('reciprocal of zero is undefined')
       const z = a.inverse()
       guardFinite(z, 'complex_reciprocal')
