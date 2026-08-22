@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { serializeComplex } from './format.ts'
-import { BaseUnit } from './units.ts'
+import { serializeComplex, formatEngineering } from './format.ts'
+import { BaseUnit, Unit } from './units.ts'
+
+describe('formatEngineering', () => {
+  it('formats with SI prefixes (engineering notation)', () => {
+    expect(formatEngineering(2400, Unit.Frequency)).toBe('2.4 k')
+    expect(formatEngineering(1.5e-9, Unit.Capacitance)).toBe('1.5 n')
+    expect(formatEngineering(0.15, Unit.Voltage)).toBe('150 m')
+    expect(formatEngineering(5, Unit.Dimensionless)).toBe('5')
+  })
+})
 
 describe('serializeComplex', () => {
   it('always exposes both rectangular and polar forms', () => {

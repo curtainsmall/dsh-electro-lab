@@ -5,11 +5,33 @@
  * display strings.
  */
 import { Complex } from "complex.js";
-import { BaseUnit, UNIT_BY_BASE, engineeringFormat } from "./units.ts";
+import { BaseUnit, Prefix, PREFIX_SYMBOL, UNIT_BY_BASE, UNIT_DEFS, type Unit } from "./units.ts";
 
-function fmtNumber(value: number): string {
+function formatNumber(value: number): string {
   // Rectangular components: plain precision formatting (no prefix noise).
   return Number(value.toPrecision(6)).toString();
+}
+
+/**
+ * Engineering formatting: choose the largest prefix so the mantissa sits in
+ * [1, 1000), round to `digits` significant figures, strip trailing zeros.
+ * Returns e.g. "2.4 k" (unit appended by the caller), "1.5 n", "150 m".
+ */
+export function formatEngineering(value: number, unit: Unit, digits = 4): string {
+  const def = UNIT_DEFS[unit];
+  const abs = Math.abs(value);
+  if (abs === 0) return "0";
+  let symbol = "";
+  let factor = 0;
+  for (const prefix of def.prefixes) {
+    if (abs / prefix >= 1 && prefix > factor) {
+      symbol = PREFIX_SYMBOL[prefix] ?? "";
+      factor = prefix;
+    }
+  }
+  const mantissa = value / (factor === 0 ? 1 : factor);
+  const rounded = Number(mantissa.toPrecision(digits)).toString();
+  return symbol === "" ? rounded : `${rounded} ${symbol}`;
 }
 
 /**
@@ -33,12 +55,12 @@ export function serializeComplex(
   unit: string;
 } {
   const unitCategory = UNIT_BY_BASE[unit];
-  const real = fmtNumber(value.re);
+  const real = formatNumber(value.re);
   const imaginary = value.im;
-  const imaginaryAbs = fmtNumber(Math.abs(imaginary));
+  const imaginaryAbs = formatNumber(Math.abs(imaginary));
   const sign = imaginary < 0 ? "-" : "+";
   const unitStr = unit === BaseUnit.Dimensionless ? "" : ` ${unit}`;
-  const magnitude = engineeringFormat(value.abs(), unitCategory, 4);
+  const magnitude = formatEngineering(value.abs(), unitCategory, 4);
   const phaseDegrees = ((value.arg() * 180) / Math.PI).toFixed(2);
   return {
     real: value.re,

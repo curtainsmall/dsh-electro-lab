@@ -219,28 +219,6 @@ export function splitUnitToken(token: string): SplitUnit | undefined {
   return undefined
 }
 
-/**
- * Engineering formatting: choose the largest prefix so the mantissa sits in
- * [1, 1000), round to `digits` significant figures, strip trailing zeros.
- * Returns e.g. "2.4 k" (unit appended by the caller), "1.5 n", "150 m".
- */
-export function engineeringFormat(value: number, unit: Unit, digits = 4): string {
-  const def = UNIT_DEFS[unit]
-  const abs = Math.abs(value)
-  if (abs === 0) return '0'
-  let symbol = ''
-  let factor = 0
-  for (const prefix of def.prefixes) {
-    if (abs / prefix >= 1 && prefix > factor) {
-      symbol = PREFIX_SYMBOL[prefix] ?? ''
-      factor = prefix
-    }
-  }
-  const mantissa = value / (factor === 0 ? 1 : factor)
-  const rounded = Number(mantissa.toPrecision(digits)).toString()
-  return symbol === '' ? rounded : `${rounded} ${symbol}`
-}
-
 /** Pure relative tolerance comparison (no absolute floor). Zero matches zero exactly. */
 export function nearlyEqual(a: number, b: number, tol = 1e-9): boolean {
   if (a === 0 && b === 0) return true

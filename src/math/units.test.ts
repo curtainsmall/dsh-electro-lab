@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BaseUnit, Unit, engineeringFormat, unitFromToken, isNegligible, nearlyEqual, splitUnitToken } from './units.ts'
+import { unitFromToken, BaseUnit, Prefix, Unit, splitUnitToken, nearlyEqual, isNegligible } from './units.ts'
 
-describe('engineeringFormat', () => {
-  it('formats with SI prefixes (engineering notation)', () => {
-    expect(engineeringFormat(2400, Unit.Frequency)).toBe('2.4 k')
-    expect(engineeringFormat(1.5e-9, Unit.Capacitance)).toBe('1.5 n')
-    expect(engineeringFormat(0.15, Unit.Voltage)).toBe('150 m')
-    expect(engineeringFormat(5, Unit.Dimensionless)).toBe('5')
-  })
-})
 
 describe('nearlyEqual — pure relative tolerance', () => {
   it('is scale-invariant: works for pF and GΩ alike', () => {
