@@ -1,0 +1,31 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Guard: a semver tag is only allowed on main. ──
+  # If a v* tag is created on develop/feature (accidental trigger),
+  # this job fails fast and nothing downstream ever runs.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      on_main: ${{ steps.check.outputs.on_main }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so ancestry can be verified
+      - name: Verify tag is on main
+        id: check
+        run: |
+          if git merge-base --is-ancestor HEAD origin/main; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+            echo "✓ tag $GITHUB_REF_NAME ($(git rev-parse --short HEAD)) is reachable from main"
+          else
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+            echo "::error::tag $GITHUB_REF_NAME is NOT on main — release aborted (accidental tag?)"
+            exit 1
+          fi
