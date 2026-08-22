@@ -16,20 +16,20 @@ function guardFinite(z: Complex, label: string): void {
   if (!Number.isFinite(z.re) || !Number.isFinite(z.im)) throw new Error(`${label} produced a non-finite value`)
 }
 
-const LOW_LEVEL_HINT = 'Low-level primitive — prefer a concept-level tool (e.g. z_rlc_series, z_to_gamma, ac_power) whenever one fits; use this only to combine intermediate values.'
+const LOW_LEVEL_HINT = 'Low-level primitive — prefer a concept-level tool (e.g. z_rlc_series, z_to_gamma, ac_Power) whenever one fits; use this only to combine intermediate values.'
 
 export const atomicTools = [
   defineJsonTool({
     name: 'complex_add',
     description: `Add two complex numbers. ${LOW_LEVEL_HINT}`,
     parameters: {
-      first_complex: { ...complexParam('first operand'), required: true },
-      second_complex: { ...complexParam('second operand'), required: true },
+      firstComplex: { ...complexParam('first operand'), required: true },
+      SecondComplex: { ...complexParam('Second operand'), required: true },
     },
     execute: (args) => {
-      const z = parseComplex(args.first_complex).add(parseComplex(args.second_complex))
+      const z = parseComplex(args.firstComplex).add(parseComplex(args.SecondComplex))
       guardFinite(z, 'complex_add')
-      return serializeComplex(z, BaseUnit.DIMENSIONLESS)
+      return serializeComplex(z, BaseUnit.Dimensionless)
     },
   }),
   defineJsonTool({
@@ -41,20 +41,20 @@ export const atomicTools = [
     execute: (args) => {
       const z = parseComplex(args.operand).neg()
       guardFinite(z, 'complex_opposite')
-      return serializeComplex(z, BaseUnit.DIMENSIONLESS)
+      return serializeComplex(z, BaseUnit.Dimensionless)
     },
   }),
   defineJsonTool({
     name: 'complex_multiply',
     description: `Multiply two complex numbers. ${LOW_LEVEL_HINT}`,
     parameters: {
-      first_complex: { ...complexParam('first factor'), required: true },
-      second_complex: { ...complexParam('second factor'), required: true },
+      firstComplex: { ...complexParam('first factor'), required: true },
+      SecondComplex: { ...complexParam('Second factor'), required: true },
     },
     execute: (args) => {
-      const z = parseComplex(args.first_complex).mul(parseComplex(args.second_complex))
+      const z = parseComplex(args.firstComplex).mul(parseComplex(args.SecondComplex))
       guardFinite(z, 'complex_mul')
-      return serializeComplex(z, BaseUnit.DIMENSIONLESS)
+      return serializeComplex(z, BaseUnit.Dimensionless)
     },
   }),
   defineJsonTool({
@@ -68,7 +68,7 @@ export const atomicTools = [
       if (a.abs() === 0) throw new Error('reciprocal of zero is undefined')
       const z = a.inverse()
       guardFinite(z, 'complex_reciprocal')
-      return serializeComplex(z, BaseUnit.DIMENSIONLESS)
+      return serializeComplex(z, BaseUnit.Dimensionless)
     },
   }),
 ]

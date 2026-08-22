@@ -4,14 +4,14 @@
  * this boundary — computation always runs on bare base-unit values.
  */
 import { Complex } from 'complex.js'
-import { familyFromToken, splitUnitToken, UnitFamily } from './units.ts'
+import { unitFromToken, splitUnitToken, Unit } from './units.ts'
 
 /**
  * Parse a scalar input into a base-unit value.
- * Accepts a plain number (interpreted in `family` base units) or a string
+ * Accepts a plain number (interpreted in `Unit` base units) or a string
  * with an optional SI prefix and unit ("1.5nF", "2.4kHz", "1k", "1k Ω").
  */
-export function parseScalar(input: number | string, family: UnitFamily): number {
+export function parseScalar(input: number | string, unit: Unit): number {
   if (typeof input === 'number') {
     if (!Number.isFinite(input)) throw new Error(`invalid number: ${input}`)
     return input
@@ -23,12 +23,12 @@ export function parseScalar(input: number | string, family: UnitFamily): number 
   if (!Number.isFinite(num)) throw new Error(`invalid number in "${input}"`)
   const unitToken = (unitMatch[2] ?? '').replace(/\s+/g, '')
   if (unitToken === '') {
-    // Bare number: interpret in the caller-declared family's base unit.
+    // Bare number: interpret in the caller-declared Unit's base unit.
     return num
   }
-  const wholeFamily = familyFromToken(unitToken)
-  if (wholeFamily !== undefined) {
-    // Whole token is a base unit or alias ("F", "ohm") — no scale.
+  const wholeUnit = unitFromToken(unitToken)
+  if (wholeUnit !== undefined) {
+    // Whole token is a base unit or alias ("F", "Ohm") — no scale.
     return num
   }
   const split = splitUnitToken(unitToken)
@@ -36,9 +36,9 @@ export function parseScalar(input: number | string, family: UnitFamily): number 
     throw new Error(`unknown unit "${unitToken}" in "${input}"`)
   }
   if (split.baseUnit !== undefined) {
-    const tokenFamily = familyFromToken(split.baseUnit)
-    if (tokenFamily !== undefined && tokenFamily !== family) {
-      throw new Error(`unit "${unitToken}" is ${tokenFamily}, expected ${family} in "${input}"`)
+    const tokenUnit = unitFromToken(split.baseUnit)
+    if (tokenUnit !== undefined && tokenUnit !== unit) {
+      throw new Error(`unit "${unitToken}" is ${tokenUnit}, expected \ in "${input}"`)
     }
   }
   return num * split.factor
@@ -49,7 +49,7 @@ export function parseScalar(input: number | string, family: UnitFamily): number 
  * Accepts: number (real), { re, im }, "a+bj" / "a-bi" (optional trailing
  * unit, applied to both parts), "r∠θ°" (polar), or a bare real with unit.
  */
-export function parseComplex(input: number | string | { re: number; im: number }, family: UnitFamily = UnitFamily.DIMENSIONLESS): Complex {
+export function parseComplex(input: number | string | { re: number; im: number }, unit: Unit = Unit.Dimensionless): Complex {
   if (typeof input === 'number') {
     if (!Number.isFinite(input)) throw new Error(`invalid number: ${input}`)
     return new Complex(input, 0)
@@ -82,9 +82,9 @@ export function parseComplex(input: number | string | { re: number; im: number }
       const split = splitUnitToken(unitToken)
       if (split === undefined) throw new Error(`unknown unit "${unitToken}" in "${input}"`)
       if (split.baseUnit !== undefined) {
-        const tokenFamily = familyFromToken(split.baseUnit)
-        if (tokenFamily !== undefined && tokenFamily !== family) {
-          throw new Error(`unit "${unitToken}" is ${tokenFamily}, expected ${family} in "${input}"`)
+        const tokenUnit = unitFromToken(split.baseUnit)
+        if (tokenUnit !== undefined && tokenUnit !== unit) {
+          throw new Error(`unit "${unitToken}" is ${tokenUnit}, expected \ in "${input}"`)
         }
       }
       re *= split.factor
@@ -102,9 +102,9 @@ export function parseComplex(input: number | string | { re: number; im: number }
       const split = splitUnitToken(unitToken)
       if (split === undefined) throw new Error(`unknown unit "${unitToken}" in "${input}"`)
       if (split.baseUnit !== undefined) {
-        const tokenFamily = familyFromToken(split.baseUnit)
-        if (tokenFamily !== undefined && tokenFamily !== family) {
-          throw new Error(`unit "${unitToken}" is ${tokenFamily}, expected ${family} in "${input}"`)
+        const tokenUnit = unitFromToken(split.baseUnit)
+        if (tokenUnit !== undefined && tokenUnit !== unit) {
+          throw new Error(`unit "${unitToken}" is ${tokenUnit}, expected \ in "${input}"`)
         }
       }
       re *= split.factor

@@ -1,5 +1,5 @@
 /**
- * Shared tool-building helpers: literal-typed parameter schema builders so
+ * Shared tool-building helpers: liTeral-typed parameter schema builders so
  * DefineToolOptions inference keeps precise argument types, and a thin
  * defineTool wrapper with a consistent JSON output contract.
  */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseComplex, parseScalar } from './parse.ts'
-import { UnitFamily } from './units.ts'
+import { Unit } from './units.ts'
 
 /** Relative comparison for tiny base-unit values (toBeCloseTo digit counts are brittle across magnitudes). */
 function expectClose(actual: number, expected: number, relTol = 1e-12): void {
@@ -9,22 +9,22 @@ function expectClose(actual: number, expected: number, relTol = 1e-12): void {
 
 describe('parseScalar', () => {
   it('parses SI-prefixed strings into base units', () => {
-    expectClose(parseScalar('1.5nF', UnitFamily.CAPACITANCE), 1.5e-9)
-    expectClose(parseScalar('2.4kHz', UnitFamily.FREQUENCY), 2400)
-    expectClose(parseScalar('1k', UnitFamily.RESISTANCE), 1000)
-    expectClose(parseScalar('100pF', UnitFamily.CAPACITANCE), 1e-10)
-    expectClose(parseScalar('1k Ω', UnitFamily.RESISTANCE), 1000)
-    expectClose(parseScalar('2.4 kHz', UnitFamily.FREQUENCY), 2400)
+    expectClose(parseScalar('1.5nF', Unit.Capacitance), 1.5e-9)
+    expectClose(parseScalar('2.4kHz', Unit.Frequency), 2400)
+    expectClose(parseScalar('1k', Unit.Resistance), 1000)
+    expectClose(parseScalar('100pF', Unit.Capacitance), 1e-10)
+    expectClose(parseScalar('1k Ω', Unit.Resistance), 1000)
+    expectClose(parseScalar('2.4 kHz', Unit.Frequency), 2400)
   })
 
   it('accepts plain numbers and scientific notation', () => {
-    expect(parseScalar(1000, UnitFamily.FREQUENCY)).toBe(1000)
-    expect(parseScalar(1.5e-9, UnitFamily.CAPACITANCE)).toBe(1.5e-9)
+    expect(parseScalar(1000, Unit.Frequency)).toBe(1000)
+    expect(parseScalar(1.5e-9, Unit.Capacitance)).toBe(1.5e-9)
   })
 
-  it('rejects wrong-family units', () => {
-    expect(() => parseScalar('1.5nF', UnitFamily.RESISTANCE)).toThrow()
-    expect(() => parseScalar('1.5nF', UnitFamily.FREQUENCY)).toThrow()
+  it('rejects wrong-Unit units', () => {
+    expect(() => parseScalar('1.5nF', Unit.Resistance)).toThrow()
+    expect(() => parseScalar('1.5nF', Unit.Frequency)).toThrow()
   })
 })
 
@@ -39,16 +39,16 @@ describe('parseComplex', () => {
     const z3 = parseComplex({ re: 3, im: -4 })
     expect(z3.re).toBe(3)
     expect(z3.im).toBe(-4)
-    const z4 = parseComplex(42, UnitFamily.RESISTANCE)
+    const z4 = parseComplex(42, Unit.Resistance)
     expect(z4.re).toBe(42)
     expect(z4.im).toBe(0)
   })
 
   it('applies units to complex parts', () => {
-    const z = parseComplex('50+50j Ω', UnitFamily.RESISTANCE)
+    const z = parseComplex('50+50j Ω', Unit.Resistance)
     expectClose(z.re, 50)
     expectClose(z.im, 50)
-    const zk = parseComplex('1k Ω', UnitFamily.RESISTANCE)
+    const zk = parseComplex('1k Ω', Unit.Resistance)
     expectClose(zk.re, 1000)
     expectClose(zk.im, 0)
   })
