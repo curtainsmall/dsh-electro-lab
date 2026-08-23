@@ -6,13 +6,16 @@ import { Complex } from 'complex.js'
 import { toComplex, toScalar, serializeComplex, realValue } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
 import {
+  ElementRole,
+  MatchSide,
   MatchTopology,
+  MatchVariant,
   designMatch,
   reflectionToVswr,
-  lNetworkMatch,
   quarterWaveImpedance,
   returnLossDb,
   impedanceToReflection,
+  type MatchElement,
 } from '../math/smith.ts'
 import { defineJsonTool, valueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
@@ -70,7 +73,7 @@ export const smithTools = [
   }),
   defineJsonTool({
     name: 'l_network_match',
-    description: 'L-network matching two real resistances at a frequency. qualityFactor = √(Rl/Rs − 1); series element (reactance = qualityFactor·Rs) sits next to the smaller resistance, shunt element (reactance = Rl/qualityFactor) next to the larger. Returns both conjugate solutions (low-pass / high-pass) with inductance/capacitance values.',
+    description: 'L-network matching two real resistances at a frequency. qualityFactor = √(Rl/Rs − 1); series element (reactance = qualityFactor·Rs) sits next to the smaller resistance, shunt element (reactance = Rl/qualityFactor) next to the larger. Returns both conjugate solutions under "low-pass" / "high-pass" keys with inductance/capacitance values.',
     parameters: {
       sourceImpedance: { ...valueParam(Unit.Resistance, 'source impedance'), required: true },
       loadImpedance: { ...valueParam(Unit.Resistance, 'load impedance'), required: true },
@@ -80,33 +83,40 @@ export const smithTools = [
       const sourceImpedance = toScalar(args.sourceImpedance, Unit.Resistance)
       const loadImpedance = toScalar(args.loadImpedance, Unit.Resistance)
       const frequency = toScalar(args.frequency, Unit.Frequency)
-      const result = lNetworkMatch(sourceImpedance, loadImpedance, frequency)
-      if (result.matched) return { matched: true, note: 'source and load are already equal — no network needed' }
+      if (sourceImpedance === loadImpedance) return { matched: true, note: 'source and load are already equal — no network needed' }
+      const design = designMatch(MatchTopology.L, sourceImpedance, loadImpedance, frequency)
+      const angularFrequency = 2 * Math.PI * frequency
+      const seriesSide = design.solutions[MatchVariant.LowPass]![0]!.role === ElementRole.SeriesSource
+        ? MatchSide.Source
+        : MatchSide.Load
+      const serialize = (elements: MatchElement[]): Record<string, JsonValue> => {
+        const [series, shunt] = elements
+        const entry: Record<string, JsonValue> = {
+          seriesReactance: realValue(series!.reactance, Unit.Resistance),
+          shuntReactance: realValue(shunt!.reactance, Unit.Resistance),
+        }
+        if (series!.reactance > 0) entry.seriesInductance = realValue(series!.reactance / angularFrequency, Unit.Inductance)
+        if (series!.reactance < 0) entry.seriesCapacitance = realValue(-1 / (angularFrequency * series!.reactance), Unit.Capacitance)
+        if (shunt!.reactance > 0) entry.shuntInductance = realValue(shunt!.reactance / angularFrequency, Unit.Inductance)
+        if (shunt!.reactance < 0) entry.shuntCapacitance = realValue(-1 / (angularFrequency * shunt!.reactance), Unit.Capacitance)
+        return entry
+      }
       const out: Record<string, JsonValue> = {
         matched: false,
-        qualityFactor: realValue(result.qualityFactor as number, Unit.None),
-        seriesSide: result.seriesSide,
-        shuntSide: result.shuntSide,
-      }
-      if (result.solutions !== undefined) {
-        out.solutions = result.solutions.map((solution) => {
-          const entry: Record<string, JsonValue> = {
-            seriesReactance: realValue(solution.seriesReactance, Unit.Resistance),
-            shuntReactance: realValue(solution.shuntReactance, Unit.Resistance),
-          }
-          if (solution.seriesInductance !== undefined) entry.seriesInductance = realValue(solution.seriesInductance, Unit.Inductance)
-          if (solution.seriesCapacitance !== undefined) entry.seriesCapacitance = realValue(solution.seriesCapacitance, Unit.Capacitance)
-          if (solution.shuntInductance !== undefined) entry.shuntInductance = realValue(solution.shuntInductance, Unit.Inductance)
-          if (solution.shuntCapacitance !== undefined) entry.shuntCapacitance = realValue(solution.shuntCapacitance, Unit.Capacitance)
-          return entry
-        })
+        qualityFactor: realValue(design.qualityFactor, Unit.None),
+        seriesSide,
+        shuntSide: seriesSide === MatchSide.Source ? MatchSide.Load : MatchSide.Source,
+        solutions: {
+          [MatchVariant.LowPass]: serialize(design.solutions[MatchVariant.LowPass]),
+          [MatchVariant.HighPass]: serialize(design.solutions[MatchVariant.HighPass]),
+        },
       }
       return out
     },
   }),
   defineJsonTool({
     name: 'matched_network',
-    description: 'Design a matching network between two real resistances at a frequency. topology "l" uses the implied quality factor (√(Rl/Rs − 1)); "pi" and "t" need a specified qualityFactor greater than that minimum. Returns two conjugate solutions (low-pass / high-pass) as ordered element lists with reactances and L/C values.',
+    description: 'Design a matching network between two real resistances at a frequency. topology "l" uses the implied quality factor (√(Rl/Rs − 1)); "pi" and "t" need a specified qualityFactor greater than that minimum. Returns both conjugate solutions under "low-pass" / "high-pass" keys as ordered element lists with reactances and L/C values.',
     parameters: {
       topology: { type: 'string', enum: [MatchTopology.L, MatchTopology.Pi, MatchTopology.T], description: 'network topology', required: true },
       sourceImpedance: { ...valueParam(Unit.Resistance, 'source impedance'), required: true },
@@ -121,20 +131,23 @@ export const smithTools = [
       const qualityFactor = args.qualityFactor === undefined ? undefined : toScalar(args.qualityFactor, Unit.None)
       const design = designMatch(args.topology, sourceImpedance, loadImpedance, frequency, qualityFactor)
       const angularFrequency = 2 * Math.PI * frequency
+      const serialize = (elements: MatchElement[]): JsonValue[] =>
+        elements.map((element) => {
+          const entry: Record<string, JsonValue> = {
+            role: element.role,
+            reactance: realValue(element.reactance, Unit.Resistance),
+          }
+          if (element.reactance > 0) entry.inductance = realValue(element.reactance / angularFrequency, Unit.Inductance)
+          if (element.reactance < 0) entry.capacitance = realValue(-1 / (angularFrequency * element.reactance), Unit.Capacitance)
+          return entry
+        })
       return {
         topology: design.topology,
         qualityFactor: realValue(design.qualityFactor, Unit.None),
-        solutions: design.solutions.map((elements) => ({
-          elements: elements.map((element) => {
-            const entry: Record<string, JsonValue> = {
-              role: element.role,
-              reactance: realValue(element.reactance, Unit.Resistance),
-            }
-            if (element.reactance > 0) entry.inductance = realValue(element.reactance / angularFrequency, Unit.Inductance)
-            if (element.reactance < 0) entry.capacitance = realValue(-1 / (angularFrequency * element.reactance), Unit.Capacitance)
-            return entry
-          }),
-        })),
+        solutions: {
+          [MatchVariant.LowPass]: { elements: serialize(design.solutions[MatchVariant.LowPass]) },
+          [MatchVariant.HighPass]: { elements: serialize(design.solutions[MatchVariant.HighPass]) },
+        },
       }
     },
   }),

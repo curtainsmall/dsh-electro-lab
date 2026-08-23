@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { MatchSide, reflectionToVswr, lNetworkMatch, quarterWaveImpedance, returnLossDb, impedanceToReflection } from './smith.ts'
+import { ElementRole, MatchTopology, MatchVariant, designMatch, quarterWaveImpedance, returnLossDb, impedanceToReflection, reflectionToVswr } from './smith.ts'
 
 describe('impedance_to_reflection (textbook check)', () => {
   it('Z = 50 + j50 Ω on a 50 Ω line → Γ = 0.447∠63.43°', () => {
@@ -51,27 +51,18 @@ describe('quarter-wave transformer', () => {
 
 describe('L-network match', () => {
   it('50 Ω → 100 Ω at 1 MHz: Q = 1, Xs = 50, Xp = 100', () => {
-    const result = lNetworkMatch(50, 100, 1e6)
-    expect(result.matched).toBe(false)
-    expect(result.qualityFactor).toBeCloseTo(1, 6)
-    expect(result.seriesSide).toBe('source') // smaller R (50) on source side
-    expect(result.shuntSide).toBe('load')
-    const solutions = result.solutions!
-    const a = solutions[0]!
-    const b = solutions[1]!
-    // Solution A: Xs = +50 (L = 7.96 µH), Xp = −100 (C = 1.59 nF)
-    expect(a.seriesReactance).toBeCloseTo(50, 6)
-    expect(a.shuntReactance).toBeCloseTo(-100, 6)
-    expect(a.seriesInductance).toBeCloseTo(50 / (2 * Math.PI * 1e6), 8)
-    expect(a.shuntCapacitance).toBeCloseTo(1 / (2 * Math.PI * 1e6 * 100), 12)
-    // Solution B: mirror image
-    expect(b.seriesReactance).toBeCloseTo(-50, 6)
-    expect(b.shuntReactance).toBeCloseTo(100, 6)
-    expect(b.seriesCapacitance).toBeCloseTo(1 / (2 * Math.PI * 1e6 * 50), 12)
-    expect(b.shuntInductance).toBeCloseTo(100 / (2 * Math.PI * 1e6), 8)
-  })
-
-  it('reports matched when equal', () => {
-    expect(lNetworkMatch(50, 50, 1e6).matched).toBe(true)
+    const design = designMatch(MatchTopology.L, 50, 100, 1e6)
+    expect(design.qualityFactor).toBeCloseTo(1, 6)
+    const lowPass = design.solutions[MatchVariant.LowPass]!
+    const highPass = design.solutions[MatchVariant.HighPass]!
+    // series arm sits next to the smaller resistance (50 Ω, source side)
+    expect(lowPass[0]!.role).toBe(ElementRole.SeriesSource)
+    expect(lowPass[1]!.role).toBe(ElementRole.ShuntLoad)
+    // Low-pass: Xs = +50, Xp = −100 (L + C)
+    expect(lowPass[0]!.reactance).toBeCloseTo(50, 6)
+    expect(lowPass[1]!.reactance).toBeCloseTo(-100, 6)
+    // High-pass: mirror image
+    expect(highPass[0]!.reactance).toBeCloseTo(-50, 6)
+    expect(highPass[1]!.reactance).toBeCloseTo(100, 6)
   })
 })

@@ -30,6 +30,12 @@ export enum ElementRole {
   SeriesLoad = 'series-load',
 }
 
+/** Which conjugate solution a matching design represents. */
+export enum MatchVariant {
+  LowPass = 'low-pass',
+  HighPass = 'high-pass',
+}
+
 // ── Types and pure mappings ──────────────────────────────────────────────
 
 /** One signed reactance in a matching network (positive = inductive). */
@@ -38,14 +44,14 @@ export interface MatchElement {
   reactance: number
 }
 
-/** A designed matching network: ordered elements per solution. */
+/** A designed matching network: ordered elements per named solution. */
 export interface MatchDesign {
   topology: MatchTopology
   qualityFactor: number
-  solutions: MatchElement[][]
+  solutions: Record<MatchVariant, MatchElement[]>
 }
 
-/** Pure mappings: match side → element role (used by designMatch). */
+/** Pure mappings: match side → element role (used by lNetworkMatch). */
 const SHUNT_ROLE: Record<MatchSide, ElementRole.ShuntSource | ElementRole.ShuntLoad> = {
   [MatchSide.Source]: ElementRole.ShuntSource,
   [MatchSide.Load]: ElementRole.ShuntLoad,
@@ -92,21 +98,14 @@ export function quarterWaveImpedance(lineImpedance: number, loadImpedance: numbe
 /**
  * L-network matching between two real resistances.
  * Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the SMALLER, shunt element (X = Rl/Q) next to the LARGER one.
- * Two conjugate solutions (low-pass / high-pass variants) are returned.
+ * Two conjugate solutions (low-pass / high-pass variants) are returned as ordered element lists.
  */
-export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, frequency: number): {
+function lNetworkMatch(sourceImpedance: number, loadImpedance: number, frequency: number): {
   matched: boolean
   qualityFactor?: number
   seriesSide: MatchSide
   shuntSide: MatchSide
-  solutions?: {
-    seriesReactance: number
-    shuntReactance: number
-    seriesInductance?: number
-    seriesCapacitance?: number
-    shuntInductance?: number
-    shuntCapacitance?: number
-  }[]
+  solutions?: Record<MatchVariant, MatchElement[]>
 } {
   if (sourceImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
   if (frequency <= 0) throw new Error('frequency must be positive (Hz)')
@@ -118,22 +117,23 @@ export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, fr
   const qualityFactor = Math.sqrt(larger / smaller - 1)
   const seriesReactance = qualityFactor * smaller
   const shuntReactance = larger / qualityFactor
-  const w = 2 * Math.PI * frequency
-  const elements = (xs: number, xp: number) => ({
-    seriesInductance: xs > 0 ? xs / w : undefined,
-    seriesCapacitance: xs < 0 ? -1 / (w * xs) : undefined,
-    shuntInductance: xp > 0 ? xp / w : undefined,
-    shuntCapacitance: xp < 0 ? -1 / (w * xp) : undefined,
-  })
+  const seriesRole = SERIES_ROLE[seriesSide]
+  const shuntRole = SHUNT_ROLE[shuntSide]
   return {
     matched: false,
     qualityFactor,
     seriesSide,
     shuntSide,
-    solutions: [
-      { seriesReactance, shuntReactance: -shuntReactance, ...elements(seriesReactance, -shuntReactance) },
-      { seriesReactance: -seriesReactance, shuntReactance, ...elements(-seriesReactance, shuntReactance) },
-    ],
+    solutions: {
+      [MatchVariant.LowPass]: [
+        { role: seriesRole, reactance: seriesReactance },
+        { role: shuntRole, reactance: -shuntReactance },
+      ],
+      [MatchVariant.HighPass]: [
+        { role: seriesRole, reactance: -seriesReactance },
+        { role: shuntRole, reactance: shuntReactance },
+      ],
+    },
   }
 }
 
@@ -143,7 +143,7 @@ export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, fr
  *   Rint = Rs/(1+Q²); Xp1 = Rs/Q; Q2 = √(Rl/Rint − 1);
  *   Xp2 = Rl/Q2; Xs = Rint·(Q + Q2).
  */
-export function piNetworkMatch(sourceImpedance: number, loadImpedance: number, qualityFactor: number): MatchElement[][] {
+function piNetworkMatch(sourceImpedance: number, loadImpedance: number, qualityFactor: number): Record<MatchVariant, MatchElement[]> {
   const [small, large, flipped] = sourceImpedance <= loadImpedance
     ? [sourceImpedance, loadImpedance, false]
     : [loadImpedance, sourceImpedance, true]
@@ -159,18 +159,18 @@ export function piNetworkMatch(sourceImpedance: number, loadImpedance: number, q
   const xs = rint * (q + q2)
   const shuntSource = flipped ? ElementRole.ShuntLoad : ElementRole.ShuntSource
   const shuntLoad = flipped ? ElementRole.ShuntSource : ElementRole.ShuntLoad
-  return [
-    [
+  return {
+    [MatchVariant.LowPass]: [
       { role: shuntSource, reactance: -xp1 },
       { role: ElementRole.Series, reactance: xs },
       { role: shuntLoad, reactance: -xp2 },
     ],
-    [
+    [MatchVariant.HighPass]: [
       { role: shuntSource, reactance: xp1 },
       { role: ElementRole.Series, reactance: -xs },
       { role: shuntLoad, reactance: xp2 },
     ],
-  ]
+  }
 }
 
 /**
@@ -183,7 +183,7 @@ export function piNetworkMatch(sourceImpedance: number, loadImpedance: number, q
  * Rp is solved implicitly from the specified Q (bisection), then:
  *   Xs1 = Q1·Rs; Xs2 = Q2·Rl; Xp = Rp/Q.
  */
-export function tNetworkMatch(sourceImpedance: number, loadImpedance: number, qualityFactor: number): MatchElement[][] {
+function tNetworkMatch(sourceImpedance: number, loadImpedance: number, qualityFactor: number): Record<MatchVariant, MatchElement[]> {
   const [small, large, flipped] = sourceImpedance <= loadImpedance
     ? [sourceImpedance, loadImpedance, false]
     : [loadImpedance, sourceImpedance, true]
@@ -209,18 +209,18 @@ export function tNetworkMatch(sourceImpedance: number, loadImpedance: number, qu
   const xp = rp / qualityFactor
   const seriesSource = flipped ? ElementRole.SeriesLoad : ElementRole.SeriesSource
   const seriesLoad = flipped ? ElementRole.SeriesSource : ElementRole.SeriesLoad
-  return [
-    [
+  return {
+    [MatchVariant.LowPass]: [
       { role: seriesSource, reactance: xs1 },
       { role: ElementRole.ShuntSource, reactance: -xp },
       { role: seriesLoad, reactance: xs2 },
     ],
-    [
+    [MatchVariant.HighPass]: [
       { role: seriesSource, reactance: -xs1 },
       { role: ElementRole.ShuntSource, reactance: xp },
       { role: seriesLoad, reactance: -xs2 },
     ],
-  ]
+  }
 }
 
 /** Design any supported matching topology; 'l' uses the implied Q, 'pi'/'t' need a specified Q. */
@@ -248,13 +248,7 @@ export function designMatch(
     case MatchTopology.L: {
       const result = lNetworkMatch(sourceImpedance, loadImpedance, frequency)
       if (result.matched) throw new Error('source and load are already equal — no network needed')
-      const shuntRole = SHUNT_ROLE[result.shuntSide]
-      const seriesRole = SERIES_ROLE[result.seriesSide]
-      const solutions: MatchElement[][] = result.solutions!.map((solution) => [
-        { role: seriesRole, reactance: solution.seriesReactance },
-        { role: shuntRole, reactance: solution.shuntReactance },
-      ])
-      return { topology, qualityFactor: result.qualityFactor!, solutions }
+      return { topology, qualityFactor: result.qualityFactor!, solutions: result.solutions! }
     }
   }
 }

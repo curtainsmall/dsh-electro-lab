@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { MatchTopology, designMatch, type MatchElement } from './smith.ts'
+import { MatchTopology, MatchVariant, designMatch, type MatchElement } from './smith.ts'
 import { ElementKind, networkImpedance } from './circuits.ts'
 import { CircuitMode } from './circuits.ts'
 
@@ -65,11 +65,14 @@ function tInputImpedance(elements: MatchElement[], loadImpedance: number): Compl
 describe('piNetworkMatch — round-trip through networkImpedance', () => {
   it('50 Ω → 100 Ω at Q = 5: input impedance returns to 50 + j0', () => {
     const design = designMatch(MatchTopology.Pi, 50, 100, F, 5)
-    for (const solution of design.solutions) {
+    for (const solution of Object.values(design.solutions)) {
       const zin = piInputImpedance(solution, 100)
       expect(zin.re).toBeCloseTo(50, 6)
       expect(zin.im).toBeCloseTo(0, 4)
     }
+    // the low-pass variant carries the inductive series arm
+    expect(design.solutions[MatchVariant.LowPass]![1]!.reactance).toBeGreaterThan(0)
+    expect(design.solutions[MatchVariant.HighPass]![1]!.reactance).toBeLessThan(0)
   })
 
   it('rejects Q at or below the L-network minimum', () => {
@@ -80,11 +83,15 @@ describe('piNetworkMatch — round-trip through networkImpedance', () => {
 describe('tNetworkMatch — round-trip through networkImpedance', () => {
   it('50 Ω → 100 Ω at Q = 5: input impedance returns to 50 + j0', () => {
     const design = designMatch(MatchTopology.T, 50, 100, F, 5)
-    for (const solution of design.solutions) {
+    for (const solution of Object.values(design.solutions)) {
       const zin = tInputImpedance(solution, 100)
       expect(zin.re).toBeCloseTo(50, 6)
       expect(zin.im).toBeCloseTo(0, 4)
     }
+    // the low-pass variant carries the inductive series arms
+    expect(design.solutions[MatchVariant.LowPass]![0]!.reactance).toBeGreaterThan(0)
+    expect(design.solutions[MatchVariant.LowPass]![2]!.reactance).toBeGreaterThan(0)
+    expect(design.solutions[MatchVariant.HighPass]![0]!.reactance).toBeLessThan(0)
   })
 
   it('rejects Q at or below the L-network minimum', () => {
@@ -96,7 +103,12 @@ describe('designMatch — l topology and guards', () => {
   it('l topology derives its implied Q (50 → 100 gives Q = 1)', () => {
     const design = designMatch(MatchTopology.L, 50, 100, F)
     expect(design.qualityFactor).toBeCloseTo(1, 6)
-    expect(design.solutions).toHaveLength(2)
+    // both named variants present, each a two-element L network
+    expect(design.solutions[MatchVariant.LowPass]).toHaveLength(2)
+    expect(design.solutions[MatchVariant.HighPass]).toHaveLength(2)
+    // low-pass = series inductive, high-pass = series capacitive
+    expect(design.solutions[MatchVariant.LowPass]![0]!.reactance).toBeGreaterThan(0)
+    expect(design.solutions[MatchVariant.HighPass]![0]!.reactance).toBeLessThan(0)
   })
 
   it('rejects equal impedances and invalid inputs', () => {
