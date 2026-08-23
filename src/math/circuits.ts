@@ -2,8 +2,13 @@
  * Circuit mathematics. All functions operate on SI base units (Hz, Ω, F, H,
  * V, A, s) and return plain numbers / complex.js values; engineering
  * presentation is the tools' job.
+ *
+ * Declaration order: enums, then types, then module-private helpers, then
+ * public functions grouped by concept.
  */
 import { Complex } from "complex.js";
+
+// ── Enums ────────────────────────────────────────────────────────────────
 
 /** Circuit topology mode. */
 export enum CircuitMode {
@@ -17,12 +22,6 @@ export enum SwitchingMode {
   Discharge = 'discharge',
 }
 
-function omega(frequency: number): number {
-  if (!Number.isFinite(frequency) || frequency <= 0)
-    throw new Error("frequency must be a finite positive number (Hz)");
-  return 2 * Math.PI * frequency;
-}
-
 /** Lumped element kind. */
 export enum ElementKind {
   Resistance = 'resistance',
@@ -34,6 +33,28 @@ export enum ElementKind {
 export enum Connection {
   Series = 'series',
   Shunt = 'shunt',
+}
+
+// ── Types ────────────────────────────────────────────────────────────────
+
+/** A network node: one lumped element, or a nested series/parallel group. */
+export type NetworkElement =
+  | { kind: ElementKind; value: number }
+  | { topology: CircuitMode; elements: NetworkElement[] };
+
+/** One transient sample point. */
+export interface TransientPoint {
+  time: number
+  voltage: number
+  current: number
+}
+
+// ── Private helpers ──────────────────────────────────────────────────────
+
+function omega(frequency: number): number {
+  if (!Number.isFinite(frequency) || frequency <= 0)
+    throw new Error("frequency must be a finite positive number (Hz)");
+  return 2 * Math.PI * frequency;
 }
 
 /** Impedance of one lumped element at a frequency: R, jωL, 1/(jωC).
@@ -53,6 +74,8 @@ function elementImpedance(
       return new Complex(0, -1 / (w * value));
   }
 }
+
+// ── Impedance primitives ─────────────────────────────────────────────────
 
 /** Series combination: Z = Σ Zi. */
 export function seriesOf(impedances: readonly Complex[]): Complex {
@@ -77,11 +100,6 @@ export function parallelOf(impedances: readonly Complex[]): Complex {
   return admittance.inverse();
 }
 
-/** A network node: one lumped element, or a nested series/parallel group. */
-export type NetworkElement =
-  | { kind: ElementKind; value: number }
-  | { topology: CircuitMode; elements: NetworkElement[] };
-
 /** Total impedance of a (possibly nested) network at a frequency. */
 export function networkImpedance(
   node: NetworkElement,
@@ -96,6 +114,8 @@ export function networkImpedance(
       return parallelOf(parts);
   }
 }
+
+// ── Scalar concepts ──────────────────────────────────────────────────────
 
 /** Series resonance: resonantFrequency = 1/(2π√(LC)). Q and bandwidth need R (mode-aware). */
 export function resonance(
@@ -146,6 +166,8 @@ export function acPower(
     powerFactor: Math.cos(phi),
   };
 }
+
+// ── Transients ───────────────────────────────────────────────────────────
 
 /** RC transient. mode charge: v(t) = Vs(1−e^(−t/τ)); discharge: v(t) = V0·e^(−t/τ). */
 export function rcTransient(
@@ -203,13 +225,6 @@ export function rlTransient(
       break;
   }
   return { current, voltage, timeConstant };
-}
-
-/** One transient sample point. */
-export interface TransientPoint {
-  time: number
-  voltage: number
-  current: number
 }
 
 /** RC transient evaluated at a list of time points (batch call for curves). */

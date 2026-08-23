@@ -1,7 +1,62 @@
 /**
  * Smith-chart mathematics. SI base units; plain complex.js values.
+ *
+ * Declaration order: enums, then types and pure mappings, then public
+ * functions grouped by concept (reflection trio, transformer, matching).
  */
 import { Complex } from 'complex.js'
+
+// ── Enums ────────────────────────────────────────────────────────────────
+
+/** Which side of a match the network element sits on. */
+export enum MatchSide {
+  Source = 'source',
+  Load = 'load',
+}
+
+/** Matching topology. */
+export enum MatchTopology {
+  L = 'l',
+  Pi = 'pi',
+  T = 't',
+}
+
+/** Role of one element inside a matching network. */
+export enum ElementRole {
+  ShuntSource = 'shunt-source',
+  Series = 'series',
+  ShuntLoad = 'shunt-load',
+  SeriesSource = 'series-source',
+  SeriesLoad = 'series-load',
+}
+
+// ── Types and pure mappings ──────────────────────────────────────────────
+
+/** One signed reactance in a matching network (positive = inductive). */
+export interface MatchElement {
+  role: ElementRole
+  reactance: number
+}
+
+/** A designed matching network: ordered elements per solution. */
+export interface MatchDesign {
+  topology: MatchTopology
+  qualityFactor: number
+  solutions: MatchElement[][]
+}
+
+/** Pure mappings: match side → element role (used by designMatch). */
+const SHUNT_ROLE: Record<MatchSide, ElementRole.ShuntSource | ElementRole.ShuntLoad> = {
+  [MatchSide.Source]: ElementRole.ShuntSource,
+  [MatchSide.Load]: ElementRole.ShuntLoad,
+}
+
+const SERIES_ROLE: Record<MatchSide, ElementRole.SeriesSource | ElementRole.SeriesLoad> = {
+  [MatchSide.Source]: ElementRole.SeriesSource,
+  [MatchSide.Load]: ElementRole.SeriesLoad,
+}
+
+// ── Reflection trio ──────────────────────────────────────────────────────
 
 /** Reflection coefficient: Γ = (Z − Z0) / (Z + Z0). */
 export function impedanceToReflection(impedance: Complex, referenceImpedance: number): Complex {
@@ -24,17 +79,15 @@ export function returnLossDb(reflectionCoefficient: Complex): number {
   return -20 * Math.log10(magnitude)
 }
 
+// ── Transformer ──────────────────────────────────────────────────────────
+
 /** Quarter-wave transformer: Z1 = √(Z0·ZL). ZL must be real and positive. */
 export function quarterWaveImpedance(lineImpedance: number, loadImpedance: number): number {
   if (lineImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
   return Math.sqrt(lineImpedance * loadImpedance)
 }
 
-/** Which side of a match the network element sits on. */
-export enum MatchSide {
-  Source = 'source',
-  Load = 'load',
-}
+// ── Matching networks ────────────────────────────────────────────────────
 
 /**
  * L-network matching between two real resistances.
@@ -82,46 +135,6 @@ export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, fr
       { seriesReactance: -seriesReactance, shuntReactance, ...elements(-seriesReactance, shuntReactance) },
     ],
   }
-}
-
-/** Matching topology. */
-export enum MatchTopology {
-  L = 'l',
-  Pi = 'pi',
-  T = 't',
-}
-
-/** Role of one element inside a matching network. */
-export enum ElementRole {
-  ShuntSource = 'shunt-source',
-  Series = 'series',
-  ShuntLoad = 'shunt-load',
-  SeriesSource = 'series-source',
-  SeriesLoad = 'series-load',
-}
-
-/** Pure mappings: match side → element role (used by designMatch). */
-const SHUNT_ROLE: Record<MatchSide, ElementRole.ShuntSource | ElementRole.ShuntLoad> = {
-  [MatchSide.Source]: ElementRole.ShuntSource,
-  [MatchSide.Load]: ElementRole.ShuntLoad,
-}
-
-const SERIES_ROLE: Record<MatchSide, ElementRole.SeriesSource | ElementRole.SeriesLoad> = {
-  [MatchSide.Source]: ElementRole.SeriesSource,
-  [MatchSide.Load]: ElementRole.SeriesLoad,
-}
-
-/** One signed reactance in a matching network (positive = inductive). */
-export interface MatchElement {
-  role: ElementRole
-  reactance: number
-}
-
-/** A designed matching network: ordered elements per solution. */
-export interface MatchDesign {
-  topology: MatchTopology
-  qualityFactor: number
-  solutions: MatchElement[][]
 }
 
 /**
