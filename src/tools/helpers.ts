@@ -3,7 +3,7 @@
  * the JSON output contract, and a thin defineTool wrapper.
  */
 import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec, type ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
-import type { JsonValue } from '@deepseek-ai/dsh-tools'
+import type { JsonValue, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { Unit } from '../math/units.ts'
 
 /**
@@ -96,16 +96,17 @@ export function renderText(value: JsonValue): Array<{ type: 'text'; text: string
 /**
  * Define a tool whose output is an unconstrained JSON value rendered as
  * pretty text. `execute` may be synchronous; it is wrapped into the async
- * contract the registry expects.
+ * contract the registry expects. The execution context is passed through
+ * so orchestrator tools can propagate cancellation and parent tokens.
  */
 export function defineJsonTool<S extends ParameterSchemaSpec>(
   options: Omit<DefineToolOptions<S, { type: 'json' }>, 'output' | 'execute'> & {
-    execute: (args: InferArgs<S>) => JsonValue | Promise<JsonValue>
+    execute: (args: InferArgs<S>, exec: ToolRunContext) => JsonValue | Promise<JsonValue>
   },
 ) {
   return defineTool({
     ...options,
-    execute: (args, exec) => Promise.resolve(options.execute(args)),
+    execute: (args, exec) => Promise.resolve(options.execute(args, exec)),
     output: {
       schema: { type: 'json' },
       render: (args, value) => renderText(value as JsonValue),
