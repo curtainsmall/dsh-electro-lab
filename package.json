@@ -52,7 +52,8 @@
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "^0.1.0-rc.7",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.7",
-    "cordis": "^4.0.0-rc.8"
+    "cordis": "^4.0.0-rc.8",
+    "react": "^18.2.0"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-tools": {
@@ -60,14 +61,19 @@
     },
     "cordis": {
       "optional": true
+    },
+    "react": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@deepseek-ai/dsh-llm": "0.1.0-rc.7",
     "@deepseek-ai/dsh-tools": "0.1.0-rc.7",
     "@types/node": "^24.0.0",
+    "@types/react": "^18.3.1",
     "complex.js": "^2.4.3",
     "cordis": "^4.0.0-rc.8",
+    "react": "^18.2.0",
     "tsdown": "^0.22.2",
     "typescript": "^5.6.0",
     "vitest": "^4.1.11"
