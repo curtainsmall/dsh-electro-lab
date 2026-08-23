@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { CircuitMode, SwitchingMode } from './enums.ts'
 import {
+  CircuitMode,
+  SwitchingMode,
   acPower,
   parallelImpedance,
   parallelTwo,

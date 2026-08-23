@@ -17,6 +17,7 @@ Use when the user asks for a worked electrical/electronics calculation (exact nu
    - polar: `{"form": "polar", "mag": …, "angDeg": …, "unit": "frequency"}` (or `angRad` in radians)
    Values are SI base units; `unit` is the semantic category (`frequency`, `resistance`, `capacitance`, `inductance`, `voltage`, `current`, `power`, `time`, `none`, `angle`, `log`).
    To pass the full output of an earlier step into a later one, use the string `"@stepN"` (e.g. `"@step0"`) as that argument.
+   Build networks from primitives: `element_impedance` (one R/L/C at a frequency), `series_impedance` / `parallel_impedance` (combine impedance lists), or `circuit_impedance` (a whole nested network tree in one call).
 4. **Narrate** — go through `stepResults` in order. For each step say: what it computes, the formula, and the result using the output's `mag` and `angDeg` fields (engineers' notation). Never recompute values yourself — read them from stepResults.
 5. **Conclude** — summarize the final answer with its unit.
 

@@ -4,12 +4,87 @@
  * presentation is the tools' job.
  */
 import { Complex } from "complex.js";
-import { CircuitMode, SwitchingMode } from "./enums.ts";
+
+/** Circuit topology mode. */
+export enum CircuitMode {
+  Series = 'series',
+  Parallel = 'parallel',
+}
+
+/** Switching state mode. */
+export enum SwitchingMode {
+  Charge = 'charge',
+  Discharge = 'discharge',
+}
 
 function omega(frequency: number): number {
   if (!Number.isFinite(frequency) || frequency <= 0)
     throw new Error("frequency must be a finite positive number (Hz)");
   return 2 * Math.PI * frequency;
+}
+
+/** Lumped element kind. */
+export enum ElementKind {
+  Resistance = 'resistance',
+  Inductance = 'inductance',
+  Capacitance = 'capacitance',
+}
+
+/** Impedance of one lumped element at a frequency: R, jωL, 1/(jωC). */
+export function elementImpedance(
+  kind: ElementKind,
+  value: number,
+  frequency: number,
+): Complex {
+  const w = omega(frequency);
+  switch (kind) {
+    case ElementKind.Resistance:
+      return new Complex(value, 0);
+    case ElementKind.Inductance:
+      return new Complex(0, w * value);
+    case ElementKind.Capacitance:
+      return new Complex(0, -1 / (w * value));
+  }
+}
+
+/** Series combination: Z = Σ Zi. */
+export function seriesOf(impedances: readonly Complex[]): Complex {
+  if (impedances.length === 0)
+    throw new Error("series combination needs at least one impedance");
+  return impedances.reduce(
+    (sum, impedance) => sum.add(impedance),
+    new Complex(0, 0),
+  );
+}
+
+/** Parallel combination: 1/Z = Σ 1/Zi. */
+export function parallelOf(impedances: readonly Complex[]): Complex {
+  if (impedances.length === 0)
+    throw new Error("parallel combination needs at least one impedance");
+  const admittance = impedances.reduce(
+    (sum, impedance) => sum.add(impedance.inverse()),
+    new Complex(0, 0),
+  );
+  if (admittance.abs() === 0)
+    throw new Error("parallel combination has zero total admittance (all open)");
+  return admittance.inverse();
+}
+
+/** A network node: one lumped element, or a nested series/parallel group. */
+export type NetworkElement =
+  | { kind: ElementKind; value: number }
+  | { topology: CircuitMode; elements: NetworkElement[] };
+
+/** Total impedance of a (possibly nested) network at a frequency. */
+export function networkImpedance(
+  node: NetworkElement,
+  frequency: number,
+): Complex {
+  if ("kind" in node) return elementImpedance(node.kind, node.value, frequency);
+  const parts = node.elements.map((child) => networkImpedance(child, frequency));
+  return node.topology === CircuitMode.Series
+    ? seriesOf(parts)
+    : parallelOf(parts);
 }
 
 /** Series RLC impedance: Z = R + jωL + 1/(jωC). Omit L=0 / C=0 terms. */

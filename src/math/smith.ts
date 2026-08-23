@@ -2,7 +2,6 @@
  * Smith-chart mathematics. SI base units; plain complex.js values.
  */
 import { Complex } from 'complex.js'
-import { MatchSide } from './enums.ts'
 
 /** Reflection coefficient: Γ = (Z − Z0) / (Z + Z0). */
 export function impedanceToReflection(impedance: Complex, referenceImpedance: number): Complex {
@@ -29,6 +28,12 @@ export function returnLossDb(reflectionCoefficient: Complex): number {
 export function quarterWaveImpedance(lineImpedance: number, loadImpedance: number): number {
   if (lineImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
   return Math.sqrt(lineImpedance * loadImpedance)
+}
+
+/** Which side of a match the network element sits on. */
+export enum MatchSide {
+  Source = 'source',
+  Load = 'load',
 }
 
 /**

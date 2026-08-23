@@ -1,69 +1,82 @@
 /**
- * Concept-level circuit tools: one textbook concept per tool.
- * IO is JSON-and-complex-only: every value is { re, im, unit }.
+ * Concept-level circuit tools: primitives (element/series/parallel/circuit
+ * impedance) plus scalar concepts. IO is JSON-and-complex-only.
  */
-import { Complex } from 'complex.js'
-import { toComplex, toScalar, serializeComplex, realValue } from '../math/convert.ts'
-import { Unit } from '../math/units.ts'
-import { CircuitMode, SwitchingMode } from '../math/enums.ts'
 import {
+  CircuitMode,
+  ElementKind,
+  SwitchingMode,
   acPower,
-  parallelImpedance,
-  parallelTwo,
+  networkImpedance,
+  parallelOf,
   rcTransient,
   resonance,
   rlTransient,
-  seriesImpedance,
+  seriesOf,
+  type NetworkElement,
 } from '../math/circuits.ts'
+import { toComplex, toScalar, serializeComplex, realValue } from '../math/convert.ts'
+import { Unit } from '../math/units.ts'
 import { defineJsonTool, valueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const circuitTools = [
   defineJsonTool({
-    name: 'rlc_series_impedance',
-    description: 'Total impedance of a series RLC network: Z = R + jωL + 1/(jωC). Set inductance/capacitance to 0 to omit that element.',
+    name: 'element_impedance',
+    description: 'Impedance of one lumped element at a frequency: resistance → R, inductance → jωL, capacitance → 1/(jωC). value is in base SI units (Ω, H, F) per kind.',
     parameters: {
+      kind: { type: 'string', enum: [ElementKind.Resistance, ElementKind.Inductance, ElementKind.Capacitance], description: 'element kind', required: true },
+      value: { type: 'number', description: 'element value in base SI units (Ω for resistance, H for inductance, F for capacitance)', required: true },
       frequency: { ...valueParam(Unit.Frequency, 'frequency'), required: true },
-      resistance: { ...valueParam(Unit.Resistance, 'resistance'), required: true },
-      inductance: { ...valueParam(Unit.Inductance, 'inductance'), required: true },
-      capacitance: { ...valueParam(Unit.Capacitance, 'capacitance'), required: true },
     },
     execute: (args) => {
       const frequency = toScalar(args.frequency, Unit.Frequency)
-      const resistance = toScalar(args.resistance, Unit.Resistance)
-      const inductance = toScalar(args.inductance, Unit.Inductance)
-      const capacitance = toScalar(args.capacitance, Unit.Capacitance)
-      return serializeComplex(seriesImpedance(frequency, resistance, inductance, capacitance), Unit.Resistance)
+      return serializeComplex(elementImpedanceOf(args.kind, args.value, frequency), Unit.Resistance)
     },
   }),
   defineJsonTool({
-    name: 'rlc_parallel_impedance',
-    description: 'Total impedance of a parallel RLC network: 1/Z = 1/R + 1/(jωL) + jωC. Omit resistance for a pure LC tank; set inductance/capacitance to 0 to omit that element.',
+    name: 'series_impedance',
+    description: 'Total impedance of impedances in series: Z = Σ Zi. Pass each impedance as a complex value object; earlier step outputs may be referenced with @stepN in solve_steps.',
     parameters: {
-      frequency: { ...valueParam(Unit.Frequency, 'frequency'), required: true },
-      resistance: { ...valueParam(Unit.Resistance, 'resistance, omit for pure LC') },
-      inductance: { ...valueParam(Unit.Inductance, 'inductance'), required: true },
-      capacitance: { ...valueParam(Unit.Capacitance, 'capacitance'), required: true },
+      impedances: {
+        type: 'array',
+        description: 'impedances to combine in series',
+        required: true,
+        items: valueParam(Unit.Resistance, 'impedance'),
+      },
     },
     execute: (args) => {
-      const frequency = toScalar(args.frequency, Unit.Frequency)
-      const resistance = args.resistance === undefined ? undefined : toScalar(args.resistance, Unit.Resistance)
-      const inductance = toScalar(args.inductance, Unit.Inductance)
-      const capacitance = toScalar(args.capacitance, Unit.Capacitance)
-      return serializeComplex(parallelImpedance(frequency, resistance, inductance, capacitance), Unit.Resistance)
+      const parts = args.impedances.map((item) => toComplex(item, Unit.Resistance))
+      return serializeComplex(seriesOf(parts), Unit.Resistance)
     },
   }),
   defineJsonTool({
     name: 'parallel_impedance',
-    description: 'Impedance of two impedances in parallel: Z = Z1·Z2 / (Z1 + Z2).',
+    description: 'Total impedance of impedances in parallel: 1/Z = Σ 1/Zi. Pass each impedance as a complex value object.',
     parameters: {
-      firstImpedance: { ...valueParam(Unit.Resistance, 'first impedance'), required: true },
-      secondImpedance: { ...valueParam(Unit.Resistance, 'second impedance'), required: true },
+      impedances: {
+        type: 'array',
+        description: 'impedances to combine in parallel',
+        required: true,
+        items: valueParam(Unit.Resistance, 'impedance'),
+      },
     },
     execute: (args) => {
-      const firstImpedance = toComplex(args.firstImpedance, Unit.Resistance)
-      const secondImpedance = toComplex(args.secondImpedance, Unit.Resistance)
-      return serializeComplex(parallelTwo(firstImpedance, secondImpedance), Unit.Resistance)
+      const parts = args.impedances.map((item) => toComplex(item, Unit.Resistance))
+      return serializeComplex(parallelOf(parts), Unit.Resistance)
+    },
+  }),
+  defineJsonTool({
+    name: 'circuit_impedance',
+    description: 'Total impedance of a (possibly nested) network at a frequency. The network is a tree: a leaf is {"kind": "resistance"|"inductance"|"capacitance", "value": number}; a group is {"topology": "series"|"parallel", "elements": [node, ...]}. Nested groups are allowed. Returns the driving-point impedance.',
+    parameters: {
+      network: { type: 'json', description: 'network tree, e.g. {"topology":"series","elements":[{"kind":"resistance","value":10},{"kind":"inductance","value":0.001}]}', required: true },
+      frequency: { ...valueParam(Unit.Frequency, 'frequency'), required: true },
+    },
+    execute: (args) => {
+      const frequency = toScalar(args.frequency, Unit.Frequency)
+      const node = validateNetwork(args.network)
+      return serializeComplex(networkImpedance(node, frequency), Unit.Resistance)
     },
   }),
   defineJsonTool({
@@ -126,8 +139,8 @@ export const circuitTools = [
       const time = toScalar(args.time, Unit.Time)
       const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, Unit.Voltage)
       const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage, Unit.Voltage)
-      if (mode === 'charge' && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
-      if (mode === 'discharge' && args.initialVoltage === undefined) throw new Error('discharge mode requires initialVoltage')
+      if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
+      if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined) throw new Error('discharge mode requires initialVoltage')
       const { voltage, current, timeConstant } = rcTransient(mode, sourceVoltage, initialVoltage, resistance, capacitance, time)
       return { voltage: realValue(voltage, Unit.Voltage), current: realValue(current, Unit.Current), timeConstant: realValue(timeConstant, Unit.Time), mode }
     },
@@ -150,10 +163,40 @@ export const circuitTools = [
       const time = toScalar(args.time, Unit.Time)
       const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, Unit.Voltage)
       const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent, Unit.Current)
-      if (mode === 'charge' && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
-      if (mode === 'discharge' && args.initialCurrent === undefined) throw new Error('discharge mode requires initialCurrent')
+      if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
+      if (mode === SwitchingMode.Discharge && args.initialCurrent === undefined) throw new Error('discharge mode requires initialCurrent')
       const { current, voltage, timeConstant } = rlTransient(mode, sourceVoltage, initialCurrent, resistance, inductance, time)
       return { current: realValue(current, Unit.Current), voltage: realValue(voltage, Unit.Voltage), timeConstant: realValue(timeConstant, Unit.Time), mode }
     },
   }),
 ]
+
+/** Build an element impedance node without validating (used by element_impedance). */
+function elementImpedanceOf(kind: ElementKind, value: number, frequency: number) {
+  return networkImpedance({ kind, value }, frequency)
+}
+
+/** Validate a raw JSON network tree into a typed NetworkElement. */
+export function validateNetwork(input: unknown): NetworkElement {
+  if (typeof input !== 'object' || input === null) throw new Error('network must be an object')
+  const node = input as Record<string, unknown>
+  if (typeof node['kind'] === 'string') {
+    const kind = node['kind'] as ElementKind
+    if (![ElementKind.Resistance, ElementKind.Inductance, ElementKind.Capacitance].includes(kind)) {
+      throw new Error(`unknown element kind "${kind}"`)
+    }
+    const value = node['value']
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(`element "${kind}" needs a non-negative finite value`)
+    }
+    return { kind, value }
+  }
+  if (node['topology'] === CircuitMode.Series || node['topology'] === CircuitMode.Parallel) {
+    const elements = node['elements']
+    if (!Array.isArray(elements) || elements.length === 0) {
+      throw new Error('a group needs a non-empty elements array')
+    }
+    return { topology: node['topology'] as CircuitMode, elements: elements.map((child) => validateNetwork(child)) }
+  }
+  throw new Error('network node must be {"kind": ...} or {"topology": ..., "elements": [...]}')
+}

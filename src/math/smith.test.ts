@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { reflectionToVswr, lNetworkMatch, quarterWaveImpedance, returnLossDb, impedanceToReflection } from './smith.ts'
-import { MatchSide } from './enums.ts'
+import { MatchSide, reflectionToVswr, lNetworkMatch, quarterWaveImpedance, returnLossDb, impedanceToReflection } from './smith.ts'
 
 describe('impedance_to_reflection (textbook check)', () => {
   it('Z = 50 + j50 Ω on a 50 Ω line → Γ = 0.447∠63.43°', () => {
