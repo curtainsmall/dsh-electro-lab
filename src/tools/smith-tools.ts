@@ -1,106 +1,99 @@
 /**
  * Concept-level Smith-chart tools: one textbook concept per tool.
+ * IO is JSON-and-complex-only: every value is { re, im, unit }.
  */
-import { parseComplex, parseScalar } from '../math/parse.ts'
-import { BaseUnit, Unit } from '../math/units.ts'
-import { serializeComplex } from '../math/format.ts'
 import { Complex } from 'complex.js'
+import { toComplex, toScalar, serializeComplex, realValue } from '../math/convert.ts'
+import { Unit } from '../math/units.ts'
 import { gammaToVswr, lNetworkMatch, quarterWaveImpedance, returnLossDb, zToGamma } from '../math/smith.ts'
-import { defineJsonTool, quantityParam, complexParam } from './helpers.ts'
+import { defineJsonTool, valueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const smithTools = [
   defineJsonTool({
     name: 'z_to_gamma',
-    description: 'Reflection coefficient Γ = (Z − Z0) / (Z + Z0) for impedance Z on a Z0 line (default 50 Ω).',
+    description: 'Reflection coefficient Γ = (Z − Z0) / (Z + Z0) for impedance on a referenceImpedance line (default 50).',
     parameters: {
-      impedance: { ...complexParam('load impedance'), required: true },
-      referenceImpedance: { ...quantityParam('reference impedance (default 50)') },
+      impedance: { ...valueParam(Unit.Resistance, 'load impedance'), required: true },
+      referenceImpedance: { ...valueParam(Unit.Resistance, 'reference impedance (default 50)') },
     },
     execute: (args) => {
-      const impedance = parseComplex(args.impedance, Unit.Resistance)
-      const referenceImpedance = args.referenceImpedance === undefined ? 50 : parseScalar(args.referenceImpedance, Unit.Resistance)
-      return serializeComplex(zToGamma(impedance, referenceImpedance), BaseUnit.Dimensionless)
+      const impedance = toComplex(args.impedance, Unit.Resistance)
+      const referenceImpedance = args.referenceImpedance === undefined ? 50 : toScalar(args.referenceImpedance, Unit.Resistance)
+      return serializeComplex(zToGamma(impedance, referenceImpedance), Unit.None)
     },
   }),
   defineJsonTool({
     name: 'gamma_to_vswr',
-    description: 'Voltage standing wave ratio from reflection coefficient: VSWR = (1+|Γ|)/(1−|Γ|). |Γ| = 1 (open/short) yields infinity.',
+    description: 'Voltage standing wave ratio from reflection coefficient: vswr = (1+|Γ|)/(1−|Γ|). |Γ| = 1 (open/short) yields infinity.',
     parameters: {
-      reflectionCoefficient: { ...complexParam('reflection coefficient'), required: true },
+      reflectionCoefficient: { ...valueParam(Unit.None, 'reflection coefficient'), required: true },
     },
     execute: (args) => {
-      const reflectionCoefficient = parseComplex(args.reflectionCoefficient)
-      return { vswr: gammaToVswr(reflectionCoefficient), display: gammaToVswr(reflectionCoefficient) === Number.POSITIVE_INFINITY ? '∞' : String(gammaToVswr(reflectionCoefficient)) }
+      const reflectionCoefficient = toComplex(args.reflectionCoefficient, Unit.None)
+      const vswr = gammaToVswr(reflectionCoefficient)
+      return { vswr: realValue(vswr, Unit.None), infinite: vswr === Number.POSITIVE_INFINITY }
     },
   }),
   defineJsonTool({
     name: 'return_loss',
-    description: 'Return loss in dB: −20·log10(|Γ|). |Γ| = 0 (perfect match) yields +∞ dB.',
+    description: 'Return loss in dB: −20·log10(|Γ|). |Γ| = 0 (perfect match) yields infinity.',
     parameters: {
-      reflectionCoefficient: { ...complexParam('reflection coefficient'), required: true },
+      reflectionCoefficient: { ...valueParam(Unit.None, 'reflection coefficient'), required: true },
     },
     execute: (args) => {
-      const reflectionCoefficient = parseComplex(args.reflectionCoefficient)
+      const reflectionCoefficient = toComplex(args.reflectionCoefficient, Unit.None)
       const db = returnLossDb(reflectionCoefficient)
-      return { returnLossDb: db, display: db === Number.POSITIVE_INFINITY ? '∞ dB' : `${db.toFixed(2)} dB` }
+      return { returnLossDb: realValue(db, Unit.Log), infinite: db === Number.POSITIVE_INFINITY }
     },
   }),
   defineJsonTool({
     name: 'quarter_wave_transformer',
-    description: 'Quarter-wave transformer characteristic impedance: Z1 = √(Z0·ZL), matching a real load ZL to line Z0.',
+    description: 'Quarter-wave transformer characteristic impedance: Z1 = √(Z0·ZL), matching a real load impedance to a line impedance.',
     parameters: {
-      lineImpedance: { ...quantityParam('line impedance'), required: true },
-      loadImpedance: { ...quantityParam('real load impedance'), required: true },
+      lineImpedance: { ...valueParam(Unit.Resistance, 'line impedance'), required: true },
+      loadImpedance: { ...valueParam(Unit.Resistance, 'real load impedance'), required: true },
     },
     execute: (args) => {
-      const lineImpedance = parseScalar(args.lineImpedance, Unit.Resistance)
-      const loadImpedance = parseScalar(args.loadImpedance, Unit.Resistance)
-      return serializeComplex(new Complex(quarterWaveImpedance(lineImpedance, loadImpedance), 0), BaseUnit.Ohm)
+      const lineImpedance = toScalar(args.lineImpedance, Unit.Resistance)
+      const loadImpedance = toScalar(args.loadImpedance, Unit.Resistance)
+      return serializeComplex(new Complex(quarterWaveImpedance(lineImpedance, loadImpedance), 0), Unit.Resistance)
     },
   }),
   defineJsonTool({
     name: 'l_network_match',
-    description: 'L-network matching two real resistances at frequency f. Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the smaller resistance, shunt element (X = Rl/Q) next to the larger. Returns both conjugate solutions (low-pass / high-pass) with L/C values.',
+    description: 'L-network matching two real resistances at a frequency. qualityFactor = √(Rl/Rs − 1); series element (reactance = qualityFactor·Rs) sits next to the smaller resistance, shunt element (reactance = Rl/qualityFactor) next to the larger. Returns both conjugate solutions (low-pass / high-pass) with inductance/capacitance values.',
     parameters: {
-      sourceImpedance: { ...quantityParam('source impedance'), required: true },
-      loadImpedance: { ...quantityParam('load impedance'), required: true },
-      frequency: { ...quantityParam('frequency'), required: true },
+      sourceImpedance: { ...valueParam(Unit.Resistance, 'source impedance'), required: true },
+      loadImpedance: { ...valueParam(Unit.Resistance, 'load impedance'), required: true },
+      frequency: { ...valueParam(Unit.Frequency, 'frequency'), required: true },
     },
     execute: (args) => {
-      const sourceImpedance = parseScalar(args.sourceImpedance, Unit.Resistance)
-      const loadImpedance = parseScalar(args.loadImpedance, Unit.Resistance)
-      const frequency = parseScalar(args.frequency, Unit.Frequency)
+      const sourceImpedance = toScalar(args.sourceImpedance, Unit.Resistance)
+      const loadImpedance = toScalar(args.loadImpedance, Unit.Resistance)
+      const frequency = toScalar(args.frequency, Unit.Frequency)
       const result = lNetworkMatch(sourceImpedance, loadImpedance, frequency)
       if (result.matched) return { matched: true, note: 'source and load are already equal — no network needed' }
       const out: Record<string, JsonValue> = {
         matched: false,
-        qualityFactor: result.qualityFactor as number,
+        qualityFactor: realValue(result.qualityFactor as number, Unit.None),
         seriesSide: result.seriesSide,
         shuntSide: result.shuntSide,
       }
       if (result.solutions !== undefined) {
-        out.solutions = result.solutions.map((s) => {
-          const sol: Record<string, JsonValue> = {
-            xSeries: fmtReactance(s.seriesReactance),
-            xShunt: fmtReactance(s.shuntReactance),
+        out.solutions = result.solutions.map((solution) => {
+          const entry: Record<string, JsonValue> = {
+            seriesReactance: realValue(solution.seriesReactance, Unit.Resistance),
+            shuntReactance: realValue(solution.shuntReactance, Unit.Resistance),
           }
-          if (s.seriesInductance !== undefined) sol.lSeries = fmtQ(s.seriesInductance, BaseUnit.Henry)
-          if (s.seriesCapacitance !== undefined) sol.cSeries = fmtQ(s.seriesCapacitance, BaseUnit.Farad)
-          if (s.shuntInductance !== undefined) sol.lShunt = fmtQ(s.shuntInductance, BaseUnit.Henry)
-          if (s.shuntCapacitance !== undefined) sol.cShunt = fmtQ(s.shuntCapacitance, BaseUnit.Farad)
-          return sol
+          if (solution.seriesInductance !== undefined) entry.seriesInductance = realValue(solution.seriesInductance, Unit.Inductance)
+          if (solution.seriesCapacitance !== undefined) entry.seriesCapacitance = realValue(solution.seriesCapacitance, Unit.Capacitance)
+          if (solution.shuntInductance !== undefined) entry.shuntInductance = realValue(solution.shuntInductance, Unit.Inductance)
+          if (solution.shuntCapacitance !== undefined) entry.shuntCapacitance = realValue(solution.shuntCapacitance, Unit.Capacitance)
+          return entry
         })
       }
       return out
     },
   }),
 ]
-
-function fmtQ(value: number, unit: BaseUnit): Record<string, number | string> {
-  return serializeComplex(new Complex(value, 0), unit)
-}
-
-function fmtReactance(x: number): Record<string, number | string> {
-  return serializeComplex(new Complex(x, 0), BaseUnit.Ohm)
-}

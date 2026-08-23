@@ -1,55 +1,89 @@
 /**
- * Shared tool-building helpers: liTeral-typed parameter schema builders so
- * DefineToolOptions inference keeps precise argument types, and a thin
- * defineTool wrapper with a consistent JSON output contract.
+ * Shared tool-building helpers: the JSON-and-complex IO parameter schema,
+ * the JSON output contract, and a thin defineTool wrapper.
  */
 import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec, type ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
+import type { Unit } from '../math/units.ts'
 
-/** Scalar parameter accepting a number (base units) or string with SI prefix ("1.5nF"). */
-export function quantityParam(description: string): {
-  oneOf: [
-    { type: 'number'; description: string },
-    { type: 'string'; description: string },
-  ]
-} {
-  return {
-    oneOf: [
-      { type: 'number', description: 'value in base SI units (e.g. 1000 for 1 kHz)' },
-      { type: 'string', description: `value with optional SI prefix and unit (e.g. "1k", "1kHz") — ${description}` },
-    ],
-  }
-}
-
-/** Complex parameter accepting { re, im }, a string ("50+50j", "5∠53.13°"), or a number. */
-export function complexParam(description: string): {
+/**
+ * The one parameter shape: a self-describing value, enum-union of three
+ * mutually exclusive forms (rect | polar-degrees | polar-radians). The
+ * expected unit is baked into each branch as an enum and the form into
+ * consts, so mismatches fail framework validation before execute runs.
+ */
+export function valueParam<const U extends Unit>(unit: U, description: string): {
   oneOf: [
     {
       type: 'object'
-      description: string
       additionalProperties: false
+      description: string
       properties: {
+        form: { type: 'string'; const: 'rect'; description: string; required: true }
         re: { type: 'number'; description: string; required: true }
         im: { type: 'number'; description: string; required: true }
+        unit: { type: 'string'; enum: [U]; description: string; required: true }
       }
     },
-    { type: 'string'; description: string },
-    { type: 'number'; description: string },
+    {
+      type: 'object'
+      additionalProperties: false
+      description: string
+      properties: {
+        form: { type: 'string'; const: 'polar'; description: string; required: true }
+        mag: { type: 'number'; description: string; required: true }
+        angDeg: { type: 'number'; description: string; required: true }
+        unit: { type: 'string'; enum: [U]; description: string; required: true }
+      }
+    },
+    {
+      type: 'object'
+      additionalProperties: false
+      description: string
+      properties: {
+        form: { type: 'string'; const: 'polar'; description: string; required: true }
+        mag: { type: 'number'; description: string; required: true }
+        angRad: { type: 'number'; description: string; required: true }
+        unit: { type: 'string'; enum: [U]; description: string; required: true }
+      }
+    },
   ]
 } {
   return {
     oneOf: [
       {
         type: 'object',
-        description: 'rectangular complex value',
         additionalProperties: false,
+        description,
         properties: {
-          re: { type: 'number', description: 'real part', required: true },
-          im: { type: 'number', description: 'imaginary part', required: true },
+          form: { type: 'string', const: 'rect', description: 'rectangular form', required: true },
+          re: { type: 'number', description: 'real part in base SI units', required: true },
+          im: { type: 'number', description: 'imaginary part in base SI units (0 for real values)', required: true },
+          unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },
         },
       },
-      { type: 'string', description: `complex value — "a+bj", "r∠θ°", optionally with unit — ${description}` },
-      { type: 'number', description: `real value — ${description}` },
+      {
+        type: 'object',
+        additionalProperties: false,
+        description,
+        properties: {
+          form: { type: 'string', const: 'polar', description: 'polar form', required: true },
+          mag: { type: 'number', description: 'mag in base SI units', required: true },
+          angDeg: { type: 'number', description: 'phase angle in degrees', required: true },
+          unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },
+        },
+      },
+      {
+        type: 'object',
+        additionalProperties: false,
+        description,
+        properties: {
+          form: { type: 'string', const: 'polar', description: 'polar form', required: true },
+          mag: { type: 'number', description: 'mag in base SI units', required: true },
+          angRad: { type: 'number', description: 'phase angle in radians', required: true },
+          unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },
+        },
+      },
     ],
   }
 }

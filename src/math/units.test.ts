@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { unitFromToken, BaseUnit, Prefix, Unit, splitUnitToken, nearlyEqual, isNegligible } from './units.ts'
-
+import { Unit, nearlyEqual, isNegligible } from './units.ts'
 
 describe('nearlyEqual — pure relative tolerance', () => {
   it('is scale-invariant: works for pF and GΩ alike', () => {
@@ -18,18 +17,15 @@ describe('isNegligible — unit-aware zero thresholds', () => {
     expect(isNegligible(1e-13, Unit.Capacitance)).toBe(false) // 0.1 pF is real
     expect(isNegligible(1e-7, Unit.Resistance)).toBe(true) // below μΩ floor
     expect(isNegligible(1e-4, Unit.Resistance)).toBe(false)
-    expect(isNegligible(1e-13, Unit.Dimensionless)).toBe(true) // |Γ| below 1e-12
-    expect(isNegligible(1e-2, Unit.Dimensionless)).toBe(false)
+    expect(isNegligible(1e-13, Unit.None)).toBe(true) // |Γ| below 1e-12
+    expect(isNegligible(1e-2, Unit.None)).toBe(false)
   })
 })
 
-describe('unit tokens', () => {
-  it('recognizes bases, aliases, and prefixed tokens', () => {
-    expect(unitFromToken(BaseUnit.Hertz)).toBe(Unit.Frequency)
-    expect(unitFromToken('ohm')).toBe(Unit.Resistance)
-    expect(unitFromToken(BaseUnit.Farad)).toBe(Unit.Capacitance)
-    expect(splitUnitToken('kHz')?.factor).toBeCloseTo(1e3, 12)
-    expect(splitUnitToken('nF')?.factor).toBeCloseTo(1e-9, 18)
-    expect(splitUnitToken('k')?.factor).toBeCloseTo(1e3, 12) // bare prefix
+describe('Unit enum values', () => {
+  it('are the lowercase semantic strings', () => {
+    expect(Unit.Frequency).toBe('frequency')
+    expect(Unit.Resistance).toBe('resistance')
+    expect(Unit.None).toBe('none')
   })
 })
