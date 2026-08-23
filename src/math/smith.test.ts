@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { gammaToVswr, lNetworkMatch, quarterWaveImpedance, returnLossDb, zToGamma } from './smith.ts'
+import { reflectionToVswr, lNetworkMatch, quarterWaveImpedance, returnLossDb, impedanceToReflection } from './smith.ts'
+import { MatchSide } from './enums.ts'
 
-describe('z_to_gamma (textbook check)', () => {
+describe('impedance_to_reflection (textbook check)', () => {
   it('Z = 50 + j50 Ω on a 50 Ω line → Γ = 0.447∠63.43°', () => {
-    const g = zToGamma(new Complex(50, 50), 50)
+    const g = impedanceToReflection(new Complex(50, 50), 50)
     // Γ = 50j / (100 + 50j) = 0.2 + 0.4j
     expect(g.re).toBeCloseTo(0.2, 6)
     expect(g.im).toBeCloseTo(0.4, 6)
@@ -13,27 +14,27 @@ describe('z_to_gamma (textbook check)', () => {
   })
 
   it('open and short circuits map to |Γ| = 1', () => {
-    expect(zToGamma(new Complex(1e12, 0), 50).abs()).toBeCloseTo(1, 6)
-    expect(zToGamma(new Complex(0, 0), 50).abs()).toBeCloseTo(1, 6)
+    expect(impedanceToReflection(new Complex(1e12, 0), 50).abs()).toBeCloseTo(1, 6)
+    expect(impedanceToReflection(new Complex(0, 0), 50).abs()).toBeCloseTo(1, 6)
   })
 
   it('matched load gives Γ = 0', () => {
-    expect(zToGamma(new Complex(50, 0), 50).abs()).toBe(0)
+    expect(impedanceToReflection(new Complex(50, 0), 50).abs()).toBe(0)
   })
 })
 
 describe('VSWR and return loss', () => {
   it('Γ = 0.4472 → VSWR 2.62 (textbook check)', () => {
-    const g = zToGamma(new Complex(50, 50), 50)
-    expect(gammaToVswr(g)).toBeCloseTo(2.618, 3)
+    const g = impedanceToReflection(new Complex(50, 50), 50)
+    expect(reflectionToVswr(g)).toBeCloseTo(2.618, 3)
   })
 
   it('|Γ| = 1 yields infinite VSWR', () => {
-    expect(gammaToVswr(new Complex(1, 0))).toBe(Number.POSITIVE_INFINITY)
+    expect(reflectionToVswr(new Complex(1, 0))).toBe(Number.POSITIVE_INFINITY)
   })
 
   it('Γ = 0.4472 → return loss ≈ 6.99 dB (textbook check)', () => {
-    const g = zToGamma(new Complex(50, 50), 50)
+    const g = impedanceToReflection(new Complex(50, 50), 50)
     expect(returnLossDb(g)).toBeCloseTo(6.9897, 3)
   })
 

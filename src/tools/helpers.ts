@@ -5,6 +5,7 @@
 import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec, type ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { Unit } from '../math/units.ts'
+import { Form } from '../math/convert.ts'
 
 /**
  * The one parameter shape: a self-describing value, enum-union of three
@@ -19,7 +20,7 @@ export function valueParam<const U extends Unit>(unit: U, description: string): 
       additionalProperties: false
       description: string
       properties: {
-        form: { type: 'string'; const: 'rect'; description: string; required: true }
+        form: { type: 'string'; const: Form.Rect; description: string; required: true }
         re: { type: 'number'; description: string; required: true }
         im: { type: 'number'; description: string; required: true }
         unit: { type: 'string'; enum: [U]; description: string; required: true }
@@ -30,7 +31,7 @@ export function valueParam<const U extends Unit>(unit: U, description: string): 
       additionalProperties: false
       description: string
       properties: {
-        form: { type: 'string'; const: 'polar'; description: string; required: true }
+        form: { type: 'string'; const: Form.Polar; description: string; required: true }
         mag: { type: 'number'; description: string; required: true }
         angDeg: { type: 'number'; description: string; required: true }
         unit: { type: 'string'; enum: [U]; description: string; required: true }
@@ -41,7 +42,7 @@ export function valueParam<const U extends Unit>(unit: U, description: string): 
       additionalProperties: false
       description: string
       properties: {
-        form: { type: 'string'; const: 'polar'; description: string; required: true }
+        form: { type: 'string'; const: Form.Polar; description: string; required: true }
         mag: { type: 'number'; description: string; required: true }
         angRad: { type: 'number'; description: string; required: true }
         unit: { type: 'string'; enum: [U]; description: string; required: true }
@@ -56,7 +57,7 @@ export function valueParam<const U extends Unit>(unit: U, description: string): 
         additionalProperties: false,
         description,
         properties: {
-          form: { type: 'string', const: 'rect', description: 'rectangular form', required: true },
+          form: { type: 'string', const: Form.Rect, description: 'rectangular form', required: true },
           re: { type: 'number', description: 'real part in base SI units', required: true },
           im: { type: 'number', description: 'imaginary part in base SI units (0 for real values)', required: true },
           unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },
@@ -67,7 +68,7 @@ export function valueParam<const U extends Unit>(unit: U, description: string): 
         additionalProperties: false,
         description,
         properties: {
-          form: { type: 'string', const: 'polar', description: 'polar form', required: true },
+          form: { type: 'string', const: Form.Polar, description: 'polar form', required: true },
           mag: { type: 'number', description: 'mag in base SI units', required: true },
           angDeg: { type: 'number', description: 'phase angle in degrees', required: true },
           unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },
@@ -78,7 +79,7 @@ export function valueParam<const U extends Unit>(unit: U, description: string): 
         additionalProperties: false,
         description,
         properties: {
-          form: { type: 'string', const: 'polar', description: 'polar form', required: true },
+          form: { type: 'string', const: Form.Polar, description: 'polar form', required: true },
           mag: { type: 'number', description: 'mag in base SI units', required: true },
           angRad: { type: 'number', description: 'phase angle in radians', required: true },
           unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },

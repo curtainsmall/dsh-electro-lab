@@ -5,9 +5,9 @@
  *
  * INPUT — enum-union of three mutually exclusive forms (oneOf in the
  * schema, so exactly one branch matches):
- *   rect  { form: 'rect',  re, im, unit }
- *   polar { form: 'polar', mag, angDeg, unit }
- *   polar { form: 'polar', mag, angRad, unit }
+ *   rect  { form: Form.Rect,  re, im, unit }
+ *   polar { form: Form.Polar, mag, angDeg, unit }
+ *   polar { form: Form.Polar, mag, angRad, unit }
  *
  * OUTPUT — a complete snapshot, both projections always present:
  *   { re, im, unit, mag, angDeg, angRad }
@@ -22,9 +22,15 @@
 import { Complex } from 'complex.js'
 import { Unit, nearlyEqual } from './units.ts'
 
+/** Complex form discriminator (wire value = lowercase string). */
+export enum Form {
+  Rect = 'rect',
+  Polar = 'polar',
+}
+
 /** Rectangular input form. */
 export type RectValue = {
-  form: 'rect'
+  form: Form.Rect
   re: number
   im: number
   unit: Unit
@@ -32,7 +38,7 @@ export type RectValue = {
 
 /** Polar input form with the phase angle in degrees. */
 export type PolarDegreesValue = {
-  form: 'polar'
+  form: Form.Polar
   mag: number
   angDeg: number
   unit: Unit
@@ -40,7 +46,7 @@ export type PolarDegreesValue = {
 
 /** Polar input form with the phase angle in radians. */
 export type PolarRadiansValue = {
-  form: 'polar'
+  form: Form.Polar
   mag: number
   angRad: number
   unit: Unit
@@ -80,7 +86,7 @@ function polarAngle(value: PolarDegreesValue | PolarRadiansValue): number {
  *  (no `form` discriminator) are treated as rect values. */
 export function toComplex(value: ComplexValue, expected: Unit): Complex {
   expectUnit(value, expected)
-  if ('form' in value && value.form === 'polar') {
+  if ('form' in value && value.form === Form.Polar) {
     const phi = polarAngle(value)
     return new Complex(value.mag * Math.cos(phi), value.mag * Math.sin(phi))
   }
@@ -92,7 +98,7 @@ export function toComplex(value: ComplexValue, expected: Unit): Complex {
  *  (angle ≈ 0° or 180°). */
 export function toScalar(value: ComplexValue, expected: Unit): number {
   expectUnit(value, expected)
-  if ('form' in value && value.form === 'polar') {
+  if ('form' in value && value.form === Form.Polar) {
     const phi = polarAngle(value)
     const halfTurns = phi / Math.PI
     if (!nearlyEqual(Math.abs(halfTurns % 1), 0) && !nearlyEqual(Math.abs(halfTurns % 1), 1)) {

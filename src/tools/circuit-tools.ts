@@ -5,6 +5,7 @@
 import { Complex } from 'complex.js'
 import { toComplex, toScalar, serializeComplex, realValue } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
+import { CircuitMode, SwitchingMode } from '../math/enums.ts'
 import {
   acPower,
   parallelImpedance,
@@ -19,7 +20,7 @@ import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const circuitTools = [
   defineJsonTool({
-    name: 'z_rlc_series',
+    name: 'rlc_series_impedance',
     description: 'Total impedance of a series RLC network: Z = R + jωL + 1/(jωC). Set inductance/capacitance to 0 to omit that element.',
     parameters: {
       frequency: { ...valueParam(Unit.Frequency, 'frequency'), required: true },
@@ -36,7 +37,7 @@ export const circuitTools = [
     },
   }),
   defineJsonTool({
-    name: 'z_rlc_parallel',
+    name: 'rlc_parallel_impedance',
     description: 'Total impedance of a parallel RLC network: 1/Z = 1/R + 1/(jωL) + jωC. Omit resistance for a pure LC tank; set inductance/capacitance to 0 to omit that element.',
     parameters: {
       frequency: { ...valueParam(Unit.Frequency, 'frequency'), required: true },
@@ -53,7 +54,7 @@ export const circuitTools = [
     },
   }),
   defineJsonTool({
-    name: 'z_parallel',
+    name: 'parallel_impedance',
     description: 'Impedance of two impedances in parallel: Z = Z1·Z2 / (Z1 + Z2).',
     parameters: {
       firstImpedance: { ...valueParam(Unit.Resistance, 'first impedance'), required: true },
@@ -72,13 +73,13 @@ export const circuitTools = [
       inductance: { ...valueParam(Unit.Inductance, 'inductance'), required: true },
       capacitance: { ...valueParam(Unit.Capacitance, 'capacitance'), required: true },
       resistance: { ...valueParam(Unit.Resistance, 'resistance, required for qualityFactor and bandwidth') },
-      mode: { type: 'string', enum: ['series', 'parallel'], description: 'resonance mode (default series)' },
+      mode: { type: 'string', enum: [CircuitMode.Series, CircuitMode.Parallel], description: 'resonance mode (default series)' },
     },
     execute: (args) => {
       const inductance = toScalar(args.inductance, Unit.Inductance)
       const capacitance = toScalar(args.capacitance, Unit.Capacitance)
       const resistance = args.resistance === undefined ? undefined : toScalar(args.resistance, Unit.Resistance)
-      const mode = args.mode === 'parallel' ? 'parallel' : 'series'
+      const mode = args.mode === CircuitMode.Parallel ? CircuitMode.Parallel : CircuitMode.Series
       const { resonantFrequency, qualityFactor, bandwidth } = resonance(inductance, capacitance, resistance, mode)
       const out: Record<string, JsonValue> = { resonantFrequency: realValue(resonantFrequency, Unit.Frequency), mode }
       if (qualityFactor !== undefined) out.qualityFactor = realValue(qualityFactor, Unit.None)
@@ -111,7 +112,7 @@ export const circuitTools = [
     name: 'rc_transient',
     description: 'RC transient at a moment in time. charge: capacitor charges from 0 toward sourceVoltage, voltage = sourceVoltage(1−e^(−time/timeConstant)); discharge: capacitor at initialVoltage discharges through resistance, voltage = initialVoltage·e^(−time/timeConstant). timeConstant = resistance·capacitance. Current: charge = (sourceVoltage − voltage)/resistance, discharge = voltage/resistance.',
     parameters: {
-      mode: { type: 'string', enum: ['charge', 'discharge'], description: 'charge or discharge', required: true },
+      mode: { type: 'string', enum: [SwitchingMode.Charge, SwitchingMode.Discharge], description: 'charge or discharge', required: true },
       sourceVoltage: { ...valueParam(Unit.Voltage, 'source voltage (charge mode)') },
       initialVoltage: { ...valueParam(Unit.Voltage, 'initial capacitor voltage (discharge mode)') },
       resistance: { ...valueParam(Unit.Resistance, 'resistance'), required: true },
@@ -119,7 +120,7 @@ export const circuitTools = [
       time: { ...valueParam(Unit.Time, 'elapsed time'), required: true },
     },
     execute: (args) => {
-      const mode = args.mode === 'discharge' ? 'discharge' : 'charge'
+      const mode = args.mode === SwitchingMode.Discharge ? SwitchingMode.Discharge : SwitchingMode.Charge
       const resistance = toScalar(args.resistance, Unit.Resistance)
       const capacitance = toScalar(args.capacitance, Unit.Capacitance)
       const time = toScalar(args.time, Unit.Time)
@@ -135,7 +136,7 @@ export const circuitTools = [
     name: 'rl_transient',
     description: 'RL transient at a moment in time. charge: current rises from 0 toward sourceVoltage/resistance, current = (sourceVoltage/resistance)(1−e^(−time/timeConstant)); discharge: current at initialCurrent decays, current = initialCurrent·e^(−time/timeConstant). timeConstant = inductance/resistance. Inductor voltage: charge = sourceVoltage·e^(−time/timeConstant), discharge = initialCurrent·resistance·e^(−time/timeConstant).',
     parameters: {
-      mode: { type: 'string', enum: ['charge', 'discharge'], description: 'charge or discharge', required: true },
+      mode: { type: 'string', enum: [SwitchingMode.Charge, SwitchingMode.Discharge], description: 'charge or discharge', required: true },
       sourceVoltage: { ...valueParam(Unit.Voltage, 'source voltage (charge mode)') },
       initialCurrent: { ...valueParam(Unit.Current, 'initial inductor current (discharge mode)') },
       resistance: { ...valueParam(Unit.Resistance, 'resistance'), required: true },
@@ -143,7 +144,7 @@ export const circuitTools = [
       time: { ...valueParam(Unit.Time, 'elapsed time'), required: true },
     },
     execute: (args) => {
-      const mode = args.mode === 'discharge' ? 'discharge' : 'charge'
+      const mode = args.mode === SwitchingMode.Discharge ? SwitchingMode.Discharge : SwitchingMode.Charge
       const resistance = toScalar(args.resistance, Unit.Resistance)
       const inductance = toScalar(args.inductance, Unit.Inductance)
       const time = toScalar(args.time, Unit.Time)

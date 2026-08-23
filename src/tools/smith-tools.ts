@@ -5,13 +5,13 @@
 import { Complex } from 'complex.js'
 import { toComplex, toScalar, serializeComplex, realValue } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
-import { gammaToVswr, lNetworkMatch, quarterWaveImpedance, returnLossDb, zToGamma } from '../math/smith.ts'
+import { reflectionToVswr, lNetworkMatch, quarterWaveImpedance, returnLossDb, impedanceToReflection } from '../math/smith.ts'
 import { defineJsonTool, valueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const smithTools = [
   defineJsonTool({
-    name: 'z_to_gamma',
+    name: 'impedance_to_reflection',
     description: 'Reflection coefficient Γ = (Z − Z0) / (Z + Z0) for impedance on a referenceImpedance line (default 50).',
     parameters: {
       impedance: { ...valueParam(Unit.Resistance, 'load impedance'), required: true },
@@ -20,18 +20,18 @@ export const smithTools = [
     execute: (args) => {
       const impedance = toComplex(args.impedance, Unit.Resistance)
       const referenceImpedance = args.referenceImpedance === undefined ? 50 : toScalar(args.referenceImpedance, Unit.Resistance)
-      return serializeComplex(zToGamma(impedance, referenceImpedance), Unit.None)
+      return serializeComplex(impedanceToReflection(impedance, referenceImpedance), Unit.None)
     },
   }),
   defineJsonTool({
-    name: 'gamma_to_vswr',
+    name: 'reflection_to_vswr',
     description: 'Voltage standing wave ratio from reflection coefficient: vswr = (1+|Γ|)/(1−|Γ|). |Γ| = 1 (open/short) yields infinity.',
     parameters: {
       reflectionCoefficient: { ...valueParam(Unit.None, 'reflection coefficient'), required: true },
     },
     execute: (args) => {
       const reflectionCoefficient = toComplex(args.reflectionCoefficient, Unit.None)
-      const vswr = gammaToVswr(reflectionCoefficient)
+      const vswr = reflectionToVswr(reflectionCoefficient)
       return { vswr: realValue(vswr, Unit.None), infinite: vswr === Number.POSITIVE_INFINITY }
     },
   }),

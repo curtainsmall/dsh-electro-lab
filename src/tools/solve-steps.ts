@@ -57,7 +57,7 @@ export function createSolveStepsTool(ctx: Context): ToolDefinition {
           type: 'object',
           additionalProperties: false,
           properties: {
-            tool: { type: 'string', description: 'the registered tool to call, e.g. "z_to_gamma"', required: true },
+            tool: { type: 'string', description: 'the registered tool to call, e.g. "impedance_to_reflection"', required: true },
             args: { type: 'json', description: 'arguments for that tool; "@stepN" references the full output object of step N', required: true },
           },
         },

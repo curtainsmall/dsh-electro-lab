@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { expectUnit, realValue, serializeComplex, toComplex, toScalar } from './convert.ts'
+import { Form, expectUnit, realValue, serializeComplex, toComplex, toScalar } from './convert.ts'
 import { Unit } from './units.ts'
 
-function rect(re: number, im: number, unit: Unit): { form: 'rect'; re: number; im: number; unit: Unit } {
-  return { form: 'rect', re, im, unit }
+function rect(re: number, im: number, unit: Unit): { form: Form.Rect; re: number; im: number; unit: Unit } {
+  return { form: Form.Rect, re, im, unit }
 }
 
-function polarDeg(mag: number, angDeg: number, unit: Unit): { form: 'polar'; mag: number; angDeg: number; unit: Unit } {
-  return { form: 'polar', mag, angDeg, unit }
+function polarDeg(mag: number, angDeg: number, unit: Unit): { form: Form.Polar; mag: number; angDeg: number; unit: Unit } {
+  return { form: Form.Polar, mag, angDeg, unit }
 }
 
-function polarRad(mag: number, angRad: number, unit: Unit): { form: 'polar'; mag: number; angRad: number; unit: Unit } {
-  return { form: 'polar', mag, angRad, unit }
+function polarRad(mag: number, angRad: number, unit: Unit): { form: Form.Polar; mag: number; angRad: number; unit: Unit } {
+  return { form: Form.Polar, mag, angRad, unit }
 }
 
 describe('toScalar — unwrap with unit validation', () => {

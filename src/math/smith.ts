@@ -2,15 +2,16 @@
  * Smith-chart mathematics. SI base units; plain complex.js values.
  */
 import { Complex } from 'complex.js'
+import { MatchSide } from './enums.ts'
 
 /** Reflection coefficient: Γ = (Z − Z0) / (Z + Z0). */
-export function zToGamma(impedance: Complex, referenceImpedance: number): Complex {
+export function impedanceToReflection(impedance: Complex, referenceImpedance: number): Complex {
   if (!Number.isFinite(referenceImpedance) || referenceImpedance <= 0) throw new Error('reference impedance must be a positive number (Ω)')
   return impedance.sub(referenceImpedance).div(impedance.add(referenceImpedance))
 }
 
 /** VSWR = (1 + |Γ|) / (1 − |Γ|); |Γ| = 1 (open/short) yields Infinity. */
-export function gammaToVswr(reflectionCoefficient: Complex): number {
+export function reflectionToVswr(reflectionCoefficient: Complex): number {
   const magnitude = reflectionCoefficient.abs()
   if (magnitude === 1) return Number.POSITIVE_INFINITY
   if (magnitude > 1) throw new Error(`|Γ| = ${magnitude} > 1 — passive load reflection cannot exceed unity`)
@@ -38,8 +39,8 @@ export function quarterWaveImpedance(lineImpedance: number, loadImpedance: numbe
 export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, frequency: number): {
   matched: boolean
   qualityFactor?: number
-  seriesSide: 'source' | 'load'
-  shuntSide: 'source' | 'load'
+  seriesSide: MatchSide
+  shuntSide: MatchSide
   solutions?: {
     seriesReactance: number
     shuntReactance: number
@@ -51,11 +52,11 @@ export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, fr
 } {
   if (sourceImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
   if (frequency <= 0) throw new Error('frequency must be positive (Hz)')
-  if (sourceImpedance === loadImpedance) return { matched: true, seriesSide: 'source', shuntSide: 'load' }
+  if (sourceImpedance === loadImpedance) return { matched: true, seriesSide: MatchSide.Source, shuntSide: MatchSide.Load }
   const smaller = Math.min(sourceImpedance, loadImpedance)
   const larger = Math.max(sourceImpedance, loadImpedance)
-  const seriesSide = sourceImpedance < loadImpedance ? 'source' : 'load'
-  const shuntSide = sourceImpedance < loadImpedance ? 'load' : 'source'
+  const seriesSide = sourceImpedance < loadImpedance ? MatchSide.Source : MatchSide.Load
+  const shuntSide = sourceImpedance < loadImpedance ? MatchSide.Load : MatchSide.Source
   const qualityFactor = Math.sqrt(larger / smaller - 1)
   const seriesReactance = qualityFactor * smaller
   const shuntReactance = larger / qualityFactor

@@ -4,6 +4,7 @@
  * presentation is the tools' job.
  */
 import { Complex } from "complex.js";
+import { CircuitMode, SwitchingMode } from "./enums.ts";
 
 function omega(frequency: number): number {
   if (!Number.isFinite(frequency) || frequency <= 0)
@@ -63,7 +64,7 @@ export function resonance(
   inductance: number,
   capacitance: number,
   resistance?: number,
-  mode: "series" | "parallel" = "series",
+  mode: CircuitMode = CircuitMode.Series,
 ): { resonantFrequency: number; qualityFactor?: number; bandwidth?: number } {
   if (!Number.isFinite(inductance) || inductance <= 0)
     throw new Error("inductance must be a finite positive number (H)");
@@ -75,7 +76,7 @@ export function resonance(
     return { resonantFrequency };
   if (resistance <= 0) throw new Error("resistance must be positive (Ω)");
   const qualityFactor =
-    mode === "series"
+    mode === CircuitMode.Series
       ? Math.sqrt(inductance / capacitance) / resistance
       : resistance * Math.sqrt(capacitance / inductance);
   return {
@@ -103,9 +104,9 @@ export function acPower(
   };
 }
 
-/** RC transient. mode 'charge': v(t) = Vs(1−e^(−t/τ)); 'discharge': v(t) = V0·e^(−t/τ). */
+/** RC transient. mode charge: v(t) = Vs(1−e^(−t/τ)); discharge: v(t) = V0·e^(−t/τ). */
 export function rcTransient(
-  mode: "charge" | "discharge",
+  mode: SwitchingMode,
   sourceVoltage: number,
   initialVoltage: number,
   resistance: number,
@@ -118,17 +119,17 @@ export function rcTransient(
   const timeConstant = resistance * capacitance;
   const exp = Math.exp(-time / timeConstant);
   const voltage =
-    mode === "charge" ? sourceVoltage * (1 - exp) : initialVoltage * exp;
+    mode === SwitchingMode.Charge ? sourceVoltage * (1 - exp) : initialVoltage * exp;
   const current =
-    mode === "charge"
+    mode === SwitchingMode.Charge
       ? (sourceVoltage - voltage) / resistance
       : voltage / resistance;
   return { voltage, current, timeConstant };
 }
 
-/** RL transient. mode 'charge': i(t) = (Vs/R)(1−e^(−t/τ)); 'discharge': i(t) = I0·e^(−t/τ). */
+/** RL transient. mode charge: i(t) = (Vs/R)(1−e^(−t/τ)); discharge: i(t) = I0·e^(−t/τ). */
 export function rlTransient(
-  mode: "charge" | "discharge",
+  mode: SwitchingMode,
   sourceVoltage: number,
   initialCurrent: number,
   resistance: number,
@@ -141,10 +142,12 @@ export function rlTransient(
   const timeConstant = inductance / resistance;
   const exp = Math.exp(-time / timeConstant);
   const current =
-    mode === "charge"
+    mode === SwitchingMode.Charge
       ? (sourceVoltage / resistance) * (1 - exp)
       : initialCurrent * exp;
   const voltage =
-    mode === "charge" ? sourceVoltage * exp : initialCurrent * resistance * exp;
+    mode === SwitchingMode.Charge
+      ? sourceVoltage * exp
+      : initialCurrent * resistance * exp;
   return { current, voltage, timeConstant };
 }

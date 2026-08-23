@@ -1,7 +1,7 @@
 /**
  * Atomic tools — the low-level layer. These are registered but described as
  * last-resort primitives: the model should prefer concept-level tools
- * (z_rlc_series, z_to_gamma, ac_power) and reach for these only when
+ * (rlc_series_impedance, impedance_to_reflection, ac_power) and reach for these only when
  * composing intermediate values by hand.
  *
  * IO is JSON-and-complex-only: operands are dimensionless complex values.
@@ -15,7 +15,7 @@ function guardFinite(z: Complex, label: string): void {
   if (!Number.isFinite(z.re) || !Number.isFinite(z.im)) throw new Error(`${label} produced a non-finite value`)
 }
 
-const LOW_LEVEL_HINT = 'Low-level primitive — prefer a concept-level tool (e.g. z_rlc_series, z_to_gamma, ac_power) whenever one fits; use this only to combine intermediate values.'
+const LOW_LEVEL_HINT = 'Low-level primitive — prefer a concept-level tool (e.g. rlc_series_impedance, impedance_to_reflection, ac_power) whenever one fits; use this only to combine intermediate values.'
 
 export const atomicTools = [
   defineJsonTool({

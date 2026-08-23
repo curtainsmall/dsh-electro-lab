@@ -67,16 +67,16 @@ describe('createSolveStepsTool', () => {
 
   it('runs steps serially and returns stepResults with inputs and outputs', async () => {
     const { ctx, calls } = fakeCtx((input) => {
-      if (input.name === 'z_to_gamma') return { re: 0.2, im: 0.4, unit: 'none' }
-      if (input.name === 'gamma_to_vswr') return { re: 2.618, im: 0, unit: 'none' }
+      if (input.name === 'impedance_to_reflection') return { re: 0.2, im: 0.4, unit: 'none' }
+      if (input.name === 'reflection_to_vswr') return { re: 2.618, im: 0, unit: 'none' }
       return { re: 6.99, im: 0, unit: 'log' }
     })
     const tool = createSolveStepsTool(ctx as never)
     const result = await tool.execute(
       {
         steps: [
-          { tool: 'z_to_gamma', args: { impedance: { form: 'rect', re: 50, im: 50, unit: 'resistance' } } },
-          { tool: 'gamma_to_vswr', args: { reflectionCoefficient: '@step0' } },
+          { tool: 'impedance_to_reflection', args: { impedance: { form: 'rect', re: 50, im: 50, unit: 'resistance' } } },
+          { tool: 'reflection_to_vswr', args: { reflectionCoefficient: '@step0' } },
           { tool: 'return_loss', args: { reflectionCoefficient: '@step0' } },
         ],
       } as never,
@@ -85,8 +85,8 @@ describe('createSolveStepsTool', () => {
 
     expect(result).toEqual({
       stepResults: [
-        { tool: 'z_to_gamma', input: { impedance: { form: 'rect', re: 50, im: 50, unit: 'resistance' } }, output: { re: 0.2, im: 0.4, unit: 'none' } },
-        { tool: 'gamma_to_vswr', input: { reflectionCoefficient: '@step0' }, output: { re: 2.618, im: 0, unit: 'none' } },
+        { tool: 'impedance_to_reflection', input: { impedance: { form: 'rect', re: 50, im: 50, unit: 'resistance' } }, output: { re: 0.2, im: 0.4, unit: 'none' } },
+        { tool: 'reflection_to_vswr', input: { reflectionCoefficient: '@step0' }, output: { re: 2.618, im: 0, unit: 'none' } },
         { tool: 'return_loss', input: { reflectionCoefficient: '@step0' }, output: { re: 6.99, im: 0, unit: 'log' } },
       ],
     })
@@ -112,7 +112,7 @@ describe('createSolveStepsTool', () => {
     const tool = createSolveStepsTool(ctx as never)
     await expect(
       tool.execute(
-        { steps: [{ tool: 'z_to_gamma', args: {} }, { tool: 'bad_tool', args: {} }] } as never,
+        { steps: [{ tool: 'impedance_to_reflection', args: {} }, { tool: 'bad_tool', args: {} }] } as never,
         fakeExec(),
       ),
     ).rejects.toThrow(/step 1 \(bad_tool\) failed: boom/)
