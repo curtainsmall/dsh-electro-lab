@@ -83,3 +83,141 @@ export function lNetworkMatch(sourceImpedance: number, loadImpedance: number, fr
     ],
   }
 }
+
+/** Matching topology. */
+export enum MatchTopology {
+  L = 'l',
+  Pi = 'pi',
+  T = 't',
+}
+
+/** One signed reactance in a matching network (positive = inductive). */
+export interface MatchElement {
+  role: 'shunt-source' | 'series' | 'shunt-load' | 'series-source' | 'series-load'
+  reactance: number
+}
+
+/** A designed matching network: ordered elements per solution. */
+export interface MatchDesign {
+  topology: MatchTopology
+  qualityFactor: number
+  solutions: MatchElement[][]
+}
+
+/**
+ * Design a pi network matching two real resistances with a specified Q.
+ * Formulas (Bowick): with Rs < Rl and Q > QL = √(Rl/Rs − 1):
+ *   Rint = Rs/(1+Q²); Xp1 = Rs/Q; Q2 = √(Rl/Rint − 1);
+ *   Xp2 = Rl/Q2; Xs = Rint·(Q + Q2).
+ */
+export function piNetworkMatch(sourceImpedance: number, loadImpedance: number, qualityFactor: number): MatchElement[][] {
+  const [small, large, flipped] = sourceImpedance <= loadImpedance
+    ? [sourceImpedance, loadImpedance, false]
+    : [loadImpedance, sourceImpedance, true]
+  const minimumQ = Math.sqrt(large / small - 1)
+  if (qualityFactor <= minimumQ) {
+    throw new Error(`pi network: qualityFactor ${qualityFactor} must exceed the L-network minimum ${minimumQ.toFixed(3)}`)
+  }
+  const q = qualityFactor
+  const rint = small / (1 + q * q)
+  const q2 = Math.sqrt(large / rint - 1)
+  const xp1 = small / q
+  const xp2 = large / q2
+  const xs = rint * (q + q2)
+  const shuntSource = flipped ? 'shunt-load' : 'shunt-source'
+  const shuntLoad = flipped ? 'shunt-source' : 'shunt-load'
+  return [
+    [
+      { role: shuntSource, reactance: -xp1 },
+      { role: 'series', reactance: xs },
+      { role: shuntLoad, reactance: -xp2 },
+    ],
+    [
+      { role: shuntSource, reactance: xp1 },
+      { role: 'series', reactance: -xs },
+      { role: shuntLoad, reactance: xp2 },
+    ],
+  ]
+}
+
+/**
+ * Design a T network matching two real resistances with a specified Q.
+ *
+ * A T network is two back-to-back L networks sharing an intermediate
+ * resistance Rp (Rs → Rp step-up, then Rp → Rl step-down). The two shunt
+ * elements sit at the same junction and merge into one:
+ *   Q1 = √(Rp/Rs − 1), Q2 = √(Rp/Rl − 1), Q = Q1 + Q2
+ * Rp is solved implicitly from the specified Q (bisection), then:
+ *   Xs1 = Q1·Rs; Xs2 = Q2·Rl; Xp = Rp/Q.
+ */
+export function tNetworkMatch(sourceImpedance: number, loadImpedance: number, qualityFactor: number): MatchElement[][] {
+  const [small, large, flipped] = sourceImpedance <= loadImpedance
+    ? [sourceImpedance, loadImpedance, false]
+    : [loadImpedance, sourceImpedance, true]
+  const minimumQ = Math.sqrt(large / small - 1)
+  if (qualityFactor <= minimumQ) {
+    throw new Error(`t network: qualityFactor ${qualityFactor} must exceed the L-network minimum ${minimumQ.toFixed(3)}`)
+  }
+  // Solve √(Rp/small − 1) + √(Rp/large − 1) = qualityFactor for Rp.
+  const target = (rp: number) => Math.sqrt(rp / small - 1) + Math.sqrt(rp / large - 1) - qualityFactor
+  let lower = large
+  let upper = large
+  while (target(upper) < 0) upper *= 2
+  for (let i = 0; i < 80; i++) {
+    const mid = (lower + upper) / 2
+    if (target(mid) < 0) lower = mid
+    else upper = mid
+  }
+  const rp = (lower + upper) / 2
+  const q1 = Math.sqrt(rp / small - 1)
+  const q2 = Math.sqrt(rp / large - 1)
+  const xs1 = q1 * small
+  const xs2 = q2 * large
+  const xp = rp / qualityFactor
+  const seriesSource = flipped ? 'series-load' : 'series-source'
+  const seriesLoad = flipped ? 'series-source' : 'series-load'
+  return [
+    [
+      { role: seriesSource, reactance: xs1 },
+      { role: 'shunt-source', reactance: -xp },
+      { role: seriesLoad, reactance: xs2 },
+    ],
+    [
+      { role: seriesSource, reactance: -xs1 },
+      { role: 'shunt-source', reactance: xp },
+      { role: seriesLoad, reactance: -xs2 },
+    ],
+  ]
+}
+
+/** Design any supported matching topology; 'l' uses the implied Q, 'pi'/'t' need a specified Q. */
+export function designMatch(
+  topology: MatchTopology,
+  sourceImpedance: number,
+  loadImpedance: number,
+  frequency: number,
+  qualityFactor?: number,
+): MatchDesign {
+  if (sourceImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
+  if (frequency <= 0) throw new Error('frequency must be positive (Hz)')
+  if (sourceImpedance === loadImpedance) {
+    throw new Error('source and load are already equal — no network needed')
+  }
+  if (topology === MatchTopology.Pi) {
+    if (qualityFactor === undefined) throw new Error('pi network requires a qualityFactor')
+    return { topology, qualityFactor, solutions: piNetworkMatch(sourceImpedance, loadImpedance, qualityFactor) }
+  }
+  if (topology === MatchTopology.T) {
+    if (qualityFactor === undefined) throw new Error('t network requires a qualityFactor')
+    return { topology, qualityFactor, solutions: tNetworkMatch(sourceImpedance, loadImpedance, qualityFactor) }
+  }
+  const result = lNetworkMatch(sourceImpedance, loadImpedance, frequency)
+  if (result.matched) throw new Error('source and load are already equal — no network needed')
+  const shuntRole = result.shuntSide === MatchSide.Source ? 'shunt-source' : 'shunt-load'
+  const seriesRole = result.seriesSide === MatchSide.Source ? 'series-source' : 'series-load'
+  const solutions: MatchElement[][] = result.solutions!.map((solution) => [
+    { role: seriesRole, reactance: solution.seriesReactance },
+    { role: shuntRole, reactance: solution.shuntReactance },
+  ])
+  return { topology, qualityFactor: result.qualityFactor!, solutions }
+}
