@@ -8,11 +8,11 @@
  *   shunt capacitors:  C_k = g_k / (R·ωc)
  * Ladder starts with a series element; roles alternate.
  */
-import { ElementKind } from './circuits.ts'
+import { Connection, ElementKind } from './circuits.ts'
 
 /** One ladder element of a designed filter. */
 export interface FilterElement {
-  role: 'series' | 'shunt'
+  role: Connection
   kind: ElementKind.Inductance | ElementKind.Capacitance
   value: number
 }
@@ -35,8 +35,8 @@ export function butterworthLowpass(
     const series = k % 2 === 1
     elements.push(
       series
-        ? { role: 'series', kind: ElementKind.Inductance, value: (resistance * g) / angularCutoff }
-        : { role: 'shunt', kind: ElementKind.Capacitance, value: g / (resistance * angularCutoff) },
+        ? { role: Connection.Series, kind: ElementKind.Inductance, value: (resistance * g) / angularCutoff }
+        : { role: Connection.Shunt, kind: ElementKind.Capacitance, value: g / (resistance * angularCutoff) },
     )
   }
   return elements

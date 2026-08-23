@@ -30,6 +30,12 @@ export enum ElementKind {
   Capacitance = 'capacitance',
 }
 
+/** How an element connects into a path. */
+export enum Connection {
+  Series = 'series',
+  Shunt = 'shunt',
+}
+
 /** Impedance of one lumped element at a frequency: R, jωL, 1/(jωC).
  *  Module-private: the public entry is networkImpedance with a leaf node. */
 function elementImpedance(
@@ -83,9 +89,12 @@ export function networkImpedance(
 ): Complex {
   if ("kind" in node) return elementImpedance(node.kind, node.value, frequency);
   const parts = node.elements.map((child) => networkImpedance(child, frequency));
-  return node.topology === CircuitMode.Series
-    ? seriesOf(parts)
-    : parallelOf(parts);
+  switch (node.topology) {
+    case CircuitMode.Series:
+      return seriesOf(parts);
+    case CircuitMode.Parallel:
+      return parallelOf(parts);
+  }
 }
 
 /** Series resonance: resonantFrequency = 1/(2π√(LC)). Q and bandwidth need R (mode-aware). */
@@ -104,10 +113,15 @@ export function resonance(
   if (resistance === undefined || !Number.isFinite(resistance))
     return { resonantFrequency };
   if (resistance <= 0) throw new Error("resistance must be positive (Ω)");
-  const qualityFactor =
-    mode === CircuitMode.Series
-      ? Math.sqrt(inductance / capacitance) / resistance
-      : resistance * Math.sqrt(capacitance / inductance);
+  let qualityFactor: number;
+  switch (mode) {
+    case CircuitMode.Series:
+      qualityFactor = Math.sqrt(inductance / capacitance) / resistance;
+      break;
+    case CircuitMode.Parallel:
+      qualityFactor = resistance * Math.sqrt(capacitance / inductance);
+      break;
+  }
   return {
     resonantFrequency,
     qualityFactor,
@@ -147,12 +161,18 @@ export function rcTransient(
   if (time < 0) throw new Error("time must be non-negative (s)");
   const timeConstant = resistance * capacitance;
   const exp = Math.exp(-time / timeConstant);
-  const voltage =
-    mode === SwitchingMode.Charge ? sourceVoltage * (1 - exp) : initialVoltage * exp;
-  const current =
-    mode === SwitchingMode.Charge
-      ? (sourceVoltage - voltage) / resistance
-      : voltage / resistance;
+  let voltage: number;
+  let current: number;
+  switch (mode) {
+    case SwitchingMode.Charge:
+      voltage = sourceVoltage * (1 - exp);
+      current = (sourceVoltage - voltage) / resistance;
+      break;
+    case SwitchingMode.Discharge:
+      voltage = initialVoltage * exp;
+      current = voltage / resistance;
+      break;
+  }
   return { voltage, current, timeConstant };
 }
 
@@ -170,14 +190,18 @@ export function rlTransient(
   if (time < 0) throw new Error("time must be non-negative (s)");
   const timeConstant = inductance / resistance;
   const exp = Math.exp(-time / timeConstant);
-  const current =
-    mode === SwitchingMode.Charge
-      ? (sourceVoltage / resistance) * (1 - exp)
-      : initialCurrent * exp;
-  const voltage =
-    mode === SwitchingMode.Charge
-      ? sourceVoltage * exp
-      : initialCurrent * resistance * exp;
+  let current: number;
+  let voltage: number;
+  switch (mode) {
+    case SwitchingMode.Charge:
+      current = (sourceVoltage / resistance) * (1 - exp);
+      voltage = sourceVoltage * exp;
+      break;
+    case SwitchingMode.Discharge:
+      current = initialCurrent * exp;
+      voltage = initialCurrent * resistance * exp;
+      break;
+  }
   return { current, voltage, timeConstant };
 }
 

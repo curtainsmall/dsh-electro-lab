@@ -86,11 +86,15 @@ function polarAngle(value: PolarDegreesValue | PolarRadiansValue): number {
  *  (no `form` discriminator) are treated as rect values. */
 export function toComplex(value: ComplexValue, expected: Unit): Complex {
   expectUnit(value, expected)
-  if ('form' in value && value.form === Form.Polar) {
-    const phi = polarAngle(value)
-    return new Complex(value.mag * Math.cos(phi), value.mag * Math.sin(phi))
+  if (!('form' in value)) return new Complex(value.re, value.im)
+  switch (value.form) {
+    case Form.Rect:
+      return new Complex(value.re, value.im)
+    case Form.Polar: {
+      const phi = polarAngle(value)
+      return new Complex(value.mag * Math.cos(phi), value.mag * Math.sin(phi))
+    }
   }
-  return new Complex(value.re, value.im)
 }
 
 /** Unwrap to a real number, validating the unit. A rect value must have a
@@ -98,18 +102,28 @@ export function toComplex(value: ComplexValue, expected: Unit): Complex {
  *  (angle ≈ 0° or 180°). */
 export function toScalar(value: ComplexValue, expected: Unit): number {
   expectUnit(value, expected)
-  if ('form' in value && value.form === Form.Polar) {
-    const phi = polarAngle(value)
-    const halfTurns = phi / Math.PI
-    if (!nearlyEqual(Math.abs(halfTurns % 1), 0) && !nearlyEqual(Math.abs(halfTurns % 1), 1)) {
-      throw new Error(`expected a real value for unit "${expected}", got phase angle ${phi} rad`)
+  if (!('form' in value)) {
+    if (!nearlyEqual(value.im, 0)) {
+      throw new Error(`expected a real value for unit "${expected}", got imaginary part ${value.im}`)
     }
-    return value.mag * (Math.round(halfTurns) % 2 === 0 ? 1 : -1)
+    return value.re
   }
-  if (!nearlyEqual(value.im, 0)) {
-    throw new Error(`expected a real value for unit "${expected}", got imaginary part ${value.im}`)
+  switch (value.form) {
+    case Form.Rect: {
+      if (!nearlyEqual(value.im, 0)) {
+        throw new Error(`expected a real value for unit "${expected}", got imaginary part ${value.im}`)
+      }
+      return value.re
+    }
+    case Form.Polar: {
+      const phi = polarAngle(value)
+      const halfTurns = phi / Math.PI
+      if (!nearlyEqual(Math.abs(halfTurns % 1), 0) && !nearlyEqual(Math.abs(halfTurns % 1), 1)) {
+        throw new Error(`expected a real value for unit "${expected}", got phase angle ${phi} rad`)
+      }
+      return value.mag * (Math.round(halfTurns) % 2 === 0 ? 1 : -1)
+    }
   }
-  return value.re
 }
 
 /** Tool output for a complex result: the complete snapshot. */

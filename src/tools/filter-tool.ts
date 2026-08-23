@@ -2,6 +2,7 @@
  * filter_design — Butterworth low-pass ladder design in one call.
  */
 import { butterworthAttenuation, butterworthLowpass } from '../math/filter.ts'
+import { ElementKind } from '../math/circuits.ts'
 import { toScalar, realValue } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
 import { defineJsonTool, valueParam } from './helpers.ts'
@@ -30,7 +31,7 @@ export const filterTool = defineJsonTool({
       elements: elements.map((element) => ({
         role: element.role,
         kind: element.kind,
-        value: realValue(element.value, element.kind === 'inductance' ? Unit.Inductance : Unit.Capacitance),
+        value: realValue(element.value, element.kind === ElementKind.Inductance ? Unit.Inductance : Unit.Capacitance),
       })),
       attenuationAtCutoffDb: realValue(butterworthAttenuation(order, cutoffFrequency, cutoffFrequency), Unit.Log),
     }

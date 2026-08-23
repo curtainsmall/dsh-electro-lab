@@ -91,9 +91,29 @@ export enum MatchTopology {
   T = 't',
 }
 
+/** Role of one element inside a matching network. */
+export enum ElementRole {
+  ShuntSource = 'shunt-source',
+  Series = 'series',
+  ShuntLoad = 'shunt-load',
+  SeriesSource = 'series-source',
+  SeriesLoad = 'series-load',
+}
+
+/** Pure mappings: match side → element role (used by designMatch). */
+const SHUNT_ROLE: Record<MatchSide, ElementRole.ShuntSource | ElementRole.ShuntLoad> = {
+  [MatchSide.Source]: ElementRole.ShuntSource,
+  [MatchSide.Load]: ElementRole.ShuntLoad,
+}
+
+const SERIES_ROLE: Record<MatchSide, ElementRole.SeriesSource | ElementRole.SeriesLoad> = {
+  [MatchSide.Source]: ElementRole.SeriesSource,
+  [MatchSide.Load]: ElementRole.SeriesLoad,
+}
+
 /** One signed reactance in a matching network (positive = inductive). */
 export interface MatchElement {
-  role: 'shunt-source' | 'series' | 'shunt-load' | 'series-source' | 'series-load'
+  role: ElementRole
   reactance: number
 }
 
@@ -124,17 +144,17 @@ export function piNetworkMatch(sourceImpedance: number, loadImpedance: number, q
   const xp1 = small / q
   const xp2 = large / q2
   const xs = rint * (q + q2)
-  const shuntSource = flipped ? 'shunt-load' : 'shunt-source'
-  const shuntLoad = flipped ? 'shunt-source' : 'shunt-load'
+  const shuntSource = flipped ? ElementRole.ShuntLoad : ElementRole.ShuntSource
+  const shuntLoad = flipped ? ElementRole.ShuntSource : ElementRole.ShuntLoad
   return [
     [
       { role: shuntSource, reactance: -xp1 },
-      { role: 'series', reactance: xs },
+      { role: ElementRole.Series, reactance: xs },
       { role: shuntLoad, reactance: -xp2 },
     ],
     [
       { role: shuntSource, reactance: xp1 },
-      { role: 'series', reactance: -xs },
+      { role: ElementRole.Series, reactance: -xs },
       { role: shuntLoad, reactance: xp2 },
     ],
   ]
@@ -174,17 +194,17 @@ export function tNetworkMatch(sourceImpedance: number, loadImpedance: number, qu
   const xs1 = q1 * small
   const xs2 = q2 * large
   const xp = rp / qualityFactor
-  const seriesSource = flipped ? 'series-load' : 'series-source'
-  const seriesLoad = flipped ? 'series-source' : 'series-load'
+  const seriesSource = flipped ? ElementRole.SeriesLoad : ElementRole.SeriesSource
+  const seriesLoad = flipped ? ElementRole.SeriesSource : ElementRole.SeriesLoad
   return [
     [
       { role: seriesSource, reactance: xs1 },
-      { role: 'shunt-source', reactance: -xp },
+      { role: ElementRole.ShuntSource, reactance: -xp },
       { role: seriesLoad, reactance: xs2 },
     ],
     [
       { role: seriesSource, reactance: -xs1 },
-      { role: 'shunt-source', reactance: xp },
+      { role: ElementRole.ShuntSource, reactance: xp },
       { role: seriesLoad, reactance: -xs2 },
     ],
   ]
@@ -203,21 +223,25 @@ export function designMatch(
   if (sourceImpedance === loadImpedance) {
     throw new Error('source and load are already equal — no network needed')
   }
-  if (topology === MatchTopology.Pi) {
-    if (qualityFactor === undefined) throw new Error('pi network requires a qualityFactor')
-    return { topology, qualityFactor, solutions: piNetworkMatch(sourceImpedance, loadImpedance, qualityFactor) }
+  switch (topology) {
+    case MatchTopology.Pi: {
+      if (qualityFactor === undefined) throw new Error('pi network requires a qualityFactor')
+      return { topology, qualityFactor, solutions: piNetworkMatch(sourceImpedance, loadImpedance, qualityFactor) }
+    }
+    case MatchTopology.T: {
+      if (qualityFactor === undefined) throw new Error('t network requires a qualityFactor')
+      return { topology, qualityFactor, solutions: tNetworkMatch(sourceImpedance, loadImpedance, qualityFactor) }
+    }
+    case MatchTopology.L: {
+      const result = lNetworkMatch(sourceImpedance, loadImpedance, frequency)
+      if (result.matched) throw new Error('source and load are already equal — no network needed')
+      const shuntRole = SHUNT_ROLE[result.shuntSide]
+      const seriesRole = SERIES_ROLE[result.seriesSide]
+      const solutions: MatchElement[][] = result.solutions!.map((solution) => [
+        { role: seriesRole, reactance: solution.seriesReactance },
+        { role: shuntRole, reactance: solution.shuntReactance },
+      ])
+      return { topology, qualityFactor: result.qualityFactor!, solutions }
+    }
   }
-  if (topology === MatchTopology.T) {
-    if (qualityFactor === undefined) throw new Error('t network requires a qualityFactor')
-    return { topology, qualityFactor, solutions: tNetworkMatch(sourceImpedance, loadImpedance, qualityFactor) }
-  }
-  const result = lNetworkMatch(sourceImpedance, loadImpedance, frequency)
-  if (result.matched) throw new Error('source and load are already equal — no network needed')
-  const shuntRole = result.shuntSide === MatchSide.Source ? 'shunt-source' : 'shunt-load'
-  const seriesRole = result.seriesSide === MatchSide.Source ? 'series-source' : 'series-load'
-  const solutions: MatchElement[][] = result.solutions!.map((solution) => [
-    { role: seriesRole, reactance: solution.seriesReactance },
-    { role: shuntRole, reactance: solution.shuntReactance },
-  ])
-  return { topology, qualityFactor: result.qualityFactor!, solutions }
 }
