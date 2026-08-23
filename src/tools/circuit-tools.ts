@@ -10,8 +10,10 @@ import {
   networkImpedance,
   parallelOf,
   rcTransient,
+  rcTransientSeries,
   resonance,
   rlTransient,
+  rlTransientSeries,
   seriesOf,
   type NetworkElement,
 } from '../math/circuits.ts'
@@ -167,6 +169,57 @@ export const circuitTools = [
       if (mode === SwitchingMode.Discharge && args.initialCurrent === undefined) throw new Error('discharge mode requires initialCurrent')
       const { current, voltage, timeConstant } = rlTransient(mode, sourceVoltage, initialCurrent, resistance, inductance, time)
       return { current: realValue(current, Unit.Current), voltage: realValue(voltage, Unit.Voltage), timeConstant: realValue(timeConstant, Unit.Time), mode }
+    },
+  }),
+  defineJsonTool({
+    name: 'transient_response',
+    description: 'RC or RL transient evaluated at a list of time points in one call — the full charge/discharge curve. kind selects rc (resistance + capacitance) or rl (resistance + inductance); charge requires sourceVoltage, discharge requires initialVoltage (rc) or initialCurrent (rl). Returns one point per time with voltage and current.',
+    parameters: {
+      kind: { type: 'string', enum: ['rc', 'rl'], description: 'circuit kind', required: true },
+      mode: { type: 'string', enum: [SwitchingMode.Charge, SwitchingMode.Discharge], description: 'charge or discharge', required: true },
+      sourceVoltage: { ...valueParam(Unit.Voltage, 'source voltage (charge mode)') },
+      initialVoltage: { ...valueParam(Unit.Voltage, 'initial capacitor voltage (rc discharge mode)') },
+      initialCurrent: { ...valueParam(Unit.Current, 'initial inductor current (rl discharge mode)') },
+      resistance: { ...valueParam(Unit.Resistance, 'resistance'), required: true },
+      capacitance: { ...valueParam(Unit.Capacitance, 'capacitance (rc)') },
+      inductance: { ...valueParam(Unit.Inductance, 'inductance (rl)') },
+      times: {
+        type: 'array',
+        description: 'time points to evaluate',
+        required: true,
+        items: valueParam(Unit.Time, 'time'),
+      },
+    },
+    execute: (args) => {
+      const mode = args.mode === SwitchingMode.Discharge ? SwitchingMode.Discharge : SwitchingMode.Charge
+      const resistance = toScalar(args.resistance, Unit.Resistance)
+      const times = args.times.map((item) => toScalar(item, Unit.Time))
+      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, Unit.Voltage)
+      let points: Array<{ time: number; voltage: number; current: number }>
+      if (args.kind === 'rl') {
+        if (args.inductance === undefined) throw new Error('rl kind requires inductance')
+        const inductance = toScalar(args.inductance, Unit.Inductance)
+        const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent, Unit.Current)
+        if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
+        if (mode === SwitchingMode.Discharge && args.initialCurrent === undefined) throw new Error('discharge mode requires initialCurrent')
+        points = rlTransientSeries(mode, sourceVoltage, initialCurrent, resistance, inductance, times)
+      } else {
+        if (args.capacitance === undefined) throw new Error('rc kind requires capacitance')
+        const capacitance = toScalar(args.capacitance, Unit.Capacitance)
+        const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage, Unit.Voltage)
+        if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
+        if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined) throw new Error('discharge mode requires initialVoltage')
+        points = rcTransientSeries(mode, sourceVoltage, initialVoltage, resistance, capacitance, times)
+      }
+      return {
+        kind: args.kind,
+        mode,
+        points: points.map((point) => ({
+          time: realValue(point.time, Unit.Time),
+          voltage: realValue(point.voltage, Unit.Voltage),
+          current: realValue(point.current, Unit.Current),
+        })),
+      }
     },
   }),
 ]

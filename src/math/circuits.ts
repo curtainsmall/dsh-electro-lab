@@ -226,3 +226,54 @@ export function rlTransient(
       : initialCurrent * resistance * exp;
   return { current, voltage, timeConstant };
 }
+
+/** One transient sample point. */
+export interface TransientPoint {
+  time: number
+  voltage: number
+  current: number
+}
+
+/** RC transient evaluated at a list of time points (batch call for curves). */
+export function rcTransientSeries(
+  mode: SwitchingMode,
+  sourceVoltage: number,
+  initialVoltage: number,
+  resistance: number,
+  capacitance: number,
+  times: readonly number[],
+): TransientPoint[] {
+  return times.map((time) => {
+    const { voltage, current } = rcTransient(
+      mode,
+      sourceVoltage,
+      initialVoltage,
+      resistance,
+      capacitance,
+      time,
+    );
+    return { time, voltage, current };
+  });
+}
+
+/** RL transient evaluated at a list of time points (batch call for curves). */
+export function rlTransientSeries(
+  mode: SwitchingMode,
+  sourceVoltage: number,
+  initialCurrent: number,
+  resistance: number,
+  inductance: number,
+  times: readonly number[],
+): TransientPoint[] {
+  return times.map((time) => {
+    const { current, voltage } = rlTransient(
+      mode,
+      sourceVoltage,
+      initialCurrent,
+      resistance,
+      inductance,
+      time,
+    );
+    return { time, voltage, current };
+  });
+}

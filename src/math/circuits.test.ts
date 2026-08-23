@@ -7,8 +7,10 @@ import {
   parallelImpedance,
   parallelTwo,
   rcTransient,
+  rcTransientSeries,
   resonance,
   rlTransient,
+  rlTransientSeries,
   seriesImpedance,
 } from './circuits.ts'
 
@@ -103,5 +105,31 @@ describe('RL transient', () => {
   it('discharges from I0', () => {
     const { current } = rlTransient(SwitchingMode.Discharge, 0, 0.2, 100, 1e-3, 1e-5)
     expect(current).toBeCloseTo(0.2 * Math.exp(-1), 6)
+  })
+})
+
+describe('transient series — batch time points', () => {
+  it('rc series matches individual evaluations', () => {
+    const times = [0, 0.5e-3, 1e-3, 2e-3]
+    const series = rcTransientSeries(SwitchingMode.Charge, 5, 0, 1e3, 1e-6, times)
+    expect(series).toHaveLength(4)
+    series.forEach((point, index) => {
+      const single = rcTransient(SwitchingMode.Charge, 5, 0, 1e3, 1e-6, times[index]!)
+      expect(point.voltage).toBeCloseTo(single.voltage, 12)
+      expect(point.current).toBeCloseTo(single.current, 12)
+    })
+  })
+
+  it('rl series matches individual evaluations', () => {
+    const times = [0, 1e-5, 2e-5]
+    const series = rlTransientSeries(SwitchingMode.Charge, 10, 0, 100, 1e-3, times)
+    series.forEach((point, index) => {
+      const single = rlTransient(SwitchingMode.Charge, 10, 0, 100, 1e-3, times[index]!)
+      expect(point.current).toBeCloseTo(single.current, 12)
+    })
+  })
+
+  it('rejects negative time points through the underlying evaluation', () => {
+    expect(() => rcTransientSeries(SwitchingMode.Charge, 5, 0, 1e3, 1e-6, [-1])).toThrow(/non-negative/)
   })
 })
