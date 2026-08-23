@@ -88,53 +88,6 @@ export function networkImpedance(
     : parallelOf(parts);
 }
 
-/** Series RLC impedance: Z = R + jωL + 1/(jωC). Omit L=0 / C=0 terms. */
-export function seriesImpedance(
-  frequency: number,
-  resistance: number,
-  inductance: number,
-  capacitance: number,
-): Complex {
-  const w = omega(frequency);
-  let z = new Complex(resistance, 0);
-  if (inductance > 0) z = z.add(new Complex(0, w * inductance));
-  if (capacitance > 0) z = z.add(new Complex(0, -1 / (w * capacitance)));
-  return z;
-}
-
-/** Parallel RLC impedance: 1/Z = 1/R + 1/(jωL) + jωC. `resistance` may be omitted (open). */
-export function parallelImpedance(
-  frequency: number,
-  resistance: number | undefined,
-  inductance: number,
-  capacitance: number,
-): Complex {
-  const w = omega(frequency);
-  let y = new Complex(
-    resistance !== undefined && Number.isFinite(resistance)
-      ? 1 / resistance
-      : 0,
-    0,
-  );
-  if (inductance > 0) y = y.add(new Complex(0, -1 / (w * inductance)));
-  if (capacitance > 0) y = y.add(new Complex(0, w * capacitance));
-  if (y.abs() === 0) throw new Error("parallel RLC has no element (all open)");
-  return y.inverse();
-}
-
-/** Parallel combination of two impedances: Z = Z1·Z2 / (Z1+Z2). */
-export function parallelTwo(
-  firstImpedance: Complex,
-  secondImpedance: Complex,
-): Complex {
-  const sum = firstImpedance.add(secondImpedance);
-  if (sum.abs() === 0)
-    throw new Error(
-      "parallel combination has zero total impedance (short circuit)",
-    );
-  return firstImpedance.mul(secondImpedance).div(sum);
-}
-
 /** Series resonance: resonantFrequency = 1/(2π√(LC)). Q and bandwidth need R (mode-aware). */
 export function resonance(
   inductance: number,

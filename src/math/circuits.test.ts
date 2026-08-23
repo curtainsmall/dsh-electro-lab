@@ -4,54 +4,12 @@ import {
   CircuitMode,
   SwitchingMode,
   acPower,
-  parallelImpedance,
-  parallelTwo,
   rcTransient,
   rcTransientSeries,
   resonance,
   rlTransient,
   rlTransientSeries,
-  seriesImpedance,
 } from './circuits.ts'
-
-describe('series RLC impedance', () => {
-  it('is purely resistive at resonance (textbook check)', () => {
-    // L = 1 mH, C = 1 µF → f0 = 1/(2π√(LC)) ≈ 5032.9 Hz
-    const f0 = 1 / (2 * Math.PI * Math.sqrt(1e-3 * 1e-6))
-    const z = seriesImpedance(f0, 10, 1e-3, 1e-6)
-    expect(z.re).toBeCloseTo(10, 12)
-    expect(z.im).toBeCloseTo(0, 6)
-  })
-
-  it('computes off-resonance reactances', () => {
-    // f = 1 kHz: XL = 2π·1000·1e-3 ≈ 6.283 Ω, XC = 1/(2π·1000·1e-6) ≈ 159.15 Ω
-    const z = seriesImpedance(1000, 10, 1e-3, 1e-6)
-    expect(z.re).toBeCloseTo(10, 12)
-    expect(z.im).toBeCloseTo(6.2832 - 159.1549, 3)
-  })
-
-  it('omits zero elements', () => {
-    const z = seriesImpedance(1000, 10, 0, 1e-6)
-    expect(z.re).toBeCloseTo(10, 12)
-    expect(z.im).toBeCloseTo(-159.1549, 3)
-  })
-})
-
-describe('parallel impedance', () => {
-  it('combines two impedances (50 ∥ 50+j50 = 30+j10)', () => {
-    const z = parallelTwo(new Complex(50, 0), new Complex(50, 50))
-    expect(z.re).toBeCloseTo(30, 6)
-    expect(z.im).toBeCloseTo(10, 6)
-  })
-
-  it('parallel RLC peaks near resonance', () => {
-    // L = 1 mH, C = 1 µF, R = 1 kΩ → at f0 the impedance is purely real = R
-    const f0 = 1 / (2 * Math.PI * Math.sqrt(1e-3 * 1e-6))
-    const z = parallelImpedance(f0, 1000, 1e-3, 1e-6)
-    expect(z.re).toBeCloseTo(1000, 3)
-    expect(Math.abs(z.im)).toBeLessThan(1e-6)
-  })
-})
 
 describe('resonance', () => {
   it('computes f0, Q, and bandwidth (textbook check)', () => {
