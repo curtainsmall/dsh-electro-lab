@@ -30,8 +30,9 @@ export enum ElementKind {
   Capacitance = 'capacitance',
 }
 
-/** Impedance of one lumped element at a frequency: R, jωL, 1/(jωC). */
-export function elementImpedance(
+/** Impedance of one lumped element at a frequency: R, jωL, 1/(jωC).
+ *  Module-private: the public entry is networkImpedance with a leaf node. */
+function elementImpedance(
   kind: ElementKind,
   value: number,
   frequency: number,

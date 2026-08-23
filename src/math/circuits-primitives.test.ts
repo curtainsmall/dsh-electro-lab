@@ -3,7 +3,6 @@ import { Complex } from 'complex.js'
 import {
   CircuitMode,
   ElementKind,
-  elementImpedance,
   networkImpedance,
   parallelOf,
   seriesOf,
@@ -15,13 +14,13 @@ function close(z: Complex, re: number, im: number, tol = 1e-6): void {
   expect(z.im).toBeCloseTo(im, 6)
 }
 
-describe('elementImpedance', () => {
+describe('element leaves (through networkImpedance)', () => {
   it('computes R, jωL, and 1/(jωC) at a frequency', () => {
     const f = 1000
     const w = 2 * Math.PI * f
-    close(elementImpedance(ElementKind.Resistance, 10, f), 10, 0)
-    close(elementImpedance(ElementKind.Inductance, 1e-3, f), 0, w * 1e-3)
-    close(elementImpedance(ElementKind.Capacitance, 1e-6, f), 0, -1 / (w * 1e-6))
+    close(networkImpedance({ kind: ElementKind.Resistance, value: 10 }, f), 10, 0)
+    close(networkImpedance({ kind: ElementKind.Inductance, value: 1e-3 }, f), 0, w * 1e-3)
+    close(networkImpedance({ kind: ElementKind.Capacitance, value: 1e-6 }, f), 0, -1 / (w * 1e-6))
   })
 })
 
@@ -29,9 +28,9 @@ describe('seriesOf / parallelOf — primitive combinations', () => {
   it('series RLC equals the textbook formula (10 − j1585 at 1 kHz)', () => {
     const f = 1000
     const parts = [
-      elementImpedance(ElementKind.Resistance, 10, f),
-      elementImpedance(ElementKind.Inductance, 1e-3, f),
-      elementImpedance(ElementKind.Capacitance, 1e-6, f),
+      networkImpedance({ kind: ElementKind.Resistance, value: 10 }, f),
+      networkImpedance({ kind: ElementKind.Inductance, value: 1e-3 }, f),
+      networkImpedance({ kind: ElementKind.Capacitance, value: 1e-6 }, f),
     ]
     const z = seriesOf(parts)
     expect(z.re).toBeCloseTo(10, 6)
