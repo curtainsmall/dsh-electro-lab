@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { dividePolynomials, findPolesZeros, findPolyRoots } from './polynomial.ts'
+import { dividePolynomials, expandPowerSeries, findPolesZeros, findPolyRoots } from './polynomial.ts'
 
 /** Sort roots by (re, im) for order-independent comparison. */
 function sortedRoots(coefficients: number[]): { re: number; im: number }[] {
@@ -124,5 +124,35 @@ describe('findPolesZeros (textbook checks)', () => {
     const result = findPolesZeros([new Complex(1, 0), new Complex(1, 0)], [new Complex(1, 0), new Complex(3, 0), new Complex(2, 0)])
     expect(result.zeros[0]!.re).toBeCloseTo(-1, 5)
     expect(result.poles).toHaveLength(2)
+  })
+})
+
+describe('expandPowerSeries (textbook checks)', () => {
+  it('0.5z/(z−0.5): impulse response 0.5·0.5ⁿ', () => {
+    // H(z) = 0.5/(1 − 0.5·z⁻¹) → numerator [0.5, 0], denominator [1, −0.5]
+    const coefficients = expandPowerSeries([new Complex(0.5, 0), new Complex(0, 0)], [new Complex(1, 0), new Complex(-0.5, 0)], 5)
+    expect(coefficients.map((c) => c.re)).toEqual([0.5, 0.25, 0.125, 0.0625, 0.03125])
+  })
+
+  it('pure delay: 1/z → h = [0, 1]', () => {
+    const coefficients = expandPowerSeries([new Complex(1, 0)], [new Complex(1, 0), new Complex(0, 0)], 3)
+    expect(coefficients.map((c) => c.re)).toEqual([0, 1, 0])
+  })
+
+  it('finite FIR: H = 1 + 0.5·z⁻¹ terminates', () => {
+    // (z + 0.5)/z → numerator [1, 0.5], denominator [1, 0]
+    const coefficients = expandPowerSeries([new Complex(1, 0), new Complex(0.5, 0)], [new Complex(1, 0), new Complex(0, 0)], 4)
+    expect(coefficients.map((c) => c.re)).toEqual([1, 0.5, 0, 0])
+  })
+
+  it('constant transfer function: h = [2, 0, 0]', () => {
+    const coefficients = expandPowerSeries([new Complex(2, 0)], [new Complex(1, 0)], 3)
+    expect(coefficients.map((c) => c.re)).toEqual([2, 0, 0])
+  })
+
+  it('rejects non-causal numerator degree and bad counts', () => {
+    expect(() => expandPowerSeries([new Complex(1, 0), new Complex(0, 0)], [new Complex(1, 0)], 2)).toThrow(/causal/)
+    expect(() => expandPowerSeries([new Complex(1, 0)], [new Complex(1, 0)], -1)).toThrow(/non-negative/)
+    expect(() => expandPowerSeries([new Complex(1, 0)], [new Complex(1, 0)], 1.5)).toThrow(/non-negative/)
   })
 })

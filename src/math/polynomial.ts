@@ -107,6 +107,37 @@ export function findPolesZeros(numerator: Polynomial, denominator: Polynomial): 
 }
 
 /**
+ * Power-series expansion of N(z)/D(z) about z⁻¹: the first `count` terms of
+ * H(z) = Σ h[n]·z⁻ⁿ. In the z domain these coefficients ARE the impulse
+ * response h[n]. With w = 1/z, H(1/w) = w^(degD−degN)·N(w)/D(w) where the
+ * descending coefficient arrays double as ascending w polynomials (the
+ * reversal cancels); the ratio is expanded by the coefficient recurrence
+ * f[k] = (n[k] − Σᵢ₌₁ d[i]·f[k−i])/d[0], then shifted by degD−degN.
+ */
+export function expandPowerSeries(numerator: Polynomial, denominator: Polynomial, count: number): Complex[] {
+  if (!Number.isInteger(count) || count < 0) throw new Error('count must be a non-negative integer')
+  const n = trimPolynomial(numerator)
+  const d = trimPolynomial(denominator)
+  const leading = d[0]!
+  if (leading.abs() === 0) throw new Error('denominator must be a non-zero polynomial')
+  const shift = d.length - n.length // degD − degN
+  if (shift < 0) throw new Error('numerator degree must not exceed denominator degree (causal system required)')
+  const ratio: Complex[] = []
+  for (let k = 0; k < count; k++) {
+    let sum = n[k] ?? new Complex(0, 0)
+    for (let i = 1; i < d.length && k - i >= 0; i++) {
+      sum = sum.sub(d[i]!.mul(ratio[k - i]!))
+    }
+    ratio.push(sum.div(leading))
+  }
+  const coefficients: Complex[] = []
+  for (let k = 0; k < count; k++) {
+    coefficients.push(k < shift ? new Complex(0, 0) : ratio[k - shift]!)
+  }
+  return coefficients
+}
+
+/**
  * Durand-Kerner (Weierstrass) iteration for all roots of a descending
  * coefficient array. Returns [] for constants; non-monic input is
  * normalized internally. Convergence is quadratic for simple roots; the
