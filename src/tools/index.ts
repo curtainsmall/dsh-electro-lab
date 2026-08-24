@@ -11,6 +11,10 @@ import { smithTools } from './smith-tools.ts'
 import { dftTools } from './dft-tools.ts'
 import { polynomialTools } from './polynomial-tools.ts'
 import { transferTools } from './transfer-tools.ts'
+import { noiseTools } from './noise-tools.ts'
+import { dbTools } from './db-tools.ts'
+import { transmissionTools } from './transmission-tools.ts'
+import { electronicsTools } from './electronics-tools.ts'
 import { filterTool } from './filter-tool.ts'
 import { createSolveStepsTool } from './solve-steps.ts'
 
@@ -20,7 +24,7 @@ declare module 'cordis' {
   }
 }
 
-export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools]
+export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools, ...noiseTools, ...dbTools, ...transmissionTools, ...electronicsTools]
 
 /** Register all tools (the orchestrator is bound to the live context); returns one disposer that unregisters every tool. */
 export function registerTools(ctx: Context): () => void {
