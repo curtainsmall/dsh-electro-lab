@@ -22,21 +22,6 @@ export enum Variable {
   Z = 'z',
 }
 
-// ── Types ────────────────────────────────────────────────────────────────
-
-/** One term of a partial-fraction expansion. */
-export interface PartialFractionTerm {
-  pole: Complex
-  order: number
-  residue: Complex
-}
-
-/** A partial-fraction expansion: polynomial part plus ordered terms. */
-export interface PartialFractionResult {
-  polynomial: Polynomial
-  terms: PartialFractionTerm[]
-}
-
 // ── Frequency response ───────────────────────────────────────────────────
 
 /** H(σ) for each point: N(σ)/D(σ) by Horner evaluation. */
@@ -70,7 +55,10 @@ export function calcFreqPoints(variable: Variable, frequencies: number[], sample
  * for the residues — no numerical differentiation, exact for polynomial
  * arithmetic.
  */
-export function expandPartialFraction(numerator: Polynomial, denominator: Polynomial): PartialFractionResult {
+export function expandPartialFraction(
+  numerator: Polynomial,
+  denominator: Polynomial,
+): { polynomial: Polynomial; terms: { pole: Complex; order: number; residue: Complex }[] } {
   const d = trimPolynomial(denominator)
   if (d.length <= 1) throw new Error('denominator must be at least degree 1')
   let n = trimPolynomial(numerator)
@@ -119,7 +107,7 @@ export function expandPartialFraction(numerator: Polynomial, denominator: Polyno
   const residues = solveLinearSystem(matrix, b)
 
   // 4. emit terms in pole order, ascending order within a pole
-  const terms: PartialFractionTerm[] = []
+  const terms: { pole: Complex; order: number; residue: Complex }[] = []
   let index = 0
   for (const { pole, multiplicity } of poles) {
     for (let order = 1; order <= multiplicity; order++) {

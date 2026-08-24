@@ -5,7 +5,6 @@
  */
 import type { Context } from 'cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
-import { complexTools } from './complex-tools.ts'
 import { expressionTools } from './expression-tools.ts'
 import { circuitTools } from './circuit-tools.ts'
 import { smithTools } from './smith-tools.ts'
@@ -21,7 +20,7 @@ declare module 'cordis' {
   }
 }
 
-export const ALL_TOOLS = [...complexTools, ...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools]
+export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools]
 
 /** Register all tools (the orchestrator is bound to the live context); returns one disposer that unregisters every tool. */
 export function registerTools(ctx: Context): () => void {

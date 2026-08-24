@@ -44,13 +44,6 @@ export interface MatchElement {
   reactance: number
 }
 
-/** A designed matching network: ordered elements per named solution. */
-export interface MatchDesign {
-  topology: MatchTopology
-  qualityFactor: number
-  solutions: Record<MatchVariant, MatchElement[]>
-}
-
 /** Pure mappings: match side → element role (used by designLNetworkMatch). */
 const SHUNT_ROLE: Record<MatchSide, ElementRole.ShuntSource | ElementRole.ShuntLoad> = {
   [MatchSide.Source]: ElementRole.ShuntSource,
@@ -242,7 +235,7 @@ export function designMatch(
   loadImpedance: number,
   frequency: number,
   qualityFactor?: number,
-): MatchDesign {
+): { topology: MatchTopology; qualityFactor: number; solutions: Record<MatchVariant, MatchElement[]> } {
   if (sourceImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
   if (frequency <= 0) throw new Error('frequency must be positive (Hz)')
   if (sourceImpedance === loadImpedance) {

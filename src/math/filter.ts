@@ -10,26 +10,19 @@
  */
 import { Connection, ElementKind } from './circuits.ts'
 
-/** One ladder element of a designed filter. */
-export interface FilterElement {
-  role: Connection
-  kind: ElementKind.Inductance | ElementKind.Capacitance
-  value: number
-}
-
 /** Butterworth low-pass ladder design (equal source/load terminations). */
 export function designButterworthLowpass(
   order: number,
   cutoffFrequency: number,
   resistance: number,
-): FilterElement[] {
+): Array<{ role: Connection; kind: ElementKind.Inductance | ElementKind.Capacitance; value: number }> {
   if (!Number.isInteger(order) || order < 1) {
     throw new Error('order must be a positive integer')
   }
   if (cutoffFrequency <= 0) throw new Error('cutoff frequency must be positive (Hz)')
   if (resistance <= 0) throw new Error('resistance must be positive (Ω)')
   const angularCutoff = 2 * Math.PI * cutoffFrequency
-  const elements: FilterElement[] = []
+  const elements: Array<{ role: Connection; kind: ElementKind.Inductance | ElementKind.Capacitance; value: number }> = []
   for (let k = 1; k <= order; k++) {
     const g = 2 * Math.sin(((2 * k - 1) * Math.PI) / (2 * order))
     const series = k % 2 === 1

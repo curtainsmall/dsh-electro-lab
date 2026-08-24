@@ -22,15 +22,6 @@ export enum WindowKind {
   Blackman = 'blackman',
 }
 
-// ── Types ────────────────────────────────────────────────────────────────
-
-/** Fourier series of a real periodic waveform: DC plus cosine/sine amplitudes. */
-export interface FourierCoefficients {
-  dc: number
-  cosine: number[]
-  sine: number[]
-}
-
 // ── Transforms ───────────────────────────────────────────────────────────
 
 /**
@@ -126,7 +117,11 @@ function isPowerOfTwo(size: number): boolean {
  * peak amplitude `amplitude` (default 1): DC 0, cosine 0, sine per the
  * textbook series. Harmonics are 1..harmonics.
  */
-export function calcFourierSeriesCoeffs(waveform: WaveformKind, harmonics: number, amplitude = 1): FourierCoefficients {
+export function calcFourierSeriesCoeffs(
+  waveform: WaveformKind,
+  harmonics: number,
+  amplitude = 1,
+): { dc: number; cosine: number[]; sine: number[] } {
   if (harmonics < 0) throw new Error('harmonics must be non-negative')
   switch (waveform) {
     case WaveformKind.Square: {

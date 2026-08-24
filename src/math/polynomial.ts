@@ -10,12 +10,6 @@ import { Complex } from 'complex.js'
 /** A polynomial: complex coefficients in DESCENDING power order [aₙ … a₁, a₀]. */
 export type Polynomial = Complex[]
 
-/** Zeros and poles of a ratio N(s)/D(s): the root sets of both polynomials. */
-export interface PolesAndZeros {
-  zeros: Complex[]
-  poles: Complex[]
-}
-
 /** Trim leading zero coefficients, keeping at least one entry. */
 export function trimPolynomial(coefficients: Polynomial): Polynomial {
   let start = 0
@@ -105,7 +99,7 @@ export function evaluatePolynomial(coefficients: Polynomial, point: Complex): Co
 }
 
 /** Zeros (numerator roots) and poles (denominator roots) of a ratio. */
-export function findPolesZeros(numerator: Polynomial, denominator: Polynomial): PolesAndZeros {
+export function findPolesZeros(numerator: Polynomial, denominator: Polynomial): { zeros: Complex[]; poles: Complex[] } {
   return {
     zeros: findPolyRoots(numerator),
     poles: findPolyRoots(denominator),
