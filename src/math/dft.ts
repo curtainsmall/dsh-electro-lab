@@ -33,10 +33,32 @@ export interface FourierCoefficients {
 
 // ── Transforms ───────────────────────────────────────────────────────────
 
-/** DFT: X[k] = Σₙ x[n]·e^{−j2πkn/N}. */
+/**
+ * DFT: X[k] = Σₙ x[n]·e^{−j2πkn/N}. Power-of-two lengths use the radix-2
+ * Cooley-Tukey FFT (O(N log N)); other lengths fall back to the direct
+ * definition (O(N²)). Both are numerically identical to the definition.
+ */
 export function calcDiscreteFourierTransform(samples: Complex[]): Complex[] {
   const size = samples.length
   if (size === 0) return []
+  if (isPowerOfTwo(size)) return fftRadix2(samples)
+  return dftDirect(samples)
+}
+
+/** IDFT: x[n] = (1/N)·Σₖ X[k]·e^{+j2πkn/N}. The inverse reuses the forward
+ *  FFT through conjugation: x = conj(FFT(conj(X)))/N. */
+export function calcInvDiscreteFourierTransform(spectrum: Complex[]): Complex[] {
+  const size = spectrum.length
+  if (size === 0) return []
+  if (isPowerOfTwo(size)) {
+    return fftRadix2(spectrum.map((bin) => bin.conjugate())).map((sample) => sample.conjugate().div(size))
+  }
+  return idftDirect(spectrum)
+}
+
+/** Direct DFT from the definition (fallback for non-power-of-two lengths). */
+function dftDirect(samples: Complex[]): Complex[] {
+  const size = samples.length
   return samples.map((_, k) => {
     let sum = new Complex(0, 0)
     for (let n = 0; n < size; n++) {
@@ -47,10 +69,9 @@ export function calcDiscreteFourierTransform(samples: Complex[]): Complex[] {
   })
 }
 
-/** IDFT: x[n] = (1/N)·Σₖ X[k]·e^{+j2πkn/N}. */
-export function calcInvDiscreteFourierTransform(spectrum: Complex[]): Complex[] {
+/** Direct IDFT from the definition (fallback for non-power-of-two lengths). */
+function idftDirect(spectrum: Complex[]): Complex[] {
   const size = spectrum.length
-  if (size === 0) return []
   return spectrum.map((_, n) => {
     let sum = new Complex(0, 0)
     for (let k = 0; k < size; k++) {
@@ -59,6 +80,43 @@ export function calcInvDiscreteFourierTransform(spectrum: Complex[]): Complex[] 
     }
     return sum.div(size)
   })
+}
+
+/** Radix-2 iterative Cooley-Tukey FFT (in-place bit reversal + butterflies). */
+function fftRadix2(samples: Complex[]): Complex[] {
+  const size = samples.length
+  const result = samples.slice()
+  for (let i = 1, j = 0; i < size; i++) {
+    let bit = size >> 1
+    for (; (j & bit) !== 0; bit >>= 1) j ^= bit
+    j ^= bit
+    if (i < j) {
+      const tmp = result[i]!
+      result[i] = result[j]!
+      result[j] = tmp
+    }
+  }
+  for (let length = 2; length <= size; length <<= 1) {
+    const angle = (-2 * Math.PI) / length
+    const twiddleStep = new Complex(Math.cos(angle), Math.sin(angle))
+    for (let start = 0; start < size; start += length) {
+      let twiddle = new Complex(1, 0)
+      const half = length / 2
+      for (let k = 0; k < half; k++) {
+        const even = result[start + k]!
+        const odd = result[start + k + half]!.mul(twiddle)
+        result[start + k] = even.add(odd)
+        result[start + k + half] = even.sub(odd)
+        twiddle = twiddle.mul(twiddleStep)
+      }
+    }
+  }
+  return result
+}
+
+/** Whether N is a positive power of two. */
+function isPowerOfTwo(size: number): boolean {
+  return size > 0 && (size & (size - 1)) === 0
 }
 
 // ── Fourier series ───────────────────────────────────────────────────────

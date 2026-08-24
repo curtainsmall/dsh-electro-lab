@@ -45,6 +45,38 @@ describe('DFT/IDFT (textbook checks)', () => {
     expect(calcDiscreteFourierTransform([])).toEqual([])
     expect(calcInvDiscreteFourierTransform([])).toEqual([])
   })
+
+  it('FFT path matches the direct definition for a power-of-two length', () => {
+    // 16 pseudo-random samples: the radix-2 FFT must equal the O(N²) sum
+    const size = 16
+    const samples: Complex[] = []
+    for (let n = 0; n < size; n++) {
+      samples.push(new Complex(Math.sin(0.7 * n) * 1.3, Math.cos(0.3 * n) * 0.9))
+    }
+    const fast = calcDiscreteFourierTransform(samples)
+    for (let k = 0; k < size; k++) {
+      let direct = new Complex(0, 0)
+      for (let n = 0; n < size; n++) {
+        const angle = (-2 * Math.PI * k * n) / size
+        direct = direct.add(samples[n]!.mul(new Complex(Math.cos(angle), Math.sin(angle))))
+      }
+      expect(fast[k]!.re).toBeCloseTo(direct.re, 9)
+      expect(fast[k]!.im).toBeCloseTo(direct.im, 9)
+    }
+  })
+
+  it('inverse FFT round-trips a power-of-two spectrum', () => {
+    const size = 16
+    const samples: Complex[] = []
+    for (let n = 0; n < size; n++) {
+      samples.push(new Complex(Math.sin(0.5 * n), Math.cos(0.4 * n)))
+    }
+    const recovered = calcInvDiscreteFourierTransform(calcDiscreteFourierTransform(samples))
+    for (let n = 0; n < size; n++) {
+      expect(recovered[n]!.re).toBeCloseTo(samples[n]!.re, 9)
+      expect(recovered[n]!.im).toBeCloseTo(samples[n]!.im, 9)
+    }
+  })
 })
 
 describe('calcFourierSeriesCoeffs (textbook checks)', () => {
