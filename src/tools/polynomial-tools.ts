@@ -3,7 +3,7 @@
  * Everything comes in as { numerator, denominator } coefficient arrays (the
  * output of rational_coefficients, the single storage form).
  */
-import { polynomialRoots } from '../math/polynomial.ts'
+import { polesZeros } from '../math/polynomial.ts'
 import { toComplex, serializeComplex } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
 import { defineJsonTool, valueParam } from './helpers.ts'
@@ -25,11 +25,12 @@ export const polynomialTools = [
     execute: (args) => {
       const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
       const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
+      const { zeros, poles } = polesZeros(numerator, denominator)
       return {
         numeratorDegree: numerator.length - 1,
         denominatorDegree: denominator.length - 1,
-        zeros: polynomialRoots(numerator).map((root) => serializeComplex(root, Unit.None)),
-        poles: polynomialRoots(denominator).map((root) => serializeComplex(root, Unit.None)),
+        zeros: zeros.map((root) => serializeComplex(root, Unit.None)),
+        poles: poles.map((root) => serializeComplex(root, Unit.None)),
       }
     },
   }),

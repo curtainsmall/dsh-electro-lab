@@ -3,6 +3,7 @@ import { Complex } from 'complex.js'
 import {
   WaveformKind,
   WindowKind,
+  applyWindow,
   discreteFourierTransform,
   fourierSeriesCoefficients,
   inverseDiscreteFourierTransform,
@@ -105,5 +106,21 @@ describe('windowSamples (textbook checks)', () => {
 
   it('rejects non-positive length', () => {
     expect(() => windowSamples(WindowKind.Hann, 0)).toThrow(/positive/)
+  })
+})
+
+describe('applyWindow', () => {
+  it('multiplies each sample by its weight', () => {
+    const samples = [new Complex(1, 0), new Complex(2, 0), new Complex(3, 0)]
+    const weighted = applyWindow(samples, [0, 0.5, 1])
+    expect(weighted[0]!.abs()).toBeCloseTo(0, 12)
+    expect(weighted[1]!.re).toBeCloseTo(1, 12)
+    expect(weighted[2]!.re).toBeCloseTo(3, 12)
+  })
+
+  it('supports complex samples', () => {
+    const weighted = applyWindow([new Complex(1, 1)], [2])
+    expect(weighted[0]!.re).toBeCloseTo(2, 12)
+    expect(weighted[0]!.im).toBeCloseTo(2, 12)
   })
 })

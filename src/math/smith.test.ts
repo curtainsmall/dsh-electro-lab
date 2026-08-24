@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { ElementRole, MatchTopology, MatchVariant, designMatch, quarterWaveImpedance, returnLossDb, impedanceToReflection, reflectionToVswr } from './smith.ts'
+import { ElementRole, MatchTopology, MatchVariant, capacitanceFromReactance, designMatch, inductanceFromReactance, quarterWaveImpedance, returnLossDb, impedanceToReflection, reflectionToVswr } from './smith.ts'
 
 describe('impedance_to_reflection (textbook check)', () => {
   it('Z = 50 + j50 Ω on a 50 Ω line → Γ = 0.447∠63.43°', () => {
@@ -46,6 +46,16 @@ describe('quarter-wave transformer', () => {
   it('Z1 = √(Z0·ZL) (textbook check)', () => {
     // 50 Ω line to 100 Ω load → Z1 = √5000 ≈ 70.71 Ω
     expect(quarterWaveImpedance(50, 100)).toBeCloseTo(70.7107, 4)
+  })
+})
+
+describe('reactance ↔ element values', () => {
+  it('positive reactance is an inductance, negative is a capacitance', () => {
+    const omega = 2 * Math.PI * 1e6
+    expect(inductanceFromReactance(50, omega)).toBeCloseTo(50 / omega, 12)
+    expect(inductanceFromReactance(-50, omega)).toBeUndefined()
+    expect(capacitanceFromReactance(-100, omega)).toBeCloseTo(1 / (omega * 100), 12)
+    expect(capacitanceFromReactance(100, omega)).toBeUndefined()
   })
 })
 

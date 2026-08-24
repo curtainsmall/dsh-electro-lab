@@ -7,6 +7,7 @@ import { Complex } from 'complex.js'
 import {
   WaveformKind,
   WindowKind,
+  applyWindow,
   discreteFourierTransform,
   fourierSeriesCoefficients,
   inverseDiscreteFourierTransform,
@@ -37,8 +38,7 @@ export const dftTools = [
     execute: (args) => {
       const window = args.window ?? WindowKind.None
       const samples = args.samples.map((sample) => toComplex(sample, Unit.None))
-      const weights = windowSamples(window, samples.length)
-      const weighted = samples.map((sample, i) => sample.mul(weights[i]!))
+      const weighted = applyWindow(samples, windowSamples(window, samples.length))
       return {
         window,
         spectrum: discreteFourierTransform(weighted).map((bin) => serializeComplex(bin, Unit.None)),

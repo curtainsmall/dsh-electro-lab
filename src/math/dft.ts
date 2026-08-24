@@ -118,3 +118,8 @@ export function windowSamples(kind: WindowKind, length: number): number[] {
   }
   return samples
 }
+
+/** Apply window weights to a sample sequence (weight i multiplies sample i). */
+export function applyWindow(samples: Complex[], weights: number[]): Complex[] {
+  return samples.map((sample, i) => sample.mul(weights[i]!))
+}

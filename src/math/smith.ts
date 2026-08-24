@@ -93,6 +93,18 @@ export function quarterWaveImpedance(lineImpedance: number, loadImpedance: numbe
   return Math.sqrt(lineImpedance * loadImpedance)
 }
 
+// ── Reactance ↔ element values ───────────────────────────────────────────
+
+/** Inductance (H) for a positive reactance at ω; undefined for a negative one. */
+export function inductanceFromReactance(reactance: number, angularFrequency: number): number | undefined {
+  return reactance > 0 ? reactance / angularFrequency : undefined
+}
+
+/** Capacitance (F) for a negative reactance at ω; undefined for a positive one. */
+export function capacitanceFromReactance(reactance: number, angularFrequency: number): number | undefined {
+  return reactance < 0 ? -1 / (angularFrequency * reactance) : undefined
+}
+
 // ── Matching networks ────────────────────────────────────────────────────
 
 /**

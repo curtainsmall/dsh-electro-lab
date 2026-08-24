@@ -33,7 +33,7 @@ export const circuitTools = [
     },
     execute: (args) => {
       const frequency = toScalar(args.frequency, Unit.Frequency)
-      return serializeComplex(elementImpedanceOf(args.kind, args.value, frequency), Unit.Resistance)
+      return serializeComplex(networkImpedance({ kind: args.kind, value: args.value }, frequency), Unit.Resistance)
     },
   }),
   defineJsonTool({
@@ -223,11 +223,6 @@ export const circuitTools = [
     },
   }),
 ]
-
-/** Build an element impedance node without validating (used by element_impedance). */
-function elementImpedanceOf(kind: ElementKind, value: number, frequency: number) {
-  return networkImpedance({ kind, value }, frequency)
-}
 
 /** Validate a raw JSON network tree into a typed NetworkElement. */
 export function validateNetwork(input: unknown): NetworkElement {

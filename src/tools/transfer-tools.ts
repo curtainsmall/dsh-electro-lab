@@ -8,6 +8,7 @@ import { Complex } from 'complex.js'
 import {
   Variable,
   differenceEquation,
+  frequencyPoints,
   partialFraction,
   stepResponse,
   transferResponse,
@@ -71,16 +72,8 @@ export const transferTools = [
       const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
       const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
       const frequencies = args.frequencies.map((value) => toScalar(value, Unit.Frequency))
-      const points = frequencies.map((frequency) => {
-        const omega = 2 * Math.PI * frequency
-        if (args.variable === Variable.Z) {
-          if (args.sampleTime === undefined) throw new Error('variable "z" requires sampleTime')
-          const sampleTime = toScalar(args.sampleTime, Unit.Time)
-          const angle = omega * sampleTime
-          return new Complex(Math.cos(angle), Math.sin(angle))
-        }
-        return new Complex(0, omega)
-      })
+      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, Unit.Time)
+      const points = frequencyPoints(args.variable, frequencies, sampleTime)
       return {
         variable: args.variable,
         frequencies,

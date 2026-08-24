@@ -44,6 +44,22 @@ export function transferResponse(numerator: Polynomial, denominator: Polynomial,
   return points.map((point) => evaluatePolynomial(numerator, point).div(evaluatePolynomial(denominator, point)))
 }
 
+/**
+ * Evaluation points for a frequency sweep: σ = jω in the s domain,
+ * σ = e^(jωT) in the z domain (sampleTime required, seconds).
+ */
+export function frequencyPoints(variable: Variable, frequencies: number[], sampleTime?: number): Complex[] {
+  return frequencies.map((frequency) => {
+    const omega = 2 * Math.PI * frequency
+    if (variable === Variable.Z) {
+      if (sampleTime === undefined) throw new Error('variable "z" requires sampleTime')
+      const angle = omega * sampleTime
+      return new Complex(Math.cos(angle), Math.sin(angle))
+    }
+    return new Complex(0, omega)
+  })
+}
+
 // ── Partial fractions ────────────────────────────────────────────────────
 
 /**

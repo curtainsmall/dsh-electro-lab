@@ -10,7 +10,9 @@ import {
   MatchSide,
   MatchTopology,
   MatchVariant,
+  capacitanceFromReactance,
   designMatch,
+  inductanceFromReactance,
   reflectionToVswr,
   quarterWaveImpedance,
   returnLossDb,
@@ -95,10 +97,14 @@ export const smithTools = [
           seriesReactance: realValue(series!.reactance, Unit.Resistance),
           shuntReactance: realValue(shunt!.reactance, Unit.Resistance),
         }
-        if (series!.reactance > 0) entry.seriesInductance = realValue(series!.reactance / angularFrequency, Unit.Inductance)
-        if (series!.reactance < 0) entry.seriesCapacitance = realValue(-1 / (angularFrequency * series!.reactance), Unit.Capacitance)
-        if (shunt!.reactance > 0) entry.shuntInductance = realValue(shunt!.reactance / angularFrequency, Unit.Inductance)
-        if (shunt!.reactance < 0) entry.shuntCapacitance = realValue(-1 / (angularFrequency * shunt!.reactance), Unit.Capacitance)
+        const seriesInductance = inductanceFromReactance(series!.reactance, angularFrequency)
+        if (seriesInductance !== undefined) entry.seriesInductance = realValue(seriesInductance, Unit.Inductance)
+        const seriesCapacitance = capacitanceFromReactance(series!.reactance, angularFrequency)
+        if (seriesCapacitance !== undefined) entry.seriesCapacitance = realValue(seriesCapacitance, Unit.Capacitance)
+        const shuntInductance = inductanceFromReactance(shunt!.reactance, angularFrequency)
+        if (shuntInductance !== undefined) entry.shuntInductance = realValue(shuntInductance, Unit.Inductance)
+        const shuntCapacitance = capacitanceFromReactance(shunt!.reactance, angularFrequency)
+        if (shuntCapacitance !== undefined) entry.shuntCapacitance = realValue(shuntCapacitance, Unit.Capacitance)
         return entry
       }
       const out: Record<string, JsonValue> = {
@@ -137,8 +143,10 @@ export const smithTools = [
             role: element.role,
             reactance: realValue(element.reactance, Unit.Resistance),
           }
-          if (element.reactance > 0) entry.inductance = realValue(element.reactance / angularFrequency, Unit.Inductance)
-          if (element.reactance < 0) entry.capacitance = realValue(-1 / (angularFrequency * element.reactance), Unit.Capacitance)
+          const inductance = inductanceFromReactance(element.reactance, angularFrequency)
+          if (inductance !== undefined) entry.inductance = realValue(inductance, Unit.Inductance)
+          const capacitance = capacitanceFromReactance(element.reactance, angularFrequency)
+          if (capacitance !== undefined) entry.capacitance = realValue(capacitance, Unit.Capacitance)
           return entry
         })
       return {

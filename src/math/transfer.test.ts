@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { Variable, differenceEquation, partialFraction, stepResponse, transferResponse } from './transfer.ts'
+import { Variable, differenceEquation, frequencyPoints, partialFraction, stepResponse, transferResponse } from './transfer.ts'
 
 describe('transferResponse (textbook checks)', () => {
   it('RC low-pass: |H| = 1/√2 and −45° at the cutoff frequency', () => {
@@ -115,6 +115,27 @@ describe('differenceEquation (textbook checks)', () => {
 
   it('rejects a zero a₀', () => {
     expect(() => differenceEquation([new Complex(0, 0)], [new Complex(1, 0)], [new Complex(1, 0)])).toThrow(/a\[0\]/)
+  })
+})
+
+describe('frequencyPoints', () => {
+  it('s domain: σ = jω', () => {
+    const points = frequencyPoints(Variable.S, [0, 1 / (2 * Math.PI)])
+    expect(points[0]!.re).toBeCloseTo(0, 12)
+    expect(points[0]!.im).toBeCloseTo(0, 12)
+    expect(points[1]!.im).toBeCloseTo(1, 10)
+  })
+
+  it('z domain: σ = e^(jωT)', () => {
+    const points = frequencyPoints(Variable.Z, [0, 1], 1) // 1 Hz · 1 s → ωT = 2π
+    expect(points[0]!.re).toBeCloseTo(1, 10)
+    expect(points[0]!.im).toBeCloseTo(0, 10)
+    expect(points[1]!.re).toBeCloseTo(Math.cos(2 * Math.PI), 10)
+    expect(points[1]!.im).toBeCloseTo(Math.sin(2 * Math.PI), 10)
+  })
+
+  it('z domain requires sampleTime', () => {
+    expect(() => frequencyPoints(Variable.Z, [1])).toThrow(/sampleTime/)
   })
 })
 
