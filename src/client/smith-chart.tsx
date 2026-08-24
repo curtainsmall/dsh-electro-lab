@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef } from 'react'
 import { Complex } from 'complex.js'
-import { impedanceToReflection, reflectionToVswr, returnLossDb } from '../math/smith.ts'
+import { convertImpedanceToReflection, convertReflectionToVswr, calcReturnLossDb } from '../math/smith.ts'
 
 /** Physical canvas size (CSS scales it). */
 const SIZE = 480
@@ -129,8 +129,8 @@ export function gammaReadouts(gamma: Complex | null, referenceOhm = 50): { gamma
   if (gamma === null) return { gamma: '—', vswr: '—', returnLoss: '—' }
   const magnitude = gamma.abs()
   const angleDeg = ((gamma.arg() * 180) / Math.PI).toFixed(2)
-  const vswr = reflectionToVswr(gamma)
-  const loss = returnLossDb(gamma)
+  const vswr = convertReflectionToVswr(gamma)
+  const loss = calcReturnLossDb(gamma)
   return {
     gamma: `Γ = ${magnitude.toFixed(4)} ∠ ${angleDeg}°`,
     vswr: vswr === Number.POSITIVE_INFINITY ? 'VSWR = ∞' : `VSWR = ${vswr.toFixed(3)}`,
@@ -138,4 +138,4 @@ export function gammaReadouts(gamma: Complex | null, referenceOhm = 50): { gamma
   }
 }
 
-export { impedanceToReflection }
+export { convertImpedanceToReflection }

@@ -7,21 +7,21 @@
 import { Complex } from 'complex.js'
 import {
   Variable,
-  differenceEquation,
-  frequencyPoints,
-  partialFraction,
-  stepResponse,
-  transferResponse,
+  solveDifferenceEquation,
+  calcFreqPoints,
+  expandPartialFraction,
+  calcStepResponse,
+  calcTransferResponse,
 } from '../math/transfer.ts'
 import { toComplex, toScalar, serializeComplex } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
-import { defineJsonTool, valueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
-const coefficientArrayParam = (description: string) => ({
+const createCoeffArrayParam = (description: string) => ({
   type: 'array' as const,
   description,
-  items: valueParam(Unit.None, 'coefficient (unit none)'),
+  items: createValueParam(Unit.None, 'coefficient (unit none)'),
 })
 
 export const transferTools = [
@@ -29,13 +29,13 @@ export const transferTools = [
     name: 'partial_fraction',
     description: 'Partial-fraction expansion of a transfer function in ratio form: polynomial part (when numerator degree ≥ denominator degree) plus terms { pole, order, residue } so that H(s) = polynomial + Σ residue/(s−pole)^order. Use the residues to invert each term symbolically (e^{pt}, t·e^{pt}, …) for analytic answers.',
     parameters: {
-      numerator: { ...coefficientArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
-      denominator: { ...coefficientArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
+      numerator: { ...createCoeffArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
+      denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
     },
     execute: (args) => {
       const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
       const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
-      const result = partialFraction(numerator, denominator)
+      const result = expandPartialFraction(numerator, denominator)
       const terms: JsonValue[] = result.terms.map((term) => ({
         pole: serializeComplex(term.pole, Unit.None),
         order: term.order,
@@ -52,8 +52,8 @@ export const transferTools = [
     name: 'transfer_function_response',
     description: 'Evaluate a transfer function at frequency points: H(jω) for variable "s", H(e^(jωT)) for variable "z" (sampleTime required, seconds). Frequencies in Hz; returns complex responses (magnitude/phase per snapshot).',
     parameters: {
-      numerator: { ...coefficientArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
-      denominator: { ...coefficientArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
+      numerator: { ...createCoeffArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
+      denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
       variable: {
         type: 'string',
         enum: [Variable.S, Variable.Z],
@@ -63,21 +63,21 @@ export const transferTools = [
       frequencies: {
         type: 'array' as const,
         description: 'frequency points in Hz',
-        items: valueParam(Unit.Frequency, 'frequency in Hz'),
+        items: createValueParam(Unit.Frequency, 'frequency in Hz'),
         required: true,
       },
-      sampleTime: { ...valueParam(Unit.Time, 'sample time in seconds (required for variable "z")') },
+      sampleTime: { ...createValueParam(Unit.Time, 'sample time in seconds (required for variable "z")') },
     },
     execute: (args) => {
       const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
       const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
       const frequencies = args.frequencies.map((value) => toScalar(value, Unit.Frequency))
       const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, Unit.Time)
-      const points = frequencyPoints(args.variable, frequencies, sampleTime)
+      const points = calcFreqPoints(args.variable, frequencies, sampleTime)
       return {
         variable: args.variable,
         frequencies,
-        responses: transferResponse(numerator, denominator, points).map((value) => serializeComplex(value, Unit.None)),
+        responses: calcTransferResponse(numerator, denominator, points).map((value) => serializeComplex(value, Unit.None)),
       }
     },
   }),
@@ -85,12 +85,12 @@ export const transferTools = [
     name: 'step_response',
     description: 'Step response y(t) of a continuous transfer function H(s) in ratio form (numerator degree ≤ denominator degree required): Y(s) = H(s)/s expanded by partial fractions and inverted analytically. Returns the response at each time point.',
     parameters: {
-      numerator: { ...coefficientArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
-      denominator: { ...coefficientArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
+      numerator: { ...createCoeffArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
+      denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
       times: {
         type: 'array' as const,
         description: 'time points in seconds',
-        items: valueParam(Unit.Time, 'time in seconds'),
+        items: createValueParam(Unit.Time, 'time in seconds'),
         required: true,
       },
     },
@@ -99,7 +99,7 @@ export const transferTools = [
       const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
       const times = args.times.map((value) => toScalar(value, Unit.Time))
       return {
-        values: stepResponse(numerator, denominator, times).map((value) => serializeComplex(value, Unit.None)),
+        values: calcStepResponse(numerator, denominator, times).map((value) => serializeComplex(value, Unit.None)),
       }
     },
   }),
@@ -107,25 +107,25 @@ export const transferTools = [
     name: 'difference_equation_response',
     description: 'Output y[n] of a difference equation y[n] = (Σ bᵢ·x[n−i] − Σ aⱼ·y[n−j])/a₀. The a/b coefficients follow the Laurent convention directly from the equation (a = [1, −a₁, …], b = [b₀, b₁, …]), NOT the ratio form. Input sequence length equals output length; past samples are zero.',
     parameters: {
-      a: { ...coefficientArrayParam('recursive coefficients, Laurent order (a₀ = 1 for a normalized equation)'), required: true },
-      b: { ...coefficientArrayParam('feed-forward coefficients, Laurent order'), required: true },
-      input: { ...sequenceOf('input samples x[n], unit none'), required: true },
+      a: { ...createCoeffArrayParam('recursive coefficients, Laurent order (a₀ = 1 for a normalized equation)'), required: true },
+      b: { ...createCoeffArrayParam('feed-forward coefficients, Laurent order'), required: true },
+      input: { ...createSequenceParam('input samples x[n], unit none'), required: true },
     },
     execute: (args) => {
       const a = args.a.map((value) => toComplex(value, Unit.None))
       const b = args.b.map((value) => toComplex(value, Unit.None))
       const input = args.input.map((value) => toComplex(value, Unit.None))
       return {
-        output: differenceEquation(a, b, input).map((value) => serializeComplex(value, Unit.None)),
+        output: solveDifferenceEquation(a, b, input).map((value) => serializeComplex(value, Unit.None)),
       }
     },
   }),
 ]
 
-function sequenceOf(description: string) {
+function createSequenceParam(description: string) {
   return {
     type: 'array' as const,
     description,
-    items: valueParam(Unit.None, 'value (unit none)'),
+    items: createValueParam(Unit.None, 'value (unit none)'),
   }
 }

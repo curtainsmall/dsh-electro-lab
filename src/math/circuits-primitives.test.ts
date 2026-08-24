@@ -3,63 +3,63 @@ import { Complex } from 'complex.js'
 import {
   CircuitMode,
   ElementKind,
-  networkImpedance,
-  parallelOf,
-  seriesOf,
+  calcNetworkImpedance,
+  combineParallelImpedances,
+  combineSeriesImpedances,
 } from './circuits.ts'
 import { validateNetwork } from '../tools/circuit-tools.ts'
 
-function close(z: Complex, re: number, im: number, tol = 1e-6): void {
+function assertClose(z: Complex, re: number, im: number, tol = 1e-6): void {
   expect(z.re).toBeCloseTo(re, tol > 1 ? tol : 6)
   expect(z.im).toBeCloseTo(im, 6)
 }
 
-describe('element leaves (through networkImpedance)', () => {
+describe('element leaves (through calcNetworkImpedance)', () => {
   it('computes R, jωL, and 1/(jωC) at a frequency', () => {
     const f = 1000
     const w = 2 * Math.PI * f
-    close(networkImpedance({ kind: ElementKind.Resistance, value: 10 }, f), 10, 0)
-    close(networkImpedance({ kind: ElementKind.Inductance, value: 1e-3 }, f), 0, w * 1e-3)
-    close(networkImpedance({ kind: ElementKind.Capacitance, value: 1e-6 }, f), 0, -1 / (w * 1e-6))
+    assertClose(calcNetworkImpedance({ kind: ElementKind.Resistance, value: 10 }, f), 10, 0)
+    assertClose(calcNetworkImpedance({ kind: ElementKind.Inductance, value: 1e-3 }, f), 0, w * 1e-3)
+    assertClose(calcNetworkImpedance({ kind: ElementKind.Capacitance, value: 1e-6 }, f), 0, -1 / (w * 1e-6))
   })
 })
 
-describe('seriesOf / parallelOf — primitive combinations', () => {
+describe('combineSeriesImpedances / combineParallelImpedances — primitive combinations', () => {
   it('series RLC equals the textbook formula (10 − j1585 at 1 kHz)', () => {
     const f = 1000
     const parts = [
-      networkImpedance({ kind: ElementKind.Resistance, value: 10 }, f),
-      networkImpedance({ kind: ElementKind.Inductance, value: 1e-3 }, f),
-      networkImpedance({ kind: ElementKind.Capacitance, value: 1e-6 }, f),
+      calcNetworkImpedance({ kind: ElementKind.Resistance, value: 10 }, f),
+      calcNetworkImpedance({ kind: ElementKind.Inductance, value: 1e-3 }, f),
+      calcNetworkImpedance({ kind: ElementKind.Capacitance, value: 1e-6 }, f),
     ]
-    const z = seriesOf(parts)
+    const z = combineSeriesImpedances(parts)
     expect(z.re).toBeCloseTo(10, 6)
     expect(z.im).toBeCloseTo(6.2832 - 159.1549, 3)
   })
 
   it('parallel combination matches 50 ∥ (50+j50) = 30+j10', () => {
-    const z = parallelOf([new Complex(50, 0), new Complex(50, 50)])
+    const z = combineParallelImpedances([new Complex(50, 0), new Complex(50, 50)])
     expect(z.re).toBeCloseTo(30, 6)
     expect(z.im).toBeCloseTo(10, 6)
   })
 
   it('parallel of two equal resistors halves the resistance', () => {
-    const z = parallelOf([new Complex(100, 0), new Complex(100, 0)])
+    const z = combineParallelImpedances([new Complex(100, 0), new Complex(100, 0)])
     expect(z.re).toBeCloseTo(50, 9)
     expect(z.im).toBeCloseTo(0, 9)
   })
 
   it('raises for empty lists and all-open parallels', () => {
-    expect(() => seriesOf([])).toThrow(/at least one/)
-    expect(() => parallelOf([])).toThrow(/at least one/)
+    expect(() => combineSeriesImpedances([])).toThrow(/at least one/)
+    expect(() => combineParallelImpedances([])).toThrow(/at least one/)
   })
 })
 
-describe('networkImpedance — nested topologies', () => {
+describe('calcNetworkImpedance — nested topologies', () => {
   it('evaluates a nested series-with-parallel network', () => {
     // R1 in series with (R2 in parallel with L): R1=10, R2=20, L=1mH at 1 kHz
     const f = 1000
-    const network: Parameters<typeof networkImpedance>[0] = {
+    const network: Parameters<typeof calcNetworkImpedance>[0] = {
       topology: CircuitMode.Series,
       elements: [
         { kind: ElementKind.Resistance, value: 10 },
@@ -72,7 +72,7 @@ describe('networkImpedance — nested topologies', () => {
         },
       ],
     }
-    const z = networkImpedance(network, f)
+    const z = calcNetworkImpedance(network, f)
     // 20 ∥ j6.283 = (20·j6.283)/(20+j6.283) ≈ 1.796 + j5.718
     expect(z.re).toBeCloseTo(10 + 1.7964, 3)
     expect(z.im).toBeCloseTo(5.7185, 3)

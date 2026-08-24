@@ -34,7 +34,7 @@ export interface FourierCoefficients {
 // ── Transforms ───────────────────────────────────────────────────────────
 
 /** DFT: X[k] = Σₙ x[n]·e^{−j2πkn/N}. */
-export function discreteFourierTransform(samples: Complex[]): Complex[] {
+export function calcDiscreteFourierTransform(samples: Complex[]): Complex[] {
   const size = samples.length
   if (size === 0) return []
   return samples.map((_, k) => {
@@ -48,7 +48,7 @@ export function discreteFourierTransform(samples: Complex[]): Complex[] {
 }
 
 /** IDFT: x[n] = (1/N)·Σₖ X[k]·e^{+j2πkn/N}. */
-export function inverseDiscreteFourierTransform(spectrum: Complex[]): Complex[] {
+export function calcInvDiscreteFourierTransform(spectrum: Complex[]): Complex[] {
   const size = spectrum.length
   if (size === 0) return []
   return spectrum.map((_, n) => {
@@ -68,7 +68,7 @@ export function inverseDiscreteFourierTransform(spectrum: Complex[]): Complex[] 
  * peak amplitude `amplitude` (default 1): DC 0, cosine 0, sine per the
  * textbook series. Harmonics are 1..harmonics.
  */
-export function fourierSeriesCoefficients(waveform: WaveformKind, harmonics: number, amplitude = 1): FourierCoefficients {
+export function calcFourierSeriesCoeffs(waveform: WaveformKind, harmonics: number, amplitude = 1): FourierCoefficients {
   if (harmonics < 0) throw new Error('harmonics must be non-negative')
   switch (waveform) {
     case WaveformKind.Square: {
@@ -95,7 +95,7 @@ export function fourierSeriesCoefficients(waveform: WaveformKind, harmonics: num
 // ── Windows ──────────────────────────────────────────────────────────────
 
 /** Window coefficients for a length-N sequence (N = 1 yields [1]). */
-export function windowSamples(kind: WindowKind, length: number): number[] {
+export function calcWindowSamples(kind: WindowKind, length: number): number[] {
   if (length <= 0) throw new Error('window length must be positive')
   if (length === 1) return [1]
   const samples: number[] = []

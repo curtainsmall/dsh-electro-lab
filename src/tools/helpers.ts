@@ -13,7 +13,7 @@ import { Form } from '../math/convert.ts'
  * expected unit is baked into each branch as an enum and the form into
  * consts, so mismatches fail framework validation before execute runs.
  */
-export function valueParam<const U extends Unit>(unit: U, description: string): {
+export function createValueParam<const U extends Unit>(unit: U, description: string): {
   oneOf: [
     {
       type: 'object'

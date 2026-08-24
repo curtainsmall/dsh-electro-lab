@@ -15,7 +15,7 @@ import {
 } from '../math/complex.ts'
 import { toComplex, serializeComplex } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
-import { defineJsonTool, valueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from './helpers.ts'
 
 const LOW_LEVEL_HINT = 'Low-level primitive — prefer calculate or a concept-level tool (e.g. circuit_impedance, impedance_to_reflection, ac_power) whenever one fits; use this only to combine intermediate values.'
 
@@ -24,8 +24,8 @@ export const complexTools = [
     name: 'complex_add',
     description: `Add two complex numbers. ${LOW_LEVEL_HINT}`,
     parameters: {
-      firstComplex: { ...valueParam(Unit.None, 'first operand'), required: true },
-      secondComplex: { ...valueParam(Unit.None, 'second operand'), required: true },
+      firstComplex: { ...createValueParam(Unit.None, 'first operand'), required: true },
+      secondComplex: { ...createValueParam(Unit.None, 'second operand'), required: true },
     },
     execute: (args) => {
       const result = addComplex(toComplex(args.firstComplex, Unit.None), toComplex(args.secondComplex, Unit.None))
@@ -37,7 +37,7 @@ export const complexTools = [
     name: 'complex_opposite',
     description: `Negate a complex number (z → −z). ${LOW_LEVEL_HINT}`,
     parameters: {
-      operand: { ...valueParam(Unit.None, 'operand'), required: true },
+      operand: { ...createValueParam(Unit.None, 'operand'), required: true },
     },
     execute: (args) => {
       const result = negateComplex(toComplex(args.operand, Unit.None))
@@ -49,8 +49,8 @@ export const complexTools = [
     name: 'complex_multiply',
     description: `Multiply two complex numbers. ${LOW_LEVEL_HINT}`,
     parameters: {
-      firstComplex: { ...valueParam(Unit.None, 'first factor'), required: true },
-      secondComplex: { ...valueParam(Unit.None, 'second factor'), required: true },
+      firstComplex: { ...createValueParam(Unit.None, 'first factor'), required: true },
+      secondComplex: { ...createValueParam(Unit.None, 'second factor'), required: true },
     },
     execute: (args) => {
       const result = multiplyComplex(toComplex(args.firstComplex, Unit.None), toComplex(args.secondComplex, Unit.None))
@@ -62,7 +62,7 @@ export const complexTools = [
     name: 'complex_reciprocal',
     description: `Take the reciprocal of a complex number (z → 1/z). ${LOW_LEVEL_HINT}`,
     parameters: {
-      operand: { ...valueParam(Unit.None, 'operand, must be non-zero'), required: true },
+      operand: { ...createValueParam(Unit.None, 'operand, must be non-zero'), required: true },
     },
     execute: (args) => {
       const result = reciprocalComplex(toComplex(args.operand, Unit.None))

@@ -35,6 +35,12 @@ export enum Connection {
   Shunt = 'shunt',
 }
 
+/** Transient circuit kind (rc = resistance + capacitance, rl = resistance + inductance). */
+export enum TransientKind {
+  Rc = 'rc',
+  Rl = 'rl',
+}
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 /** A network node: one lumped element, or a nested series/parallel group. */
@@ -42,29 +48,22 @@ export type NetworkElement =
   | { kind: ElementKind; value: number }
   | { topology: CircuitMode; elements: NetworkElement[] };
 
-/** One transient sample point. */
-export interface TransientPoint {
-  time: number
-  voltage: number
-  current: number
-}
-
 // ── Private helpers ──────────────────────────────────────────────────────
 
-function omega(frequency: number): number {
+function calcAngularFreq(frequency: number): number {
   if (!Number.isFinite(frequency) || frequency <= 0)
     throw new Error("frequency must be a finite positive number (Hz)");
   return 2 * Math.PI * frequency;
 }
 
 /** Impedance of one lumped element at a frequency: R, jωL, 1/(jωC).
- *  Module-private: the public entry is networkImpedance with a leaf node. */
-function elementImpedance(
+ *  Module-private: the public entry is calcNetworkImpedance with a leaf node. */
+function calcElementImpedance(
   kind: ElementKind,
   value: number,
   frequency: number,
 ): Complex {
-  const w = omega(frequency);
+  const w = calcAngularFreq(frequency);
   switch (kind) {
     case ElementKind.Resistance:
       return new Complex(value, 0);
@@ -78,7 +77,7 @@ function elementImpedance(
 // ── Impedance primitives ─────────────────────────────────────────────────
 
 /** Series combination: Z = Σ Zi. */
-export function seriesOf(impedances: readonly Complex[]): Complex {
+export function combineSeriesImpedances(impedances: readonly Complex[]): Complex {
   if (impedances.length === 0)
     throw new Error("series combination needs at least one impedance");
   return impedances.reduce(
@@ -88,7 +87,7 @@ export function seriesOf(impedances: readonly Complex[]): Complex {
 }
 
 /** Parallel combination: 1/Z = Σ 1/Zi. */
-export function parallelOf(impedances: readonly Complex[]): Complex {
+export function combineParallelImpedances(impedances: readonly Complex[]): Complex {
   if (impedances.length === 0)
     throw new Error("parallel combination needs at least one impedance");
   const admittance = impedances.reduce(
@@ -101,24 +100,24 @@ export function parallelOf(impedances: readonly Complex[]): Complex {
 }
 
 /** Total impedance of a (possibly nested) network at a frequency. */
-export function networkImpedance(
+export function calcNetworkImpedance(
   node: NetworkElement,
   frequency: number,
 ): Complex {
-  if ("kind" in node) return elementImpedance(node.kind, node.value, frequency);
-  const parts = node.elements.map((child) => networkImpedance(child, frequency));
+  if ("kind" in node) return calcElementImpedance(node.kind, node.value, frequency);
+  const parts = node.elements.map((child) => calcNetworkImpedance(child, frequency));
   switch (node.topology) {
     case CircuitMode.Series:
-      return seriesOf(parts);
+      return combineSeriesImpedances(parts);
     case CircuitMode.Parallel:
-      return parallelOf(parts);
+      return combineParallelImpedances(parts);
   }
 }
 
 // ── Scalar concepts ──────────────────────────────────────────────────────
 
 /** Series resonance: resonantFrequency = 1/(2π√(LC)). Q and bandwidth need R (mode-aware). */
-export function resonance(
+export function calcResonance(
   inductance: number,
   capacitance: number,
   resistance?: number,
@@ -150,7 +149,7 @@ export function resonance(
 }
 
 /** AC power from RMS values: S = V·I, P = S·cosφ, Q = S·sinφ, pf = cosφ. */
-export function acPower(
+export function calcAcPower(
   rmsVoltage: number,
   rmsCurrent: number,
   phaseAngleDegree = 0,
@@ -169,104 +168,76 @@ export function acPower(
 
 // ── Transients ───────────────────────────────────────────────────────────
 
-/** RC transient. mode charge: v(t) = Vs(1−e^(−t/τ)); discharge: v(t) = V0·e^(−t/τ). */
-export function rcTransient(
-  mode: SwitchingMode,
-  sourceVoltage: number,
-  initialVoltage: number,
-  resistance: number,
-  capacitance: number,
-  time: number,
-): { voltage: number; current: number; timeConstant: number } {
-  if (resistance <= 0) throw new Error("resistance must be positive (Ω)");
-  if (capacitance <= 0) throw new Error("capacitance must be positive (F)");
-  if (time < 0) throw new Error("time must be non-negative (s)");
-  const timeConstant = resistance * capacitance;
-  const exp = Math.exp(-time / timeConstant);
-  let voltage: number;
-  let current: number;
-  switch (mode) {
-    case SwitchingMode.Charge:
-      voltage = sourceVoltage * (1 - exp);
-      current = (sourceVoltage - voltage) / resistance;
-      break;
-    case SwitchingMode.Discharge:
-      voltage = initialVoltage * exp;
-      current = voltage / resistance;
-      break;
-  }
-  return { voltage, current, timeConstant };
-}
-
-/** RL transient. mode charge: i(t) = (Vs/R)(1−e^(−t/τ)); discharge: i(t) = I0·e^(−t/τ). */
-export function rlTransient(
-  mode: SwitchingMode,
-  sourceVoltage: number,
-  initialCurrent: number,
-  resistance: number,
-  inductance: number,
-  time: number,
-): { current: number; voltage: number; timeConstant: number } {
-  if (resistance <= 0) throw new Error("resistance must be positive (Ω)");
-  if (inductance <= 0) throw new Error("inductance must be positive (H)");
-  if (time < 0) throw new Error("time must be non-negative (s)");
-  const timeConstant = inductance / resistance;
-  const exp = Math.exp(-time / timeConstant);
-  let current: number;
-  let voltage: number;
-  switch (mode) {
-    case SwitchingMode.Charge:
-      current = (sourceVoltage / resistance) * (1 - exp);
-      voltage = sourceVoltage * exp;
-      break;
-    case SwitchingMode.Discharge:
-      current = initialCurrent * exp;
-      voltage = initialCurrent * resistance * exp;
-      break;
-  }
-  return { current, voltage, timeConstant };
-}
-
-/** RC transient evaluated at a list of time points (batch call for curves). */
-export function rcTransientSeries(
+/**
+ * RC transient evaluated at time points (single point = pass [time]).
+ * mode charge: v(t) = Vs(1−e^(−t/τ)); discharge: v(t) = V0·e^(−t/τ).
+ * Current: charge = (Vs − v)/R, discharge = v/R.
+ */
+export function calcRcTransientSeries(
   mode: SwitchingMode,
   sourceVoltage: number,
   initialVoltage: number,
   resistance: number,
   capacitance: number,
   times: readonly number[],
-): TransientPoint[] {
+): Array<{ time: number; voltage: number; current: number; timeConstant: number }> {
+  if (resistance <= 0) throw new Error('resistance must be positive (Ω)')
+  if (capacitance <= 0) throw new Error('capacitance must be positive (F)')
+  for (const time of times) {
+    if (time < 0) throw new Error('time must be non-negative (s)')
+  }
+  const timeConstant = resistance * capacitance
   return times.map((time) => {
-    const { voltage, current } = rcTransient(
-      mode,
-      sourceVoltage,
-      initialVoltage,
-      resistance,
-      capacitance,
-      time,
-    );
-    return { time, voltage, current };
-  });
+    const exp = Math.exp(-time / timeConstant)
+    let voltage: number
+    let current: number
+    switch (mode) {
+      case SwitchingMode.Charge:
+        voltage = sourceVoltage * (1 - exp)
+        current = (sourceVoltage - voltage) / resistance
+        break
+      case SwitchingMode.Discharge:
+        voltage = initialVoltage * exp
+        current = voltage / resistance
+        break
+    }
+    return { time, voltage, current, timeConstant }
+  })
 }
 
-/** RL transient evaluated at a list of time points (batch call for curves). */
-export function rlTransientSeries(
+/**
+ * RL transient evaluated at time points (single point = pass [time]).
+ * mode charge: i(t) = (Vs/R)(1−e^(−t/τ)); discharge: i(t) = I0·e^(−t/τ).
+ * Inductor voltage: charge = Vs·e^(−t/τ), discharge = I0·R·e^(−t/τ).
+ */
+export function calcRlTransientSeries(
   mode: SwitchingMode,
   sourceVoltage: number,
   initialCurrent: number,
   resistance: number,
   inductance: number,
   times: readonly number[],
-): TransientPoint[] {
+): Array<{ time: number; current: number; voltage: number; timeConstant: number }> {
+  if (resistance <= 0) throw new Error('resistance must be positive (Ω)')
+  if (inductance <= 0) throw new Error('inductance must be positive (H)')
+  for (const time of times) {
+    if (time < 0) throw new Error('time must be non-negative (s)')
+  }
+  const timeConstant = inductance / resistance
   return times.map((time) => {
-    const { current, voltage } = rlTransient(
-      mode,
-      sourceVoltage,
-      initialCurrent,
-      resistance,
-      inductance,
-      time,
-    );
-    return { time, voltage, current };
-  });
+    const exp = Math.exp(-time / timeConstant)
+    let current: number
+    let voltage: number
+    switch (mode) {
+      case SwitchingMode.Charge:
+        current = (sourceVoltage / resistance) * (1 - exp)
+        voltage = sourceVoltage * exp
+        break
+      case SwitchingMode.Discharge:
+        current = initialCurrent * exp
+        voltage = initialCurrent * resistance * exp
+        break
+    }
+    return { time, current, voltage, timeConstant }
+  })
 }

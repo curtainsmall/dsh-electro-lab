@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { Unit, nearlyEqual, isNegligible } from './units.ts'
+import { Unit, isNearlyEqual, isNegligible } from './units.ts'
 
-describe('nearlyEqual — pure relative tolerance', () => {
+describe('isNearlyEqual — pure relative tolerance', () => {
   it('is scale-invariant: works for pF and GΩ alike', () => {
-    expect(nearlyEqual(1e-12, 1.5e-12)).toBe(false) // 50% difference
-    expect(nearlyEqual(1e12, 1e12 + 1)).toBe(true) // 1e-12 relative
-    expect(nearlyEqual(1e-15, 2e-15)).toBe(false) // 100% difference
-    expect(nearlyEqual(0, 0)).toBe(true)
-    expect(nearlyEqual(1, 1 + 1e-10)).toBe(true)
+    expect(isNearlyEqual(1e-12, 1.5e-12)).toBe(false) // 50% difference
+    expect(isNearlyEqual(1e12, 1e12 + 1)).toBe(true) // 1e-12 relative
+    expect(isNearlyEqual(1e-15, 2e-15)).toBe(false) // 100% difference
+    expect(isNearlyEqual(0, 0)).toBe(true)
+    expect(isNearlyEqual(1, 1 + 1e-10)).toBe(true)
   })
 })
 

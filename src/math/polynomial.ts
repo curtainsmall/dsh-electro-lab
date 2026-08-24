@@ -83,7 +83,7 @@ export function dividePolynomials(dividend: Polynomial, divisor: Polynomial): { 
 }
 
 /** Polynomial GCD by the Euclidean algorithm, made monic. */
-export function polynomialGcd(left: Polynomial, right: Polynomial): Polynomial {
+export function findPolyGcd(left: Polynomial, right: Polynomial): Polynomial {
   let a = trimPolynomial(left)
   let b = trimPolynomial(right)
   while (!isZeroPolynomial(b)) {
@@ -105,10 +105,10 @@ export function evaluatePolynomial(coefficients: Polynomial, point: Complex): Co
 }
 
 /** Zeros (numerator roots) and poles (denominator roots) of a ratio. */
-export function polesZeros(numerator: Polynomial, denominator: Polynomial): PolesAndZeros {
+export function findPolesZeros(numerator: Polynomial, denominator: Polynomial): PolesAndZeros {
   return {
-    zeros: polynomialRoots(numerator),
-    poles: polynomialRoots(denominator),
+    zeros: findPolyRoots(numerator),
+    poles: findPolyRoots(denominator),
   }
 }
 
@@ -118,7 +118,7 @@ export function polesZeros(numerator: Polynomial, denominator: Polynomial): Pole
  * normalized internally. Convergence is quadratic for simple roots; the
  * iteration stops after MAX_ITERATIONS and returns the best estimate.
  */
-export function polynomialRoots(coefficients: Polynomial): Complex[] {
+export function findPolyRoots(coefficients: Polynomial): Complex[] {
   const trimmed = trimPolynomial(coefficients)
   const degree = trimmed.length - 1
   if (degree <= 0) return []

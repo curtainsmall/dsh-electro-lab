@@ -1,34 +1,34 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
 import { MatchTopology, MatchVariant, designMatch, type MatchElement } from './smith.ts'
-import { ElementKind, networkImpedance } from './circuits.ts'
+import { ElementKind, calcNetworkImpedance } from './circuits.ts'
 import { CircuitMode } from './circuits.ts'
 
 const F = 1e6
 const W = 2 * Math.PI * F
 
 /** Build a NetworkElement node for one match element (sign → L/C). */
-function elementNode(element: MatchElement) {
+function buildElementNode(element: MatchElement) {
   return element.reactance > 0
     ? { kind: ElementKind.Inductance, value: element.reactance / W }
     : { kind: ElementKind.Capacitance, value: -1 / (W * element.reactance) }
 }
 
 /** Input impedance of a pi network with the load attached. */
-function piInputImpedance(elements: MatchElement[], loadImpedance: number): Complex {
+function calcPiInputImpedance(elements: MatchElement[], loadImpedance: number): Complex {
   const [shuntSource, series, shuntLoad] = elements
-  return networkImpedance(
+  return calcNetworkImpedance(
     {
       topology: CircuitMode.Parallel,
       elements: [
-        elementNode(shuntSource!),
+        buildElementNode(shuntSource!),
         {
           topology: CircuitMode.Series,
           elements: [
-            elementNode(series!),
+            buildElementNode(series!),
             {
               topology: CircuitMode.Parallel,
-              elements: [elementNode(shuntLoad!), { kind: ElementKind.Resistance, value: loadImpedance }],
+              elements: [buildElementNode(shuntLoad!), { kind: ElementKind.Resistance, value: loadImpedance }],
             },
           ],
         },
@@ -39,20 +39,20 @@ function piInputImpedance(elements: MatchElement[], loadImpedance: number): Comp
 }
 
 /** Input impedance of a T network with the load attached. */
-function tInputImpedance(elements: MatchElement[], loadImpedance: number): Complex {
+function calcTInputImpedance(elements: MatchElement[], loadImpedance: number): Complex {
   const [seriesSource, shunt, seriesLoad] = elements
-  return networkImpedance(
+  return calcNetworkImpedance(
     {
       topology: CircuitMode.Series,
       elements: [
-        elementNode(seriesSource!),
+        buildElementNode(seriesSource!),
         {
           topology: CircuitMode.Parallel,
           elements: [
-            elementNode(shunt!),
+            buildElementNode(shunt!),
             {
               topology: CircuitMode.Series,
-              elements: [elementNode(seriesLoad!), { kind: ElementKind.Resistance, value: loadImpedance }],
+              elements: [buildElementNode(seriesLoad!), { kind: ElementKind.Resistance, value: loadImpedance }],
             },
           ],
         },
@@ -62,11 +62,11 @@ function tInputImpedance(elements: MatchElement[], loadImpedance: number): Compl
   )
 }
 
-describe('piNetworkMatch — round-trip through networkImpedance', () => {
+describe('designPiNetworkMatch — round-trip through calcNetworkImpedance', () => {
   it('50 Ω → 100 Ω at Q = 5: input impedance returns to 50 + j0', () => {
     const design = designMatch(MatchTopology.Pi, 50, 100, F, 5)
     for (const solution of Object.values(design.solutions)) {
-      const zin = piInputImpedance(solution, 100)
+      const zin = calcPiInputImpedance(solution, 100)
       expect(zin.re).toBeCloseTo(50, 6)
       expect(zin.im).toBeCloseTo(0, 4)
     }
@@ -80,11 +80,11 @@ describe('piNetworkMatch — round-trip through networkImpedance', () => {
   })
 })
 
-describe('tNetworkMatch — round-trip through networkImpedance', () => {
+describe('designTNetworkMatch — round-trip through calcNetworkImpedance', () => {
   it('50 Ω → 100 Ω at Q = 5: input impedance returns to 50 + j0', () => {
     const design = designMatch(MatchTopology.T, 50, 100, F, 5)
     for (const solution of Object.values(design.solutions)) {
-      const zin = tInputImpedance(solution, 100)
+      const zin = calcTInputImpedance(solution, 100)
       expect(zin.re).toBeCloseTo(50, 6)
       expect(zin.im).toBeCloseTo(0, 4)
     }

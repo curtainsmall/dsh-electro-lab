@@ -23,7 +23,7 @@ export enum Unit {
 }
 
 /** Pure relative tolerance comparison (no absolute floor). Zero matches zero exactly. */
-export function nearlyEqual(a: number, b: number, tol = 1e-9): boolean {
+export function isNearlyEqual(a: number, b: number, tol = 1e-9): boolean {
   if (a === 0 && b === 0) return true
   const scale = Math.max(Math.abs(a), Math.abs(b))
   if (scale === 0) return a === b

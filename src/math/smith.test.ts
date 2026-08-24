@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { ElementRole, MatchTopology, MatchVariant, capacitanceFromReactance, designMatch, inductanceFromReactance, quarterWaveImpedance, returnLossDb, impedanceToReflection, reflectionToVswr } from './smith.ts'
+import { ElementRole, MatchTopology, MatchVariant, calcCapacitanceFromReactance, designMatch, calcInductanceFromReactance, calcQuarterWaveImpedance, calcReturnLossDb, convertImpedanceToReflection, convertReflectionToVswr } from './smith.ts'
 
 describe('impedance_to_reflection (textbook check)', () => {
   it('Z = 50 + j50 Ω on a 50 Ω line → Γ = 0.447∠63.43°', () => {
-    const g = impedanceToReflection(new Complex(50, 50), 50)
+    const g = convertImpedanceToReflection(new Complex(50, 50), 50)
     // Γ = 50j / (100 + 50j) = 0.2 + 0.4j
     expect(g.re).toBeCloseTo(0.2, 6)
     expect(g.im).toBeCloseTo(0.4, 6)
@@ -13,49 +13,49 @@ describe('impedance_to_reflection (textbook check)', () => {
   })
 
   it('open and short circuits map to |Γ| = 1', () => {
-    expect(impedanceToReflection(new Complex(1e12, 0), 50).abs()).toBeCloseTo(1, 6)
-    expect(impedanceToReflection(new Complex(0, 0), 50).abs()).toBeCloseTo(1, 6)
+    expect(convertImpedanceToReflection(new Complex(1e12, 0), 50).abs()).toBeCloseTo(1, 6)
+    expect(convertImpedanceToReflection(new Complex(0, 0), 50).abs()).toBeCloseTo(1, 6)
   })
 
   it('matched load gives Γ = 0', () => {
-    expect(impedanceToReflection(new Complex(50, 0), 50).abs()).toBe(0)
+    expect(convertImpedanceToReflection(new Complex(50, 0), 50).abs()).toBe(0)
   })
 })
 
 describe('VSWR and return loss', () => {
   it('Γ = 0.4472 → VSWR 2.62 (textbook check)', () => {
-    const g = impedanceToReflection(new Complex(50, 50), 50)
-    expect(reflectionToVswr(g)).toBeCloseTo(2.618, 3)
+    const g = convertImpedanceToReflection(new Complex(50, 50), 50)
+    expect(convertReflectionToVswr(g)).toBeCloseTo(2.618, 3)
   })
 
   it('|Γ| = 1 yields infinite VSWR', () => {
-    expect(reflectionToVswr(new Complex(1, 0))).toBe(Number.POSITIVE_INFINITY)
+    expect(convertReflectionToVswr(new Complex(1, 0))).toBe(Number.POSITIVE_INFINITY)
   })
 
   it('Γ = 0.4472 → return loss ≈ 6.99 dB (textbook check)', () => {
-    const g = impedanceToReflection(new Complex(50, 50), 50)
-    expect(returnLossDb(g)).toBeCloseTo(6.9897, 3)
+    const g = convertImpedanceToReflection(new Complex(50, 50), 50)
+    expect(calcReturnLossDb(g)).toBeCloseTo(6.9897, 3)
   })
 
   it('perfect match gives infinite return loss', () => {
-    expect(returnLossDb(new Complex(0, 0))).toBe(Number.POSITIVE_INFINITY)
+    expect(calcReturnLossDb(new Complex(0, 0))).toBe(Number.POSITIVE_INFINITY)
   })
 })
 
 describe('quarter-wave transformer', () => {
   it('Z1 = √(Z0·ZL) (textbook check)', () => {
     // 50 Ω line to 100 Ω load → Z1 = √5000 ≈ 70.71 Ω
-    expect(quarterWaveImpedance(50, 100)).toBeCloseTo(70.7107, 4)
+    expect(calcQuarterWaveImpedance(50, 100)).toBeCloseTo(70.7107, 4)
   })
 })
 
 describe('reactance ↔ element values', () => {
   it('positive reactance is an inductance, negative is a capacitance', () => {
-    const omega = 2 * Math.PI * 1e6
-    expect(inductanceFromReactance(50, omega)).toBeCloseTo(50 / omega, 12)
-    expect(inductanceFromReactance(-50, omega)).toBeUndefined()
-    expect(capacitanceFromReactance(-100, omega)).toBeCloseTo(1 / (omega * 100), 12)
-    expect(capacitanceFromReactance(100, omega)).toBeUndefined()
+    const angularFrequency = 2 * Math.PI * 1e6
+    expect(calcInductanceFromReactance(50, angularFrequency)).toBeCloseTo(50 / angularFrequency, 12)
+    expect(calcInductanceFromReactance(-50, angularFrequency)).toBeUndefined()
+    expect(calcCapacitanceFromReactance(-100, angularFrequency)).toBeCloseTo(1 / (angularFrequency * 100), 12)
+    expect(calcCapacitanceFromReactance(100, angularFrequency)).toBeUndefined()
   })
 })
 

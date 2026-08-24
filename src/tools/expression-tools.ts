@@ -6,10 +6,10 @@
  * semantics belong to the domain tools).
  */
 import { Complex } from 'complex.js'
-import { calculateExpression, rationalCoefficients } from '../math/expression.ts'
+import { calcExpression, reduceRational } from '../math/expression.ts'
 import { toComplex, serializeComplex } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
-import { defineJsonTool, valueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from './helpers.ts'
 
 export const expressionTools = [
   defineJsonTool({
@@ -25,7 +25,7 @@ export const expressionTools = [
           additionalProperties: false,
           properties: {
             name: { type: 'string', description: 'variable name', required: true },
-            value: { ...valueParam(Unit.None, 'variable value (unit must be none)'), required: true },
+            value: { ...createValueParam(Unit.None, 'variable value (unit must be none)'), required: true },
           },
           required: ['name', 'value'],
         },
@@ -36,7 +36,7 @@ export const expressionTools = [
       for (const binding of args.variables ?? []) {
         variables[binding.name] = toComplex(binding.value, Unit.None)
       }
-      return serializeComplex(calculateExpression(args.expression, variables), Unit.None)
+      return serializeComplex(calcExpression(args.expression, variables), Unit.None)
     },
   }),
   defineJsonTool({
@@ -54,7 +54,7 @@ export const expressionTools = [
           additionalProperties: false,
           properties: {
             name: { type: 'string', description: 'symbol name', required: true },
-            value: { ...valueParam(Unit.None, 'symbol value (unit must be none)'), required: true },
+            value: { ...createValueParam(Unit.None, 'symbol value (unit must be none)'), required: true },
           },
           required: ['name', 'value'],
         },
@@ -66,7 +66,7 @@ export const expressionTools = [
       for (const binding of args.variables ?? []) {
         parameters[binding.name] = toComplex(binding.value, Unit.None)
       }
-      const { numerator, denominator } = rationalCoefficients(args.expression, variable, args.reduce ?? true, parameters)
+      const { numerator, denominator } = reduceRational(args.expression, variable, args.reduce ?? true, parameters)
       return {
         variable,
         numeratorDegree: numerator.length - 1,

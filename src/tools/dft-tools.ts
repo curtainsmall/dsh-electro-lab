@@ -8,19 +8,19 @@ import {
   WaveformKind,
   WindowKind,
   applyWindow,
-  discreteFourierTransform,
-  fourierSeriesCoefficients,
-  inverseDiscreteFourierTransform,
-  windowSamples,
+  calcDiscreteFourierTransform,
+  calcFourierSeriesCoeffs,
+  calcInvDiscreteFourierTransform,
+  calcWindowSamples,
 } from '../math/dft.ts'
-import { toComplex, toScalar, serializeComplex, realValue } from '../math/convert.ts'
+import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
-import { defineJsonTool, valueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from './helpers.ts'
 
-const sequenceParam = (description: string) => ({
+const createSequenceParam = (description: string) => ({
   type: 'array' as const,
   description,
-  items: valueParam(Unit.None, 'value (unit none)'),
+  items: createValueParam(Unit.None, 'value (unit none)'),
 })
 
 export const dftTools = [
@@ -28,7 +28,7 @@ export const dftTools = [
     name: 'discrete_fourier_transform',
     description: 'DFT of a complex sample sequence: X[k] = Σ x[n]·e^(−j2πkn/N). Bin k corresponds to frequency k·fs/N with sample rate fs. Returns the complex spectrum (magnitude/phase per bin via the value snapshots).',
     parameters: {
-      samples: { ...sequenceParam('time-domain samples, unit none'), required: true },
+      samples: { ...createSequenceParam('time-domain samples, unit none'), required: true },
       window: {
         type: 'string',
         enum: [WindowKind.None, WindowKind.Hann, WindowKind.Hamming, WindowKind.Blackman],
@@ -38,10 +38,10 @@ export const dftTools = [
     execute: (args) => {
       const window = args.window ?? WindowKind.None
       const samples = args.samples.map((sample) => toComplex(sample, Unit.None))
-      const weighted = applyWindow(samples, windowSamples(window, samples.length))
+      const weighted = applyWindow(samples, calcWindowSamples(window, samples.length))
       return {
         window,
-        spectrum: discreteFourierTransform(weighted).map((bin) => serializeComplex(bin, Unit.None)),
+        spectrum: calcDiscreteFourierTransform(weighted).map((bin) => serializeComplex(bin, Unit.None)),
       }
     },
   }),
@@ -49,12 +49,12 @@ export const dftTools = [
     name: 'inverse_discrete_fourier_transform',
     description: 'IDFT of a spectrum: x[n] = (1/N)·Σ X[k]·e^(+j2πkn/N). Recovers the time-domain sequence (round-trip of discrete_fourier_transform).',
     parameters: {
-      spectrum: { ...sequenceParam('spectral bins, unit none'), required: true },
+      spectrum: { ...createSequenceParam('spectral bins, unit none'), required: true },
     },
     execute: (args) => {
       const spectrum = args.spectrum.map((bin) => toComplex(bin, Unit.None))
       return {
-        samples: inverseDiscreteFourierTransform(spectrum).map((sample) => serializeComplex(sample, Unit.None)),
+        samples: calcInvDiscreteFourierTransform(spectrum).map((sample) => serializeComplex(sample, Unit.None)),
       }
     },
   }),
@@ -69,17 +69,17 @@ export const dftTools = [
         required: true,
       },
       harmonics: { type: 'number', description: 'number of harmonics to compute', required: true },
-      amplitude: { ...valueParam(Unit.None, 'peak amplitude (default 1)') },
+      amplitude: { ...createValueParam(Unit.None, 'peak amplitude (default 1)') },
     },
     execute: (args) => {
       const amplitude = args.amplitude === undefined ? 1 : toScalar(args.amplitude, Unit.None)
-      const coefficients = fourierSeriesCoefficients(args.waveform, args.harmonics, amplitude)
+      const coefficients = calcFourierSeriesCoeffs(args.waveform, args.harmonics, amplitude)
       return {
         waveform: args.waveform,
         harmonics: args.harmonics,
-        dc: realValue(coefficients.dc, Unit.None),
-        cosine: coefficients.cosine.map((value) => realValue(value, Unit.None)),
-        sine: coefficients.sine.map((value) => realValue(value, Unit.None)),
+        dc: serializeReal(coefficients.dc, Unit.None),
+        cosine: coefficients.cosine.map((value) => serializeReal(value, Unit.None)),
+        sine: coefficients.sine.map((value) => serializeReal(value, Unit.None)),
       }
     },
   }),
@@ -99,7 +99,7 @@ export const dftTools = [
       return {
         window: args.window,
         length: args.length,
-        samples: windowSamples(args.window, args.length).map((value) => realValue(value, Unit.None)),
+        samples: calcWindowSamples(args.window, args.length).map((value) => serializeReal(value, Unit.None)),
       }
     },
   }),

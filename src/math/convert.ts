@@ -20,7 +20,7 @@
  * that bypass schema validation).
  */
 import { Complex } from 'complex.js'
-import { Unit, nearlyEqual } from './units.ts'
+import { Unit, isNearlyEqual } from './units.ts'
 
 /** Complex form discriminator (wire value = lowercase string). */
 export enum Form {
@@ -103,14 +103,14 @@ export function toComplex(value: ComplexValue, expected: Unit): Complex {
 export function toScalar(value: ComplexValue, expected: Unit): number {
   expectUnit(value, expected)
   if (!('form' in value)) {
-    if (!nearlyEqual(value.im, 0)) {
+    if (!isNearlyEqual(value.im, 0)) {
       throw new Error(`expected a real value for unit "${expected}", got imaginary part ${value.im}`)
     }
     return value.re
   }
   switch (value.form) {
     case Form.Rect: {
-      if (!nearlyEqual(value.im, 0)) {
+      if (!isNearlyEqual(value.im, 0)) {
         throw new Error(`expected a real value for unit "${expected}", got imaginary part ${value.im}`)
       }
       return value.re
@@ -118,7 +118,7 @@ export function toScalar(value: ComplexValue, expected: Unit): number {
     case Form.Polar: {
       const phi = polarAngle(value)
       const halfTurns = phi / Math.PI
-      if (!nearlyEqual(Math.abs(halfTurns % 1), 0) && !nearlyEqual(Math.abs(halfTurns % 1), 1)) {
+      if (!isNearlyEqual(Math.abs(halfTurns % 1), 0) && !isNearlyEqual(Math.abs(halfTurns % 1), 1)) {
         throw new Error(`expected a real value for unit "${expected}", got phase angle ${phi} rad`)
       }
       return value.mag * (Math.round(halfTurns) % 2 === 0 ? 1 : -1)
@@ -139,6 +139,6 @@ export function serializeComplex(value: Complex, unit: Unit): ComplexOutput {
 }
 
 /** Convenience: tool output for a real result. */
-export function realValue(value: number, unit: Unit): ComplexOutput {
+export function serializeReal(value: number, unit: Unit): ComplexOutput {
   return serializeComplex(new Complex(value, 0), unit)
 }

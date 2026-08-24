@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { dividePolynomials, polesZeros, polynomialRoots } from './polynomial.ts'
+import { dividePolynomials, findPolesZeros, findPolyRoots } from './polynomial.ts'
 
 /** Sort roots by (re, im) for order-independent comparison. */
 function sortedRoots(coefficients: number[]): { re: number; im: number }[] {
-  return polynomialRoots(coefficients.map((value) => new Complex(value, 0)))
+  return findPolyRoots(coefficients.map((value) => new Complex(value, 0)))
     .map((root) => ({ re: root.re, im: root.im }))
     .sort((a, b) => a.re - b.re || a.im - b.im)
 }
@@ -68,7 +68,7 @@ describe('dividePolynomials (descending order, the standard)', () => {
   })
 })
 
-describe('polynomialRoots (textbook checks)', () => {
+describe('findPolyRoots (textbook checks)', () => {
   it('solves a quadratic with two real roots', () => {
     const roots = sortedRoots([1, -3, 2]) // x² − 3x + 2 = (x−1)(x−2)
     expect(roots[0]!.re).toBeCloseTo(1, 6)
@@ -106,14 +106,14 @@ describe('polynomialRoots (textbook checks)', () => {
   })
 
   it('returns [] for constants and handles leading zeros', () => {
-    expect(polynomialRoots([new Complex(5, 0)])).toEqual([])
-    expect(polynomialRoots([new Complex(0, 0), new Complex(1, 0), new Complex(-3, 0), new Complex(2, 0)]).length).toBe(2) // 0x³ + x² − 3x + 2
+    expect(findPolyRoots([new Complex(5, 0)])).toEqual([])
+    expect(findPolyRoots([new Complex(0, 0), new Complex(1, 0), new Complex(-3, 0), new Complex(2, 0)]).length).toBe(2) // 0x³ + x² − 3x + 2
   })
 })
 
-describe('polesZeros (textbook checks)', () => {
+describe('findPolesZeros (textbook checks)', () => {
   it('1/((s+1)(s+2)): no zeros, poles −1 and −2', () => {
-    const result = polesZeros([new Complex(1, 0)], [new Complex(1, 0), new Complex(3, 0), new Complex(2, 0)])
+    const result = findPolesZeros([new Complex(1, 0)], [new Complex(1, 0), new Complex(3, 0), new Complex(2, 0)])
     expect(result.zeros).toEqual([])
     const poles = result.poles.map((pole) => pole.re).sort((a, b) => a - b)
     expect(poles[0]).toBeCloseTo(-2, 5)
@@ -121,7 +121,7 @@ describe('polesZeros (textbook checks)', () => {
   })
 
   it('(s+1)/(s²+3s+2): zero −1, poles −1 and −2 (cancellable pair kept)', () => {
-    const result = polesZeros([new Complex(1, 0), new Complex(1, 0)], [new Complex(1, 0), new Complex(3, 0), new Complex(2, 0)])
+    const result = findPolesZeros([new Complex(1, 0), new Complex(1, 0)], [new Complex(1, 0), new Complex(3, 0), new Complex(2, 0)])
     expect(result.zeros[0]!.re).toBeCloseTo(-1, 5)
     expect(result.poles).toHaveLength(2)
   })

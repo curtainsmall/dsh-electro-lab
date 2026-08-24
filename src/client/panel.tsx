@@ -5,7 +5,7 @@
  */
 import { useState, useSyncExternalStore } from 'react'
 import { Complex } from 'complex.js'
-import { impedanceToReflection, gammaReadouts, SmithChart } from './smith-chart.tsx'
+import { convertImpedanceToReflection, gammaReadouts, SmithChart } from './smith-chart.tsx'
 
 /** Tiny shared store: open state + subscription for the header button and the overlay. */
 const panelStore = {
@@ -78,7 +78,7 @@ export function ElectroLabPanel(_props: Record<string, unknown>): React.JSX.Elem
   const imaginary = Number(imagText)
   const reference = Number(referenceText)
   const impedanceValid = Number.isFinite(real) && Number.isFinite(imaginary) && Number.isFinite(reference) && reference > 0
-  const gamma = impedanceValid ? impedanceToReflection(new Complex(real, imaginary), reference) : null
+  const gamma = impedanceValid ? convertImpedanceToReflection(new Complex(real, imaginary), reference) : null
   const readouts = gammaReadouts(gamma)
 
   if (!open) return null

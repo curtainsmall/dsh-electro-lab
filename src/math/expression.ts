@@ -23,7 +23,7 @@ import {
   convolvePolynomials,
   dividePolynomials,
   isZeroPolynomial,
-  polynomialGcd,
+  findPolyGcd,
   trimPolynomial,
   type Polynomial,
 } from './polynomial.ts'
@@ -362,19 +362,19 @@ function containsVariable(expression: Expr, name: string): boolean {
  * canceled unless reduce is false. Functions of the variable (sin(x)) and
  * non-integer powers are rejected.
  */
-export function rationalCoefficients(
+export function reduceRational(
   source: string,
   variable = 'x',
   reduce = true,
   parameters: Record<string, Complex> = {},
 ): { numerator: Polynomial; denominator: Polynomial } {
   const expression = new Parser(tokenize(source)).parse()
-  let rational = rationalOf(expression, variable, parameters)
+  let rational = reduceRationalOf(expression, variable, parameters)
   if (isZeroPolynomial(rational.denominator)) {
     throw new Error('denominator is identically zero — division by the zero polynomial')
   }
   if (reduce) {
-    const gcd = polynomialGcd(rational.numerator, rational.denominator)
+    const gcd = findPolyGcd(rational.numerator, rational.denominator)
     if (gcd.length > 1) {
       rational = {
         numerator: dividePolynomials(rational.numerator, gcd).quotient,
@@ -389,7 +389,7 @@ export function rationalCoefficients(
 }
 
 /** Reduce a subtree to one rational function; parameters supply symbol values. */
-function rationalOf(expression: Expr, variable: string, parameters: Record<string, Complex>): Rational {
+function reduceRationalOf(expression: Expr, variable: string, parameters: Record<string, Complex>): Rational {
   const ONE = new Complex(1, 0)
   switch (expression.kind) {
     case ExprKind.Number:
@@ -406,7 +406,7 @@ function rationalOf(expression: Expr, variable: string, parameters: Record<strin
       throw new Error(`unbound variable '${expression.name}' — provide it in variables, or it may be a typo`)
     }
     case ExprKind.Negate: {
-      const rational = rationalOf(expression.operand, variable, parameters)
+      const rational = reduceRationalOf(expression.operand, variable, parameters)
       return { numerator: rational.numerator.map((coefficient) => coefficient.neg()), denominator: rational.denominator }
     }
     case ExprKind.Binary: {
@@ -419,15 +419,15 @@ function rationalOf(expression: Expr, variable: string, parameters: Record<strin
         if (exponent.im !== 0 || !Number.isInteger(exponent.re)) {
           throw new Error(`rational expansion needs an integer exponent, got ${exponent.toString()}`)
         }
-        let base = rationalOf(expression.left, variable, parameters)
+        let base = reduceRationalOf(expression.left, variable, parameters)
         const power = Math.abs(exponent.re)
         if (exponent.re < 0) base = { numerator: base.denominator, denominator: base.numerator }
         let result: Rational = { numerator: [ONE], denominator: [ONE] }
         for (let i = 0; i < power; i++) result = multiplyRationals(result, base)
         return result
       }
-      const left = rationalOf(expression.left, variable, parameters)
-      const right = rationalOf(expression.right, variable, parameters)
+      const left = reduceRationalOf(expression.left, variable, parameters)
+      const right = reduceRationalOf(expression.right, variable, parameters)
       switch (expression.operator) {
         case BinaryOperator.Add:
           return addRationals(left, right)
@@ -490,7 +490,7 @@ function divideRationals(left: Rational, right: Rational): Rational {
 // ── Public entry ─────────────────────────────────────────────────────────
 
 /** Evaluate a string expression; every value is complex (real = im 0). */
-export function calculateExpression(source: string, variables: Record<string, Complex> = {}): Complex {
+export function calcExpression(source: string, variables: Record<string, Complex> = {}): Complex {
   if (source.trim() === '') throw new Error('expression is empty')
   const expression = new Parser(tokenize(source)).parse()
   return evaluate(expression, variables)

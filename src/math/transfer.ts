@@ -9,7 +9,7 @@ import {
   convolvePolynomials,
   dividePolynomials,
   evaluatePolynomial,
-  polynomialRoots,
+  findPolyRoots,
   trimPolynomial,
   type Polynomial,
 } from './polynomial.ts'
@@ -40,7 +40,7 @@ export interface PartialFractionResult {
 // ── Frequency response ───────────────────────────────────────────────────
 
 /** H(σ) for each point: N(σ)/D(σ) by Horner evaluation. */
-export function transferResponse(numerator: Polynomial, denominator: Polynomial, points: Complex[]): Complex[] {
+export function calcTransferResponse(numerator: Polynomial, denominator: Polynomial, points: Complex[]): Complex[] {
   return points.map((point) => evaluatePolynomial(numerator, point).div(evaluatePolynomial(denominator, point)))
 }
 
@@ -48,15 +48,15 @@ export function transferResponse(numerator: Polynomial, denominator: Polynomial,
  * Evaluation points for a frequency sweep: σ = jω in the s domain,
  * σ = e^(jωT) in the z domain (sampleTime required, seconds).
  */
-export function frequencyPoints(variable: Variable, frequencies: number[], sampleTime?: number): Complex[] {
+export function calcFreqPoints(variable: Variable, frequencies: number[], sampleTime?: number): Complex[] {
   return frequencies.map((frequency) => {
-    const omega = 2 * Math.PI * frequency
+    const angularFrequency = 2 * Math.PI * frequency
     if (variable === Variable.Z) {
       if (sampleTime === undefined) throw new Error('variable "z" requires sampleTime')
-      const angle = omega * sampleTime
+      const angle = angularFrequency * sampleTime
       return new Complex(Math.cos(angle), Math.sin(angle))
     }
-    return new Complex(0, omega)
+    return new Complex(0, angularFrequency)
   })
 }
 
@@ -70,7 +70,7 @@ export function frequencyPoints(variable: Variable, frequencies: number[], sampl
  * for the residues — no numerical differentiation, exact for polynomial
  * arithmetic.
  */
-export function partialFraction(numerator: Polynomial, denominator: Polynomial): PartialFractionResult {
+export function expandPartialFraction(numerator: Polynomial, denominator: Polynomial): PartialFractionResult {
   const d = trimPolynomial(denominator)
   if (d.length <= 1) throw new Error('denominator must be at least degree 1')
   let n = trimPolynomial(numerator)
@@ -84,7 +84,7 @@ export function partialFraction(numerator: Polynomial, denominator: Polynomial):
   }
 
   // 2. poles with multiplicities
-  const roots = polynomialRoots(d)
+  const roots = findPolyRoots(d)
   const poles: Array<{ pole: Complex; multiplicity: number }> = []
   const sorted = roots.slice().sort((a, b) => a.re - b.re || a.im - b.im)
   for (const root of sorted) {
@@ -162,13 +162,13 @@ function solveLinearSystem(matrix: Complex[][], rhs: Complex[]): Complex[] {
  * by partial fractions, each term c/(s−p)^k inverts to
  * c·t^(k−1)/(k−1)!·e^(pt). Requires deg N ≤ deg D (physically realizable).
  */
-export function stepResponse(numerator: Polynomial, denominator: Polynomial, times: number[]): Complex[] {
+export function calcStepResponse(numerator: Polynomial, denominator: Polynomial, times: number[]): Complex[] {
   const n = trimPolynomial(numerator)
   const d = trimPolynomial(denominator)
   if (n.length > d.length) throw new Error('step response requires numerator degree ≤ denominator degree')
   if (d.length === 0) throw new Error('denominator must be at least degree 1')
   const timesDenominator = [...d, new Complex(0, 0)] // D(s)·s: append the zero (raise every power)
-  const { terms } = partialFraction(n, timesDenominator)
+  const { terms } = expandPartialFraction(n, timesDenominator)
   return times.map((t) => {
     let sum = new Complex(0, 0)
     for (const term of terms) {
@@ -193,7 +193,7 @@ export function stepResponse(numerator: Polynomial, denominator: Polynomial, tim
  *   y[n] = (Σᵢ bᵢ·x[n−i] − Σⱼ aⱼ·y[n−j]) / a₀
  * Output length equals the input length; past samples are zero.
  */
-export function differenceEquation(a: Polynomial, b: Polynomial, input: Complex[]): Complex[] {
+export function solveDifferenceEquation(a: Polynomial, b: Polynomial, input: Complex[]): Complex[] {
   const a0 = a[0] ?? new Complex(1, 0)
   if (a0.abs() === 0) throw new Error('a[0] must be non-zero')
   const output: Complex[] = []

@@ -18,7 +18,7 @@ export interface FilterElement {
 }
 
 /** Butterworth low-pass ladder design (equal source/load terminations). */
-export function butterworthLowpass(
+export function designButterworthLowpass(
   order: number,
   cutoffFrequency: number,
   resistance: number,
@@ -43,7 +43,7 @@ export function butterworthLowpass(
 }
 
 /** Butterworth attenuation at a frequency: 10·log10(1 + (f/fc)^(2n)) dB. */
-export function butterworthAttenuation(
+export function calcButterworthAttenuation(
   order: number,
   cutoffFrequency: number,
   frequency: number,
