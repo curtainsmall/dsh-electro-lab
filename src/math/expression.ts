@@ -18,6 +18,15 @@
  * error on evaluation.
  */
 import { Complex } from 'complex.js'
+import {
+  addPolynomials,
+  convolvePolynomials,
+  dividePolynomials,
+  isZeroPolynomial,
+  polynomialGcd,
+  trimPolynomial,
+  type Polynomial,
+} from './polynomial.ts'
 
 // ── Enums ────────────────────────────────────────────────────────────────
 
@@ -70,8 +79,8 @@ type Token =
 
 /** A rational function as two coefficient arrays, descending power order. */
 interface Rational {
-  numerator: Complex[]
-  denominator: Complex[]
+  numerator: Polynomial
+  denominator: Polynomial
 }
 
 // ── Pure mappings ────────────────────────────────────────────────────────
@@ -358,7 +367,7 @@ export function rationalCoefficients(
   variable = 'x',
   reduce = true,
   parameters: Record<string, Complex> = {},
-): { numerator: Complex[]; denominator: Complex[] } {
+): { numerator: Polynomial; denominator: Polynomial } {
   const expression = new Parser(tokenize(source)).parse()
   let rational = rationalOf(expression, variable, parameters)
   if (isZeroPolynomial(rational.denominator)) {
@@ -368,8 +377,8 @@ export function rationalCoefficients(
     const gcd = polynomialGcd(rational.numerator, rational.denominator)
     if (gcd.length > 1) {
       rational = {
-        numerator: divideAscending(rational.numerator.slice().reverse(), gcd.slice().reverse()).quotient.reverse(),
-        denominator: divideAscending(rational.denominator.slice().reverse(), gcd.slice().reverse()).quotient.reverse(),
+        numerator: dividePolynomials(rational.numerator, gcd).quotient,
+        denominator: dividePolynomials(rational.denominator, gcd).quotient,
       }
     }
   }
@@ -476,88 +485,6 @@ function divideRationals(left: Rational, right: Rational): Rational {
     numerator: convolvePolynomials(left.numerator, right.denominator),
     denominator: convolvePolynomials(left.denominator, right.numerator),
   }
-}
-
-/** Trim leading zero coefficients, keeping at least one entry. */
-function trimPolynomial(coefficients: Complex[]): Complex[] {
-  let start = 0
-  while (start < coefficients.length - 1 && coefficients[start]!.abs() === 0) start++
-  return coefficients.slice(start)
-}
-
-/** A polynomial is zero when it trimmed down to a single zero entry. */
-function isZeroPolynomial(coefficients: Complex[]): boolean {
-  return coefficients.every((coefficient) => coefficient.abs() === 0)
-}
-
-/**
- * Long division in ascending coefficient order (index = power):
- * dividend = quotient · divisor + remainder. The highest (trailing) term of
- * the remainder is eliminated each round, so the loop strictly shrinks.
- */
-function divideAscending(dividend: Complex[], divisor: Complex[]): { quotient: Complex[]; remainder: Complex[] } {
-  const remainder = dividend.slice()
-  const quotient: Complex[] = new Array(Math.max(dividend.length - divisor.length + 1, 0)).fill(null).map(() => new Complex(0, 0))
-  const leading = divisor[divisor.length - 1]!
-  while (remainder.length >= divisor.length && remainder[remainder.length - 1]!.abs() !== 0) {
-    const degree = remainder.length - divisor.length
-    const factor = remainder[remainder.length - 1]!.div(leading)
-    quotient[degree] = quotient[degree]!.add(factor)
-    for (let i = 0; i < divisor.length; i++) {
-      remainder[degree + i] = remainder[degree + i]!.sub(factor.mul(divisor[i]!))
-    }
-    remainder.pop()
-    while (remainder.length > 0 && remainder[remainder.length - 1]!.abs() === 0) remainder.pop()
-  }
-  return { quotient: trimAscending(quotient), remainder: trimAscending(remainder) }
-}
-
-/** Strip trailing (high-power) zeros from an ascending array; empty stays empty. */
-function trimAscending(ascending: Complex[]): Complex[] {
-  let end = ascending.length
-  while (end > 0 && ascending[end - 1]!.abs() === 0) end--
-  return ascending.slice(0, end)
-}
-
-/** An ascending array is zero when every entry vanishes (empty counts). */
-function isZeroAscending(ascending: Complex[]): boolean {
-  return ascending.every((coefficient) => coefficient.abs() === 0)
-}
-
-/** Polynomial GCD by the Euclidean algorithm (ascending order), made monic. */
-function polynomialGcd(left: Complex[], right: Complex[]): Complex[] {
-  let a = trimPolynomial(left).reverse()
-  let b = trimPolynomial(right).reverse()
-  while (!isZeroAscending(b)) {
-    const { remainder } = divideAscending(a, b)
-    a = b
-    b = remainder
-  }
-  const leading = a[a.length - 1]!
-  return a.map((coefficient) => coefficient.div(leading)).reverse()
-}
-
-/** Align lengths, then add element-wise. */
-function addPolynomials(left: Complex[], right: Complex[]): Complex[] {
-  const length = Math.max(left.length, right.length)
-  const result: Complex[] = []
-  for (let i = 0; i < length; i++) {
-    const l = left[left.length - 1 - i] ?? new Complex(0, 0)
-    const r = right[right.length - 1 - i] ?? new Complex(0, 0)
-    result.unshift(l.add(r))
-  }
-  return result
-}
-
-/** Multiplication as coefficient convolution. */
-function convolvePolynomials(left: Complex[], right: Complex[]): Complex[] {
-  const result: Complex[] = new Array(left.length + right.length - 1).fill(null).map(() => new Complex(0, 0))
-  for (let i = 0; i < left.length; i++) {
-    for (let j = 0; j < right.length; j++) {
-      result[i + j] = result[i + j]!.add(left[i]!.mul(right[j]!))
-    }
-  }
-  return result
 }
 
 // ── Public entry ─────────────────────────────────────────────────────────

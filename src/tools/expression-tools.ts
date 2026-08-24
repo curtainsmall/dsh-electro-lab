@@ -1,5 +1,5 @@
 /**
- * General math tools: the string-expression engine. The LLM never does
+ * Expression tools: the string-expression engine. The LLM never does
  * arithmetic by hand — every intermediate calculation is a calculate call,
  * and rational reduction for transfer-function chains is rational_coefficients.
  * IO is JSON-and-complex-only; expression values are unit 'none' (unit
@@ -11,7 +11,7 @@ import { toComplex, serializeComplex } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
 import { defineJsonTool, valueParam } from './helpers.ts'
 
-export const mathTools = [
+export const expressionTools = [
   defineJsonTool({
     name: 'calculate',
     description: 'Evaluate a string math expression and return the complex result. Expression language: + - * / ^ (^ is right-associative, -2^2 = -4), parentheses, unary minus, scientific notation (1e6, 2.5e-3), complex literals with j or i suffix (3+4j, 2i; j/i alone is the imaginary unit), constants pi and e, and functions sin cos tan exp ln log10 sqrt abs arg conjugate real imag. Variables are bound via the variables array; every bound value must have unit "none". Use this for ALL arithmetic — never compute by hand.',
