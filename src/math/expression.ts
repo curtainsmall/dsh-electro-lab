@@ -68,6 +68,12 @@ type Token =
   | { kind: TokenKind.Comma }
   | { kind: TokenKind.End }
 
+/** A rational function as two coefficient arrays, descending power order. */
+interface Rational {
+  numerator: Complex[]
+  denominator: Complex[]
+}
+
 // ── Pure mappings ────────────────────────────────────────────────────────
 
 const CONSTANTS: Record<string, Complex> = {
@@ -336,66 +342,199 @@ function containsVariable(expression: Expr, name: string): boolean {
   }
 }
 
-// ── Polynomial coefficient extraction ────────────────────────────────────
+// ── Rational function expansion ──────────────────────────────────────────
 
 /**
- * Expand an expression about one variable and return its coefficients in
- * descending power order, [aₙ … a₁, a₀] (highest degree first). The result
- * is a polynomial in that variable alone; functions of the variable (e.g.
- * sin(x)) and non-integer powers are rejected.
+ * Reduce an expression built from + - * / and integer powers in one variable
+ * to a single rational function and return its numerator/denominator
+ * coefficients in descending power order, [aₙ … a₁, a₀]. Pure polynomials
+ * come back with denominator [1]; negative powers (s^-1), nested divisions
+ * and sums of rationals are normalized automatically. Common factors are
+ * canceled unless reduce is false. Functions of the variable (sin(x)) and
+ * non-integer powers are rejected.
  */
-export function polynomialCoefficients(source: string, variable = 'x'): { degree: number; coefficients: Complex[] } {
+export function rationalCoefficients(
+  source: string,
+  variable = 'x',
+  reduce = true,
+  parameters: Record<string, Complex> = {},
+): { numerator: Complex[]; denominator: Complex[] } {
   const expression = new Parser(tokenize(source)).parse()
-  if (!containsVariable(expression, variable)) {
-    return { degree: 0, coefficients: [evaluate(expression, {})] }
+  let rational = rationalOf(expression, variable, parameters)
+  if (isZeroPolynomial(rational.denominator)) {
+    throw new Error('denominator is identically zero — division by the zero polynomial')
   }
-  const coefficients = polynomialOf(expression, variable)
-  while (coefficients.length > 1 && coefficients[0]!.abs() === 0) coefficients.shift()
-  return { degree: coefficients.length - 1, coefficients }
+  if (reduce) {
+    const gcd = polynomialGcd(rational.numerator, rational.denominator)
+    if (gcd.length > 1) {
+      rational = {
+        numerator: divideAscending(rational.numerator.slice().reverse(), gcd.slice().reverse()).quotient.reverse(),
+        denominator: divideAscending(rational.denominator.slice().reverse(), gcd.slice().reverse()).quotient.reverse(),
+      }
+    }
+  }
+  return {
+    numerator: trimPolynomial(rational.numerator),
+    denominator: trimPolynomial(rational.denominator),
+  }
 }
 
-/** Coeffs of a subtree about `variable`, descending order, without trimming. */
-function polynomialOf(expression: Expr, variable: string): Complex[] {
+/** Reduce a subtree to one rational function; parameters supply symbol values. */
+function rationalOf(expression: Expr, variable: string, parameters: Record<string, Complex>): Rational {
+  const ONE = new Complex(1, 0)
   switch (expression.kind) {
     case ExprKind.Number:
-      return [expression.value]
+      return { numerator: [expression.value], denominator: [ONE] }
     case ExprKind.Variable: {
-      // the polynomial variable is x¹ = [1, 0]; any other identifier is a constant (pi, e, j, i, …)
-      return expression.name === variable ? [new Complex(1, 0), new Complex(0, 0)] : [evaluate(expression, {})]
+      if (expression.name === variable) {
+        // the polynomial variable is x¹ = [1, 0]
+        return { numerator: [new Complex(1, 0), new Complex(0, 0)], denominator: [ONE] }
+      }
+      const constant = CONSTANTS[expression.name]
+      if (constant !== undefined) return { numerator: [constant], denominator: [ONE] }
+      const parameter = parameters[expression.name]
+      if (parameter !== undefined) return { numerator: [parameter], denominator: [ONE] }
+      throw new Error(`unbound variable '${expression.name}' — provide it in variables, or it may be a typo`)
     }
-    case ExprKind.Negate:
-      return polynomialOf(expression.operand, variable).map((coefficient) => coefficient.neg())
+    case ExprKind.Negate: {
+      const rational = rationalOf(expression.operand, variable, parameters)
+      return { numerator: rational.numerator.map((coefficient) => coefficient.neg()), denominator: rational.denominator }
+    }
     case ExprKind.Binary: {
-      if (expression.operator === BinaryOperator.Add || expression.operator === BinaryOperator.Subtract) {
-        const left = polynomialOf(expression.left, variable)
-        const right = polynomialOf(expression.right, variable)
-        return addPolynomials(left, expression.operator === BinaryOperator.Add ? right : right.map((coefficient) => coefficient.neg()))
-      }
-      if (expression.operator === BinaryOperator.Multiply) {
-        return convolvePolynomials(polynomialOf(expression.left, variable), polynomialOf(expression.right, variable))
-      }
       if (expression.operator === BinaryOperator.Power) {
-        const right = polynomialOf(expression.right, variable)
-        const isConstant = right.length === 1 && right[0]!.im === 0
-        if (!isConstant) throw new Error(`power base/degree must be a constant integer for polynomial expansion, got ${right.length === 1 ? right[0]!.toString() : 'an expression in ' + variable}`)
-        const degree = right[0]!.re
-        if (!Number.isInteger(degree) || degree < 0) {
-          throw new Error(`polynomial expansion needs a non-negative integer power, got ${degree}`)
+        // exponent must be a constant integer; negative powers flip the fraction
+        if (containsVariable(expression.right, variable)) {
+          throw new Error(`power exponent must not contain the variable for rational expansion, got an expression in ${variable}`)
         }
-        const base = polynomialOf(expression.left, variable)
-        let result: Complex[] = [new Complex(1, 0)]
-        for (let i = 0; i < degree; i++) result = convolvePolynomials(result, base)
+        const exponent = evaluate(expression.right, parameters)
+        if (exponent.im !== 0 || !Number.isInteger(exponent.re)) {
+          throw new Error(`rational expansion needs an integer exponent, got ${exponent.toString()}`)
+        }
+        let base = rationalOf(expression.left, variable, parameters)
+        const power = Math.abs(exponent.re)
+        if (exponent.re < 0) base = { numerator: base.denominator, denominator: base.numerator }
+        let result: Rational = { numerator: [ONE], denominator: [ONE] }
+        for (let i = 0; i < power; i++) result = multiplyRationals(result, base)
         return result
       }
-      throw new Error(`operator '${expression.operator}' is not supported in polynomial expansion`)
+      const left = rationalOf(expression.left, variable, parameters)
+      const right = rationalOf(expression.right, variable, parameters)
+      switch (expression.operator) {
+        case BinaryOperator.Add:
+          return addRationals(left, right)
+        case BinaryOperator.Subtract:
+          return subtractRationals(left, right)
+        case BinaryOperator.Multiply:
+          return multiplyRationals(left, right)
+        case BinaryOperator.Divide:
+          return divideRationals(left, right)
+      }
+      throw new Error(`operator '${expression.operator}' is not supported in rational expansion`)
     }
     case ExprKind.Call: {
       if (!containsVariable(expression.argument, variable)) {
-        return [evaluate(expression, {})]
+        return { numerator: [evaluate(expression, parameters)], denominator: [ONE] }
       }
-      throw new Error(`'${expression.functionName}(${variable})' is not a polynomial in ${variable}`)
+      throw new Error(`'${expression.functionName}(${variable})' is not a rational function of ${variable}`)
     }
   }
+}
+
+/** A/B + C/D = (AD + CB) / BD */
+function addRationals(left: Rational, right: Rational): Rational {
+  return {
+    numerator: addPolynomials(
+      convolvePolynomials(left.numerator, right.denominator),
+      convolvePolynomials(right.numerator, left.denominator),
+    ),
+    denominator: convolvePolynomials(left.denominator, right.denominator),
+  }
+}
+
+/** A/B − C/D = (AD − CB) / BD */
+function subtractRationals(left: Rational, right: Rational): Rational {
+  return {
+    numerator: addPolynomials(
+      convolvePolynomials(left.numerator, right.denominator),
+      convolvePolynomials(right.numerator, left.denominator).map((coefficient) => coefficient.neg()),
+    ),
+    denominator: convolvePolynomials(left.denominator, right.denominator),
+  }
+}
+
+/** A/B · C/D = AC / BD */
+function multiplyRationals(left: Rational, right: Rational): Rational {
+  return {
+    numerator: convolvePolynomials(left.numerator, right.numerator),
+    denominator: convolvePolynomials(left.denominator, right.denominator),
+  }
+}
+
+/** (A/B) / (C/D) = AD / BC — avoid U+00F7: rolldown on Windows hangs on it even in comments */
+function divideRationals(left: Rational, right: Rational): Rational {
+  return {
+    numerator: convolvePolynomials(left.numerator, right.denominator),
+    denominator: convolvePolynomials(left.denominator, right.numerator),
+  }
+}
+
+/** Trim leading zero coefficients, keeping at least one entry. */
+function trimPolynomial(coefficients: Complex[]): Complex[] {
+  let start = 0
+  while (start < coefficients.length - 1 && coefficients[start]!.abs() === 0) start++
+  return coefficients.slice(start)
+}
+
+/** A polynomial is zero when it trimmed down to a single zero entry. */
+function isZeroPolynomial(coefficients: Complex[]): boolean {
+  return coefficients.every((coefficient) => coefficient.abs() === 0)
+}
+
+/**
+ * Long division in ascending coefficient order (index = power):
+ * dividend = quotient · divisor + remainder. The highest (trailing) term of
+ * the remainder is eliminated each round, so the loop strictly shrinks.
+ */
+function divideAscending(dividend: Complex[], divisor: Complex[]): { quotient: Complex[]; remainder: Complex[] } {
+  const remainder = dividend.slice()
+  const quotient: Complex[] = new Array(Math.max(dividend.length - divisor.length + 1, 0)).fill(null).map(() => new Complex(0, 0))
+  const leading = divisor[divisor.length - 1]!
+  while (remainder.length >= divisor.length && remainder[remainder.length - 1]!.abs() !== 0) {
+    const degree = remainder.length - divisor.length
+    const factor = remainder[remainder.length - 1]!.div(leading)
+    quotient[degree] = quotient[degree]!.add(factor)
+    for (let i = 0; i < divisor.length; i++) {
+      remainder[degree + i] = remainder[degree + i]!.sub(factor.mul(divisor[i]!))
+    }
+    remainder.pop()
+    while (remainder.length > 0 && remainder[remainder.length - 1]!.abs() === 0) remainder.pop()
+  }
+  return { quotient: trimAscending(quotient), remainder: trimAscending(remainder) }
+}
+
+/** Strip trailing (high-power) zeros from an ascending array; empty stays empty. */
+function trimAscending(ascending: Complex[]): Complex[] {
+  let end = ascending.length
+  while (end > 0 && ascending[end - 1]!.abs() === 0) end--
+  return ascending.slice(0, end)
+}
+
+/** An ascending array is zero when every entry vanishes (empty counts). */
+function isZeroAscending(ascending: Complex[]): boolean {
+  return ascending.every((coefficient) => coefficient.abs() === 0)
+}
+
+/** Polynomial GCD by the Euclidean algorithm (ascending order), made monic. */
+function polynomialGcd(left: Complex[], right: Complex[]): Complex[] {
+  let a = trimPolynomial(left).reverse()
+  let b = trimPolynomial(right).reverse()
+  while (!isZeroAscending(b)) {
+    const { remainder } = divideAscending(a, b)
+    a = b
+    b = remainder
+  }
+  const leading = a[a.length - 1]!
+  return a.map((coefficient) => coefficient.div(leading)).reverse()
 }
 
 /** Align lengths, then add element-wise. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { calculateExpression, polynomialCoefficients } from './expression.ts'
+import { calculateExpression, rationalCoefficients } from './expression.ts'
 
 describe('arithmetic and precedence', () => {
   it('respects operator precedence and parentheses', () => {
@@ -105,43 +105,83 @@ describe('errors', () => {
   })
 })
 
-describe('polynomialCoefficients', () => {
+describe('rationalCoefficients — pure polynomials', () => {
   it('extracts descending coefficients (textbook checks)', () => {
-    expect(polynomialCoefficients('x^2-3*x+2').coefficients.map((c) => c.re)).toEqual([1, -3, 2])
-    expect(polynomialCoefficients('x^2+5').coefficients.map((c) => c.re)).toEqual([1, 0, 5])
-    expect(polynomialCoefficients('3').coefficients.map((c) => c.re)).toEqual([3])
+    expect(rationalCoefficients('x^2-3*x+2').numerator.map((c) => c.re)).toEqual([1, -3, 2])
+    expect(rationalCoefficients('x^2-3*x+2').denominator.map((c) => c.re)).toEqual([1])
+    expect(rationalCoefficients('x^2+5').numerator.map((c) => c.re)).toEqual([1, 0, 5])
+    expect(rationalCoefficients('3').numerator.map((c) => c.re)).toEqual([3])
   })
 
-  it('expands products', () => {
-    expect(polynomialCoefficients('(x+1)*(x-2)').coefficients.map((c) => c.re)).toEqual([1, -1, -2])
-    expect(polynomialCoefficients('(x-1)^3').coefficients.map((c) => c.re)).toEqual([1, -3, 3, -1])
-  })
-
-  it('combines like terms', () => {
-    expect(polynomialCoefficients('x^2+x^2+2*x').coefficients.map((c) => c.re)).toEqual([2, 2, 0])
+  it('expands products and combines like terms', () => {
+    expect(rationalCoefficients('(x+1)*(x-2)').numerator.map((c) => c.re)).toEqual([1, -1, -2])
+    expect(rationalCoefficients('(x-1)^3').numerator.map((c) => c.re)).toEqual([1, -3, 3, -1])
+    expect(rationalCoefficients('x^2+x^2+2*x').numerator.map((c) => c.re)).toEqual([2, 2, 0])
   })
 
   it('keeps complex coefficients', () => {
-    const coefficients = polynomialCoefficients('(1+j)*x+2').coefficients
-    expect(coefficients[0]!.re).toBeCloseTo(1, 10)
-    expect(coefficients[0]!.im).toBeCloseTo(1, 10)
-    expect(coefficients[1]!.re).toBeCloseTo(2, 10)
+    const numerator = rationalCoefficients('(1+j)*x+2').numerator
+    expect(numerator[0]!.re).toBeCloseTo(1, 10)
+    expect(numerator[0]!.im).toBeCloseTo(1, 10)
+    expect(numerator[1]!.re).toBeCloseTo(2, 10)
   })
 
-  it('honors a custom variable and reports degree', () => {
-    const result = polynomialCoefficients('s^2+3*s+2', 's')
-    expect(result.degree).toBe(2)
-    expect(result.coefficients.map((c) => c.re)).toEqual([1, 3, 2])
+  it('honors a custom variable', () => {
+    expect(rationalCoefficients('s^2+3*s+2', 's').numerator.map((c) => c.re)).toEqual([1, 3, 2])
+  })
+})
+
+describe('rationalCoefficients — rational functions', () => {
+  it('reduces a plain ratio (unreduced view)', () => {
+    const result = rationalCoefficients('(s+1)/(s^2+3*s+2)', 's', false)
+    expect(result.numerator.map((c) => c.re)).toEqual([1, 1])
+    expect(result.denominator.map((c) => c.re)).toEqual([1, 3, 2])
   })
 
-  it('rejects non-polynomial expressions', () => {
-    expect(() => polynomialCoefficients('sin(x)')).toThrow(/not a polynomial/)
-    expect(() => polynomialCoefficients('x^-1')).toThrow(/non-negative integer/)
+  it('normalizes negative powers', () => {
+    const result = rationalCoefficients('s^-1+2', 's')
+    // (1 + 2s) / s
+    expect(result.numerator.map((c) => c.re)).toEqual([2, 1])
+    expect(result.denominator.map((c) => c.re)).toEqual([1, 0])
   })
 
-  it('reports a constant expression as degree 0', () => {
-    const result = polynomialCoefficients('2+2', 'x')
-    expect(result.degree).toBe(0)
-    expect(result.coefficients[0]!.re).toBeCloseTo(4, 10)
+  it('keeps parameter symbols via bindings (RC low-pass)', () => {
+    const result = rationalCoefficients('1/(1+s*RC)', 's', true, { RC: new Complex(10000, 0) })
+    expect(result.numerator.map((c) => c.re)).toEqual([1])
+    expect(result.denominator[0]!.re).toBeCloseTo(10000, 10)
+    expect(result.denominator[1]!.re).toBeCloseTo(1, 10)
+  })
+
+  it('adds rationals by cross-multiplication', () => {
+    const result = rationalCoefficients('1/s + 2/(s+1)', 's')
+    // (s+1 + 2s) / (s(s+1)) = (3s+1) / (s²+s)
+    expect(result.numerator.map((c) => c.re)).toEqual([3, 1])
+    expect(result.denominator.map((c) => c.re)).toEqual([1, 1, 0])
+  })
+
+  it('handles nested division', () => {
+    const result = rationalCoefficients('1/(1+1/s)', 's')
+    // 1 / ((s+1)/s) = s/(s+1)
+    expect(result.numerator.map((c) => c.re)).toEqual([1, 0])
+    expect(result.denominator.map((c) => c.re)).toEqual([1, 1])
+  })
+
+  it('cancels common factors by default and keeps them with reduce false', () => {
+    const reduced = rationalCoefficients('(x+1)/(x^2+3*x+2)')
+    expect(reduced.numerator.map((c) => c.re)).toEqual([1])
+    expect(reduced.denominator.map((c) => c.re)).toEqual([1, 2])
+    const unreduced = rationalCoefficients('(x+1)/(x^2+3*x+2)', 'x', false)
+    expect(unreduced.numerator.map((c) => c.re)).toEqual([1, 1])
+    expect(unreduced.denominator.map((c) => c.re)).toEqual([1, 3, 2])
+  })
+
+  it('rejects division by the zero polynomial', () => {
+    expect(() => rationalCoefficients('1/(x-x)')).toThrow(/identically zero/)
+  })
+
+  it('rejects non-rational expressions', () => {
+    expect(() => rationalCoefficients('sin(x)')).toThrow(/not a rational function/)
+    expect(() => rationalCoefficients('x^0.5')).toThrow(/integer exponent/)
+    expect(() => rationalCoefficients('x^x')).toThrow(/must not contain the variable/)
   })
 })
