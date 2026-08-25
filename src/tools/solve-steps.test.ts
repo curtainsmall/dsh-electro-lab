@@ -44,6 +44,24 @@ describe('resolveReferences', () => {
     expect(() => resolveReferences('@step1', [{ re: 1, im: 0, unit: 'none' }])).toThrow(/beyond the last computed step/)
     expect(() => resolveReferences('@step5', [])).toThrow(/beyond the last computed step/)
   })
+
+  it('resolves nested field paths "@stepN.path.to.field"', () => {
+    const outputs: JsonValue[] = [{ numerator: [1, 1], denominator: [1, 3, 2] }]
+    expect(resolveReferences('@step0.numerator', outputs)).toEqual([1, 1])
+    expect(resolveReferences('@step0.denominator', outputs)).toEqual([1, 3, 2])
+  })
+
+  it('resolves deep paths and inside structures', () => {
+    const outputs: JsonValue[] = [{ solutions: { lowPass: { elements: [{ role: 'series-source' }] } } }]
+    expect(resolveReferences('@step0.solutions.lowPass.elements', outputs)).toEqual([{ role: 'series-source' }])
+    expect(resolveReferences({ num: '@step0.solutions.lowPass.elements.0.role' }, outputs)).toEqual({ num: 'series-source' })
+  })
+
+  it('raises for missing fields on the path', () => {
+    const outputs: JsonValue[] = [{ numerator: [1] }]
+    expect(() => resolveReferences('@step0.denominator', outputs)).toThrow(/has no field "denominator"/)
+    expect(() => resolveReferences('@step0.numerator.deep', outputs)).toThrow(/has no field "deep"/)
+  })
 })
 
 describe('createSolveStepsTool', () => {

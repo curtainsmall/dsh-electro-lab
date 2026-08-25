@@ -176,3 +176,45 @@ export function calcWindowSamples(kind: WindowKind, length: number): number[] {
 export function applyWindow(samples: Complex[], weights: number[]): Complex[] {
   return samples.map((sample, i) => sample.mul(weights[i]!))
 }
+
+/**
+ * Signal statistics: RMS (√mean|x|²), peak |x|, peak-to-peak of the real
+ * part, and DC (mean of the real part).
+ */
+export function calcSignalStatistics(samples: Complex[]): { rms: number; peak: number; peakToPeak: number; dc: number } {
+  if (samples.length === 0) throw new Error('samples must not be empty')
+  let sumSquares = 0
+  let peak = 0
+  let dcSum = 0
+  let minimum = Number.POSITIVE_INFINITY
+  let maximum = Number.NEGATIVE_INFINITY
+  for (const sample of samples) {
+    const magnitude = sample.abs()
+    sumSquares += magnitude * magnitude
+    peak = Math.max(peak, magnitude)
+    dcSum += sample.re
+    minimum = Math.min(minimum, sample.re)
+    maximum = Math.max(maximum, sample.re)
+  }
+  const count = samples.length
+  return {
+    rms: Math.sqrt(sumSquares / count),
+    peak,
+    peakToPeak: maximum - minimum,
+    dc: dcSum / count,
+  }
+}
+
+/**
+ * Signal analysis: statistics plus the windowed spectrum in one call.
+ * Composes calcSignalStatistics, the window and the FFT (all existing
+ * primitives).
+ */
+export function calcSignalAnalysis(
+  samples: Complex[],
+  window: WindowKind,
+): { rms: number; peak: number; peakToPeak: number; dc: number; spectrum: Complex[] } {
+  const statistics = calcSignalStatistics(samples)
+  const weighted = applyWindow(samples, calcWindowSamples(window, samples.length))
+  return { ...statistics, spectrum: calcDiscreteFourierTransform(weighted) }
+}

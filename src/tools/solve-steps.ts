@@ -3,7 +3,8 @@
  *
  * Executes a multi-step calculation: each step calls an already-registered
  * tool by name. A step argument may be the string "@stepN" to reference the
- * full output object of step N (resolved recursively before dispatch).
+ * full output object of step N, or "@stepN.path.to.field" for a nested field
+ * (resolved recursively before dispatch).
  * Steps run serially through the registry's own pipeline (guards, policy,
  * cancellation), so nested calls are first-class executions, and every
  * intermediate result is returned in stepResults (array order = step order).
@@ -19,9 +20,13 @@ interface StepSpec {
   args: JsonValue
 }
 
-const STEP_REF = /^@step(\d+)$/
+const STEP_REF = /^@step(\d+)((?:\.[A-Za-z_][A-Za-z0-9_]*|\.[0-9]+)*)$/
 
-/** Replace "@stepN" strings with the stored output snapshot of step N, recursively. */
+/**
+ * Replace "@stepN" (the whole output of step N) and "@stepN.path.to.field"
+ * (a nested field of that output) strings with the stored output, recursively.
+ * Other strings pass through untouched.
+ */
 export function resolveReferences(value: JsonValue, outputs: JsonValue[]): JsonValue {
   if (typeof value === 'string') {
     const match = STEP_REF.exec(value)
@@ -30,7 +35,17 @@ export function resolveReferences(value: JsonValue, outputs: JsonValue[]): JsonV
       if (index >= outputs.length) {
         throw new Error(`reference "@step${index}" points beyond the last computed step (${outputs.length - 1})`)
       }
-      return outputs[index] as JsonValue
+      let result: JsonValue = outputs[index] as JsonValue
+      const path = match[2]!
+        .split('.')
+        .filter((segment) => segment.length > 0)
+      for (const segment of path) {
+        if (typeof result !== 'object' || result === null || !(segment in result)) {
+          throw new Error(`reference "@step${index}.${path.join('.')}" has no field "${segment}"`)
+        }
+        result = (result as Record<string, JsonValue>)[segment]!
+      }
+      return result
     }
     return value
   }
@@ -47,7 +62,7 @@ export function resolveReferences(value: JsonValue, outputs: JsonValue[]): JsonV
 export function createSolveStepsTool(ctx: Context): ToolDefinition {
   return defineJsonTool({
     name: 'solve_steps',
-    description: 'Execute a deterministic multi-step calculation: each step calls an already-registered tool by name with its arguments; a step argument may be "@stepN" to reference the full output object of step N. Steps run serially and every intermediate result is returned in stepResults (array order = step order). Use when the user asks for a worked calculation with exact numbers; conceptual questions do not need it.',
+    description: 'Execute a deterministic multi-step calculation: each step calls an already-registered tool by name with its arguments; a step argument may be "@stepN" to reference the full output object of step N, or "@stepN.path.to.field" for a nested field (e.g. "@step1.numerator"). Steps run serially and every intermediate result is returned in stepResults (array order = step order). Use when the user asks for a worked calculation with exact numbers; conceptual questions do not need it.',
     parameters: {
       steps: {
         type: 'array',
@@ -58,7 +73,7 @@ export function createSolveStepsTool(ctx: Context): ToolDefinition {
           additionalProperties: false,
           properties: {
             tool: { type: 'string', description: 'the registered tool to call, e.g. "impedance_to_reflection"', required: true },
-            args: { type: 'json', description: 'arguments for that tool; "@stepN" references the full output object of step N', required: true },
+            args: { type: 'json', description: 'arguments for that tool; "@stepN" references the full output object of step N, "@stepN.path.to.field" a nested field', required: true },
           },
         },
       },

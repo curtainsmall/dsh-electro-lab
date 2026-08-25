@@ -1,19 +1,21 @@
 /**
  * System-analysis tools: partial fractions, frequency and step response of
- * a ratio-form transfer function, and difference-equation recursion. Every
- * transfer function comes in as { numerator, denominator } coefficient
- * arrays (the output of rational_coefficients, the single storage form).
+ * a ratio-form transfer function, difference-equation recursion, and the
+ * bode_response combo. Every transfer function comes in as
+ * { numerator, denominator } coefficient arrays (the output of
+ * rational_coefficients, the single storage form).
  */
 import { Complex } from 'complex.js'
 import {
   Variable,
   solveDifferenceEquation,
+  calcBodeResponse,
   calcFreqPoints,
   expandPartialFraction,
   calcStepResponse,
   calcTransferResponse,
 } from '../math/transfer.ts'
-import { toComplex, toScalar, serializeComplex } from '../math/convert.ts'
+import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
 import { Unit } from '../math/units.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
@@ -117,6 +119,37 @@ export const transferTools = [
       const input = args.input.map((value) => toComplex(value, Unit.None))
       return {
         output: solveDifferenceEquation(a, b, input).map((value) => serializeComplex(value, Unit.None)),
+      }
+    },
+  }),
+  defineJsonTool({
+    name: 'bode_response',
+    description: 'Bode plot of a transfer function in ratio form: magnitude in dB and phase in degrees on a logarithmic frequency grid (pointsPerDecade, default 10). Composes the grid, the frequency points and the response in one call. variable "z" requires sampleTime.',
+    parameters: {
+      numerator: { ...createCoeffArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
+      denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
+      variable: { type: 'string', enum: [Variable.S, Variable.Z], description: 'transform variable (default "s")' },
+      frequencyStart: { ...createValueParam(Unit.Frequency, 'grid start frequency (Hz)'), required: true },
+      frequencyEnd: { ...createValueParam(Unit.Frequency, 'grid end frequency (Hz)'), required: true },
+      pointsPerDecade: { type: 'number', description: 'grid points per decade (default 10)' },
+      sampleTime: { ...createValueParam(Unit.Time, 'sample time in seconds (required for variable "z")') },
+    },
+    execute: (args) => {
+      const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
+      const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
+      const variable = args.variable ?? Variable.S
+      const frequencyStart = toScalar(args.frequencyStart, Unit.Frequency)
+      const frequencyEnd = toScalar(args.frequencyEnd, Unit.Frequency)
+      const pointsPerDecade = args.pointsPerDecade ?? 10
+      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, Unit.Time)
+      const result = calcBodeResponse(numerator, denominator, variable, frequencyStart, frequencyEnd, pointsPerDecade, sampleTime)
+      return {
+        variable,
+        points: result.frequencies.map((frequency, index) => ({
+          frequency: serializeReal(frequency, Unit.Frequency),
+          magnitudeDb: serializeReal(result.magnitudesDb[index]!, Unit.Log),
+          phaseDeg: serializeReal(result.phasesDeg[index]!, Unit.Angle),
+        })),
       }
     },
   }),

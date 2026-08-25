@@ -91,3 +91,9 @@ export function convertDecibelRatio(
   if (value <= 0) throw new Error('ratio must be positive')
   return { ratio: value, db: kind === RatioKind.Power ? 10 * Math.log10(value) : 20 * Math.log10(value) }
 }
+
+/** Magnitude to decibels: 20·log₁₀(magnitude); zero maps to −Infinity. */
+export function calcMagnitudeToDb(magnitude: number): number {
+  if (magnitude < 0) throw new Error('magnitude must be non-negative')
+  return 20 * Math.log10(magnitude)
+}

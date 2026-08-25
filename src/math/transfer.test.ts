@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { Variable, solveDifferenceEquation, calcFreqPoints, expandPartialFraction, calcStepResponse, calcTransferResponse } from './transfer.ts'
+import {
+  Variable,
+  solveDifferenceEquation,
+  calcBodeResponse,
+  calcFreqPoints,
+  calcLogarithmicFrequencyGrid,
+  expandPartialFraction,
+  calcStepResponse,
+  calcTransferResponse,
+} from './transfer.ts'
 
 describe('calcTransferResponse (textbook checks)', () => {
   it('RC low-pass: |H| = 1/√2 and −45° at the cutoff frequency', () => {
@@ -136,6 +145,36 @@ describe('calcFreqPoints', () => {
 
   it('z domain requires sampleTime', () => {
     expect(() => calcFreqPoints(Variable.Z, [1])).toThrow(/sampleTime/)
+  })
+})
+
+describe('calcLogarithmicFrequencyGrid', () => {
+  it('spans one decade with the requested point density', () => {
+    const grid = calcLogarithmicFrequencyGrid(10, 1000, 2) // 2 decades × 2 = 4 points
+    expect(grid).toHaveLength(5) // inclusive endpoints
+    expect(grid[0]).toBeCloseTo(10, 10)
+    expect(grid[4]).toBeCloseTo(1000, 6)
+    expect(grid[1]).toBeCloseTo(10 * 10 ** 0.5, 8) // log-spaced
+  })
+
+  it('rejects invalid ranges', () => {
+    expect(() => calcLogarithmicFrequencyGrid(0, 100, 10)).toThrow(/positive/)
+    expect(() => calcLogarithmicFrequencyGrid(100, 10, 10)).toThrow(/exceed/)
+    expect(() => calcLogarithmicFrequencyGrid(1, 100, 0)).toThrow(/PerDecade/)
+  })
+})
+
+describe('calcBodeResponse (textbook checks)', () => {
+  it('RC low-pass H(s) = 1/(1+s): −3.01 dB and −45° at the cutoff', () => {
+    // grid starts exactly at the cutoff frequency f = 1/(2π)
+    const cutoff = 1 / (2 * Math.PI)
+    const result = calcBodeResponse([new Complex(1, 0)], [new Complex(1, 0), new Complex(1, 0)], Variable.S, cutoff, cutoff * 10, 1)
+    expect(result.frequencies[0]).toBeCloseTo(cutoff, 12)
+    expect(result.magnitudesDb[0]).toBeCloseTo(-3.0103, 3)
+    expect(result.phasesDeg[0]).toBeCloseTo(-45, 3)
+    // one decade above the cutoff: ≈ −20 dB/decade → ≈ −23 dB, ≈ −84°
+    expect(result.magnitudesDb[1]).toBeCloseTo(-20.043, 2)
+    expect(result.phasesDeg[1]).toBeCloseTo(-84.29, 2)
   })
 })
 

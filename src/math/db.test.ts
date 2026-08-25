@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DbUnit, RatioKind, convertDbLevels, convertDecibelRatio } from './db.ts'
+import { DbUnit, RatioKind, calcMagnitudeToDb, convertDbLevels, convertDecibelRatio } from './db.ts'
 
 describe('convertDbLevels (textbook checks)', () => {
   it('30 dBm = 1 W = 137 dBµV into 50 Ω (textbook approximation)', () => {
@@ -55,5 +55,17 @@ describe('convertDecibelRatio (textbook checks)', () => {
 
   it('rejects non-positive ratio', () => {
     expect(() => convertDecibelRatio(RatioKind.Power, -1)).toThrow(/positive/)
+  })
+})
+
+describe('calcMagnitudeToDb (textbook checks)', () => {
+  it('maps 1 → 0 dB, 1/√2 → −3.01 dB, 0 → −Infinity', () => {
+    expect(calcMagnitudeToDb(1)).toBeCloseTo(0, 12)
+    expect(calcMagnitudeToDb(1 / Math.SQRT2)).toBeCloseTo(-3.0103, 3)
+    expect(calcMagnitudeToDb(0)).toBe(Number.NEGATIVE_INFINITY)
+  })
+
+  it('rejects negative magnitudes', () => {
+    expect(() => calcMagnitudeToDb(-1)).toThrow(/non-negative/)
   })
 })

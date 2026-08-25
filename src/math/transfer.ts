@@ -13,6 +13,7 @@ import {
   trimPolynomial,
   type Polynomial,
 } from './polynomial.ts'
+import { calcMagnitudeToDb } from './db.ts'
 
 // ── Enums ────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,46 @@ export function calcFreqPoints(variable: Variable, frequencies: number[], sample
     }
     return new Complex(0, angularFrequency)
   })
+}
+
+/**
+ * Logarithmically spaced frequency grid from start to end (Hz): the
+ * `pointsPerDecade` count is rounded to whole points per decade.
+ */
+export function calcLogarithmicFrequencyGrid(start: number, end: number, pointsPerDecade: number): number[] {
+  if (start <= 0) throw new Error('frequency start must be positive (Hz)')
+  if (end <= start) throw new Error('frequency end must exceed start (Hz)')
+  if (pointsPerDecade < 1) throw new Error('pointsPerDecade must be ≥ 1')
+  const decades = Math.log10(end / start)
+  const points = Math.max(1, Math.round(decades * pointsPerDecade))
+  const grid: number[] = []
+  for (let i = 0; i <= points; i++) {
+    grid.push(start * 10 ** ((i / points) * decades))
+  }
+  return grid
+}
+
+/**
+ * Bode response: the transfer function sampled on a logarithmic frequency
+ * grid, with magnitude in dB and phase in degrees. Composes the grid, the
+ * evaluation points and the response (all existing primitives).
+ */
+export function calcBodeResponse(
+  numerator: Polynomial,
+  denominator: Polynomial,
+  variable: Variable,
+  frequencyStart: number,
+  frequencyEnd: number,
+  pointsPerDecade: number,
+  sampleTime?: number,
+): { frequencies: number[]; magnitudesDb: number[]; phasesDeg: number[] } {
+  const frequencies = calcLogarithmicFrequencyGrid(frequencyStart, frequencyEnd, pointsPerDecade)
+  const responses = calcTransferResponse(numerator, denominator, calcFreqPoints(variable, frequencies, sampleTime))
+  return {
+    frequencies,
+    magnitudesDb: responses.map((response) => calcMagnitudeToDb(response.abs())),
+    phasesDeg: responses.map((response) => (response.arg() * 180) / Math.PI),
+  }
 }
 
 // ── Partial fractions ────────────────────────────────────────────────────

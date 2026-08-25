@@ -11,6 +11,7 @@ import {
   calcDiscreteFourierTransform,
   calcFourierSeriesCoeffs,
   calcInvDiscreteFourierTransform,
+  calcSignalAnalysis,
   calcWindowSamples,
 } from '../math/dft.ts'
 import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
@@ -100,6 +101,31 @@ export const dftTools = [
         window: args.window,
         length: args.length,
         samples: calcWindowSamples(args.window, args.length).map((value) => serializeReal(value, Unit.None)),
+      }
+    },
+  }),
+  defineJsonTool({
+    name: 'signal_analysis',
+    description: 'Signal statistics plus the windowed spectrum in one call: RMS, peak, peak-to-peak, DC component, and the DFT spectrum of the windowed samples (magnitude/phase per bin via the value snapshots).',
+    parameters: {
+      samples: { ...createSequenceParam('time-domain samples, unit none'), required: true },
+      window: {
+        type: 'string',
+        enum: [WindowKind.None, WindowKind.Hann, WindowKind.Hamming, WindowKind.Blackman],
+        description: 'window applied before the transform (default none)',
+      },
+    },
+    execute: (args) => {
+      const window = args.window ?? WindowKind.None
+      const samples = args.samples.map((sample) => toComplex(sample, Unit.None))
+      const result = calcSignalAnalysis(samples, window)
+      return {
+        window,
+        rms: serializeReal(result.rms, Unit.None),
+        peak: serializeReal(result.peak, Unit.None),
+        peakToPeak: serializeReal(result.peakToPeak, Unit.None),
+        dc: serializeReal(result.dc, Unit.None),
+        spectrum: result.spectrum.map((bin) => serializeComplex(bin, Unit.None)),
       }
     },
   }),

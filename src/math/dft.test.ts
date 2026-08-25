@@ -7,6 +7,8 @@ import {
   calcDiscreteFourierTransform,
   calcFourierSeriesCoeffs,
   calcInvDiscreteFourierTransform,
+  calcSignalAnalysis,
+  calcSignalStatistics,
   calcWindowSamples,
 } from './dft.ts'
 
@@ -154,5 +156,40 @@ describe('applyWindow', () => {
     const weighted = applyWindow([new Complex(1, 1)], [2])
     expect(weighted[0]!.re).toBeCloseTo(2, 12)
     expect(weighted[0]!.im).toBeCloseTo(2, 12)
+  })
+})
+
+describe('calcSignalStatistics (textbook checks)', () => {
+  it('a unit sine: rms = 1/√2, peak 1, peak-to-peak 2, dc 0', () => {
+    const samples: Complex[] = []
+    for (let n = 0; n < 64; n++) samples.push(new Complex(Math.sin((2 * Math.PI * n) / 64), 0))
+    const statistics = calcSignalStatistics(samples)
+    expect(statistics.rms).toBeCloseTo(1 / Math.SQRT2, 3)
+    expect(statistics.peak).toBeCloseTo(1, 6)
+    expect(statistics.peakToPeak).toBeCloseTo(2, 6)
+    expect(statistics.dc).toBeCloseTo(0, 8)
+  })
+
+  it('a DC offset shows up in dc and rms', () => {
+    const statistics = calcSignalStatistics([new Complex(3, 0), new Complex(3, 0), new Complex(3, 0)])
+    expect(statistics.dc).toBeCloseTo(3, 12)
+    expect(statistics.rms).toBeCloseTo(3, 12)
+    expect(statistics.peakToPeak).toBeCloseTo(0, 12)
+  })
+
+  it('rejects empty samples', () => {
+    expect(() => calcSignalStatistics([])).toThrow(/empty/)
+  })
+})
+
+describe('calcSignalAnalysis', () => {
+  it('combines statistics with the windowed spectrum', () => {
+    const size = 16
+    const samples: Complex[] = []
+    for (let n = 0; n < size; n++) samples.push(new Complex(Math.sin((2 * Math.PI * n) / size), 0))
+    const result = calcSignalAnalysis(samples, WindowKind.None)
+    expect(result.spectrum).toHaveLength(size)
+    expect(result.spectrum[1]!.abs()).toBeCloseTo(size / 2, 6) // one spectral line at bin 1
+    expect(result.rms).toBeCloseTo(1 / Math.SQRT2, 3)
   })
 })
