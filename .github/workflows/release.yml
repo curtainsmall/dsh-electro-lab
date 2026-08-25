@@ -37,14 +37,19 @@ jobs:
       - name: Strip tag prefix
         id: ver
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-      - name: Verify tag matches package.json version
+      - name: Verify tag matches package.json and dsh.plugin.json versions
         run: |
           pkg="$(node -p "require('./package.json').version")"
+          manifest="$(node -p "require('./dsh.plugin.json').version")"
           if [ "$pkg" != "${{ steps.ver.outputs.version }}" ]; then
             echo "::error::tag $GITHUB_REF_NAME does not match package.json version v$pkg — bump package.json first"
             exit 1
           fi
-          echo "✓ tag $GITHUB_REF_NAME matches package.json version"
+          if [ "$manifest" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match dsh.plugin.json version v$manifest — bump the manifest first"
+            exit 1
+          fi
+          echo "✓ tag $GITHUB_REF_NAME matches package.json and dsh.plugin.json versions"
       - name: Verify changelog entry exists for the tag
         uses: mindsers/changelog-reader-action@v2
         with:
@@ -52,7 +57,7 @@ jobs:
           path: ./CHANGELOG.md
       - name: Verify tag matches the latest changelog entry
         run: |
-          latest="$(awk '/^## \[[0-9]+\.[0-9]+\.[0-9]+\]/{ v=$0; sub(/^## \[/, "", v); sub(/\].*$/, "", v); print v; exit }' CHANGELOG.md)"
+          latest="$(awk '/^## \[[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\]/{ v=$0; sub(/^## \[/, "", v); sub(/\].*$/, "", v); print v; exit }' CHANGELOG.md)"
           if [ -z "$latest" ]; then
             echo "::error::no versioned entry (## [x.y.z]) found in CHANGELOG.md — add one before releasing"
             exit 1
