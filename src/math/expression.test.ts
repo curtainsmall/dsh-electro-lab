@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
 import { calcExpression, reduceRational } from './expression.ts'
+import { serializeComplex } from './convert.ts'
+import { QuantityKind } from './quantity-kind.ts'
 
 describe('arithmetic and precedence', () => {
   it('respects operator precedence and parentheses', () => {
@@ -88,6 +90,32 @@ describe('variables', () => {
     const result = calcExpression('x^2', { x: new Complex(0, 2) })
     expect(result.re).toBeCloseTo(-4, 10)
     expect(result.im).toBeCloseTo(0, 10)
+  })
+})
+
+describe('regression — single-stub matching quadratic (lossless output)', () => {
+  it('computes both tangent roots; serialized output carries no negative zero', () => {
+    // y_L = g + jb with g = 0.5190311418685122, b = -0.2768166089965398;
+    // solving Re[y(d)] = 1 with t = tan(βd) gives A·t² − 2b·t + (1−g) = 0.
+    // The plus branch divides +0 by a negative denominator, so complex.js
+    // yields im = -0 — which the harness lossless-JSON boundary rejects.
+    const variables = {
+      b: new Complex(-0.2768166089965398, 0),
+      g: new Complex(0.5190311418685122, 0),
+    }
+    const roots = [
+      calcExpression('(-(-2*b) - sqrt((-2*b)^2 - 4*(b^2+g^2-g)*(1-g)))/(2*(b^2+g^2-g))', variables),
+      calcExpression('(-(-2*b) + sqrt((-2*b)^2 - 4*(b^2+g^2-g)*(1-g)))/(2*(b^2+g^2-g))', variables),
+    ]
+    expect(roots[0]!.re).toBeCloseTo(3.9108440016582695, 12)
+    expect(roots[1]!.re).toBeCloseTo(-0.7108440016582688, 12)
+    for (const root of roots) {
+      const output = serializeComplex(root, QuantityKind.None)
+      for (const value of [output.re, output.im, output.mag, output.angDeg, output.angRad]) {
+        expect(Object.is(value, -0)).toBe(false)
+        expect(Number.isFinite(value)).toBe(true)
+      }
+    }
   })
 })
 

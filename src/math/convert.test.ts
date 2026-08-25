@@ -92,6 +92,22 @@ describe('serializeComplex — tool output', () => {
     expect(json.kind).toBe('resistance')
     expect(json.re).toBeCloseTo(10, 12)
   })
+
+  it('folds negative zero to positive zero (lossless-JSON boundary)', () => {
+    // complex.js arithmetic yields -0 routinely (e.g. +0 divided by a negative
+    // real divisor); the harness lossless-JSON check rejects Object.is(x, -0).
+    const output = serializeComplex(new Complex(0.2459667825807158, 0).div(new Complex(-0.34602076124567472, 0)), QuantityKind.None)
+    for (const value of [output.re, output.im, output.mag, output.angDeg, output.angRad]) {
+      expect(Object.is(value, -0)).toBe(false)
+      expect(Number.isFinite(value)).toBe(true)
+    }
+    expect(output.re).toBeCloseTo(-0.7108440016582688, 12)
+  })
+
+  it('raises a readable error for non-finite results instead of emitting them', () => {
+    expect(() => serializeComplex(new Complex(Number.NaN, 0), QuantityKind.None)).toThrow(/not a finite number/)
+    expect(() => serializeComplex(new Complex(Number.POSITIVE_INFINITY, 0), QuantityKind.None)).toThrow(/not a finite number/)
+  })
 })
 
 describe('serializeReal — real result output', () => {
@@ -102,5 +118,11 @@ describe('serializeReal — real result output', () => {
     expect(output.kind).toBe(QuantityKind.Frequency)
     expect(output.mag).toBe(2400)
     expect(output.angDeg).toBe(0)
+  })
+
+  it('folds negative zero input to positive zero', () => {
+    const output = serializeReal(-0, QuantityKind.None)
+    expect(Object.is(output.re, -0)).toBe(false)
+    expect(output.re).toBe(0)
   })
 })

@@ -128,15 +128,30 @@ export function toScalar(value: ComplexValue, expected: QuantityKind): number {
   }
 }
 
+/**
+ * JSON cannot carry negative zero or non-finite numbers. complex.js
+ * arithmetic produces -0 routinely (e.g. +0 divided by a negative number),
+ * and the harness rejects it at the lossless-JSON boundary — fold -0 to +0
+ * and raise a readable error for NaN/Infinity instead.
+ */
+function normalizeOutputNumber(value: number): number {
+  if (value === 0) return 0
+  if (!Number.isFinite(value)) {
+    throw new Error('result is not a finite number (NaN or Infinity) — check for division by zero or an invalid operation')
+  }
+  return value
+}
+
 /** Tool output for a complex result: the complete snapshot. */
 export function serializeComplex(value: Complex, kind: QuantityKind): ComplexOutput {
+  const angRad = normalizeOutputNumber(value.arg())
   return {
-    re: value.re,
-    im: value.im,
+    re: normalizeOutputNumber(value.re),
+    im: normalizeOutputNumber(value.im),
     kind,
-    mag: value.abs(),
-    angDeg: (value.arg() * 180) / Math.PI,
-    angRad: value.arg(),
+    mag: normalizeOutputNumber(value.abs()),
+    angDeg: normalizeOutputNumber((angRad * 180) / Math.PI),
+    angRad,
   }
 }
 
