@@ -29,12 +29,21 @@ describe('parseSkillFile', () => {
     expect(() => parseSkillFile('---\ndescription: only\n---\nbody')).toThrow(/needs name and description/)
   })
 
-  it('parses the shipped skill file (format guard)', () => {
+  it('parses the shipped template skill (format guard)', () => {
     const text = readFileSync(new URL('../skills/electro-lab-template.md', import.meta.url), 'utf8')
     const skill = parseSkillFile(text)
     expect(skill.name).toBe('electro-lab-template')
     expect(skill.description).toContain('five-part')
+    expect(skill.whenToUse).toContain('electro-lab workflow')
+    expect(skill.content).toContain('## Template')
+  })
+
+  it('parses the shipped interface skill (format guard)', () => {
+    const text = readFileSync(new URL('../skills/electro-lab-interface.md', import.meta.url), 'utf8')
+    const skill = parseSkillFile(text)
+    expect(skill.name).toBe('electro-lab-interface')
+    expect(skill.description).toContain('Operational interface')
     expect(skill.whenToUse).toContain('quantitative')
-    expect(skill.content).toContain('Template')
+    expect(skill.content).toContain('Value format')
   })
 })

@@ -5,12 +5,11 @@
 # no file system, no network, no subagents. Runtime context snapshots are
 # suppressed; every number must come from a tool call result.
 #
-# Division of labour with the skills (kept in sync deliberately):
-# - persona rules 1-3 and 5: standing prohibitions and the summary, always
-#   in context (skills can be skipped by the model, the persona cannot);
-# - persona rule 4: points at the electro-lab-template skill, which carries
-#   the mandatory five-part answer template (analyse -> plan -> calls ->
-#   results -> answer) and is maintained there as the single detailed source.
+# The five-part answer template is embedded IN the persona (not referenced):
+# a skill can be skipped by the model, a complete persona cannot — this is
+# the standing enforcement. The electro-lab-template skill carries the same
+# template plus the detailed workflow (value formats, solve_steps) for
+# presets that only use the toolset; keep the two in sync.
 
 - id: persona
   name: '@deepseek-ai/dsh-persona'
@@ -22,13 +21,22 @@
       1. Use ONLY the tools listed in your available tools. Git, shell, file system, network, subagents, and every other unlisted tool do not exist here — never attempt them.
       2. Every number in your answer must come from a tool call result. Never quote values from memory, "standard" tables, or text generation.
       3. If the problem lacks the conditions needed, or no available tool can produce the required quantity, say exactly what is missing and stop. Do not assume conditions or continue with fabricated values.
-      4. When an electro-lab workflow is triggered, answer with the electro-lab-template skill's mandatory five-part template as a whole: analyse, plan, tool calls, results, answer — in order, with no other selection in between.
-      5. Answer in 简体中文 unless the user writes in another language.
+
+      When an electro-lab workflow is triggered, you MUST answer with the template below as a whole — never omit, reorder, or insert other selections between its parts:
+      1. Analyse (natural language)
+      2. Plan (mathematical/physical language — formulas, no numbers yet)
+      3. Tool calls (table — one row per call, in execution order)
+      4. Results (table — one row per call result, same order as part 3)
+      5. Answer (natural language — reasoning only from part 4)
+
+      Load the electro-lab-template skill for the full details (value formats, solve_steps usage, and the stop procedure).
+
+      Answer in 简体中文 unless the user writes in another language.
     complete: true
     includeRuntimeContext: false
 
 # The electro-lab workbench: 30 tools (expression engine, circuit analysis,
 # Smith chart, transforms, noise/dB, transmission line, electronics) plus
-# the solve_steps orchestrator and the two electro-lab skills.
+# the solve_steps orchestrator and the electro-lab-template skill.
 - id: electro-lab
   name: 'dsh-electro-lab'
