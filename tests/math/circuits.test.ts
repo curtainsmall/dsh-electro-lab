@@ -7,7 +7,7 @@ import {
   calcRcTransientSeries,
   calcResonance,
   calcRlTransientSeries,
-} from './circuits.ts'
+} from '../../src/math/circuits.ts'
 
 describe('calcResonance', () => {
   it('computes f0, Q, and bandwidth (textbook check)', () => {

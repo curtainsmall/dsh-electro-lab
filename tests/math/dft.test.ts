@@ -10,7 +10,7 @@ import {
   calcSignalAnalysis,
   calcSignalStatistics,
   calcWindowSamples,
-} from './dft.ts'
+} from '../../src/math/dft.ts'
 
 describe('DFT/IDFT (textbook checks)', () => {
   it('maps a delta sequence to a flat spectrum', () => {

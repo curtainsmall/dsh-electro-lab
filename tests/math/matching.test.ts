@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { MatchTopology, MatchVariant, designMatch, type MatchElement } from './smith.ts'
-import { ElementKind, calcNetworkImpedance } from './circuits.ts'
-import { CircuitMode } from './circuits.ts'
+import { MatchTopology, MatchVariant, designMatch, type MatchElement } from '../../src/math/smith.ts'
+import { ElementKind, calcNetworkImpedance } from '../../src/math/circuits.ts'
+import { CircuitMode } from '../../src/math/circuits.ts'
 
 const F = 1e6
 const W = 2 * Math.PI * F

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DbUnit, RatioKind, calcMagnitudeToDb, convertDbLevels, convertDecibelRatio } from './db.ts'
+import { DbUnit, RatioKind, calcMagnitudeToDb, convertDbLevels, convertDecibelRatio } from '../../src/math/db.ts'
 
 describe('convertDbLevels (textbook checks)', () => {
   it('30 dBm = 1 W = 137 dBµV into 50 Ω (textbook approximation)', () => {

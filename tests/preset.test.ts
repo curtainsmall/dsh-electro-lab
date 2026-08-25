@@ -2,7 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { installPresets } from './preset.ts'
+import { installPresets } from '../src/preset.ts'
 
 const ORIGINAL_HOME = process.env.DSH_HOME
 

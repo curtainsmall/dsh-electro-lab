@@ -4,7 +4,7 @@ import {
   calcCoaxialParameters,
   calcRiseTimeFromBandwidth,
   calcWavelength,
-} from './transmission.ts'
+} from '../../src/math/transmission.ts'
 
 describe('wavelength (textbook checks)', () => {
   it('300 MHz in vacuum → 1 m', () => {

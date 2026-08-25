@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { calcExpression, reduceRational } from './expression.ts'
-import { serializeComplex } from './convert.ts'
-import { QuantityKind } from './quantity-kind.ts'
+import { calcExpression, reduceRational } from '../../src/math/expression.ts'
+import { serializeComplex } from '../../src/math/convert.ts'
+import { QuantityKind } from '../../src/math/quantity-kind.ts'
 
 describe('arithmetic and precedence', () => {
   it('respects operator precedence and parentheses', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { dividePolynomials, expandPowerSeries, findPolesZeros, findPolyRoots } from './polynomial.ts'
+import { dividePolynomials, expandPowerSeries, findPolesZeros, findPolyRoots } from '../../src/math/polynomial.ts'
 
 /** Sort roots by (re, im) for order-independent comparison. */
 function sortedRoots(coefficients: number[]): { re: number; im: number }[] {

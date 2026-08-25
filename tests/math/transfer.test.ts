@@ -9,7 +9,7 @@ import {
   expandPartialFraction,
   calcStepResponse,
   calcTransferResponse,
-} from './transfer.ts'
+} from '../../src/math/transfer.ts'
 
 describe('calcTransferResponse (textbook checks)', () => {
   it('RC low-pass: |H| = 1/√2 and −45° at the cutoff frequency', () => {

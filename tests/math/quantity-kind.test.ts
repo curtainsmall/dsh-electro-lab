@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { QuantityKind, isNearlyEqual, isNegligible } from './quantity-kind.ts'
+import { QuantityKind, isNearlyEqual, isNegligible } from '../../src/math/quantity-kind.ts'
 
 describe('isNearlyEqual — pure relative tolerance', () => {
   it('is scale-invariant: works for pF and GΩ alike', () => {

@@ -6,7 +6,7 @@ import {
   calcOpamp,
   calcTimeConstant,
   calcVoltageDivider,
-} from './electronics.ts'
+} from '../../src/math/electronics.ts'
 
 describe('op-amp configurations (textbook checks)', () => {
   it('inverting: gain = −Rf/Rin', () => {

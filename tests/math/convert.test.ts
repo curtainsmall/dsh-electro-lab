@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { Form, expectQuantity, serializeReal, serializeComplex, toComplex, toScalar } from './convert.ts'
-import { QuantityKind } from './quantity-kind.ts'
+import { Form, expectQuantity, serializeReal, serializeComplex, toComplex, toScalar } from '../../src/math/convert.ts'
+import { QuantityKind } from '../../src/math/quantity-kind.ts'
 
 function createRectValue(re: number, im: number, kind: QuantityKind): { form: Form.Rect; re: number; im: number; kind: QuantityKind } {
   return { form: Form.Rect, re, im, kind }

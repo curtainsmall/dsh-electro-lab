@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcCascadeNoiseFigure, calcQuantizationSnr, calcThermalNoisePower } from './noise.ts'
+import { calcCascadeNoiseFigure, calcQuantizationSnr, calcThermalNoisePower } from '../../src/math/noise.ts'
 
 describe('thermal noise (textbook checks)', () => {
   it('290 K in 1 MHz ≈ −114 dBm', () => {

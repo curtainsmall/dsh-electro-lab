@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { calcButterworthAttenuation, designButterworthLowpass } from './filter.ts'
-import { ElementKind } from './circuits.ts'
+import { calcButterworthAttenuation, designButterworthLowpass } from '../../src/math/filter.ts'
+import { ElementKind } from '../../src/math/circuits.ts'
 
 describe('designButterworthLowpass', () => {
   it('order 2: g1 = g2 = √2 (R = 50, fc = 1 kHz)', () => {

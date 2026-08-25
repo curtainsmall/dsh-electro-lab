@@ -6,8 +6,8 @@ import {
   calcNetworkImpedance,
   combineParallelImpedances,
   combineSeriesImpedances,
-} from './circuits.ts'
-import { validateNetwork } from '../tools/circuit-tools.ts'
+} from '../../src/math/circuits.ts'
+import { validateNetwork } from '../../src/tools/circuit-tools.ts'
 
 function assertClose(z: Complex, re: number, im: number, tol = 1e-6): void {
   expect(z.re).toBeCloseTo(re, tol > 1 ? tol : 6)

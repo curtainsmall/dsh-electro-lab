@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { parseSkillFile } from './skill.ts'
+import { parseSkillFile } from '../src/skill.ts'
 
 describe('parseSkillFile', () => {
   it('parses frontmatter metadata and the body', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { ElementRole, MatchTopology, MatchVariant, calcCapacitanceFromReactance, designMatch, calcInductanceFromReactance, calcQuarterWaveImpedance, calcReturnLossDb, convertImpedanceToReflection, convertReflectionToVswr } from './smith.ts'
+import { ElementRole, MatchTopology, MatchVariant, calcCapacitanceFromReactance, designMatch, calcInductanceFromReactance, calcQuarterWaveImpedance, calcReturnLossDb, convertImpedanceToReflection, convertReflectionToVswr } from '../../src/math/smith.ts'
 
 describe('impedance_to_reflection (textbook check)', () => {
   it('Z = 50 + j50 Ω on a 50 Ω line → Γ = 0.447∠63.43°', () => {

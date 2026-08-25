@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
-import { createSolveStepsTool, resolveReferences } from './solve-steps.ts'
+import { createSolveStepsTool, resolveReferences } from '../../src/tools/solve-steps.ts'
 
 function fakeExec(): ToolRunContext {
   return {
