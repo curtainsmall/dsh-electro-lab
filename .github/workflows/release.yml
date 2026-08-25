@@ -29,3 +29,38 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME is NOT on main — release aborted (accidental tag?)"
             exit 1
           fi
+
+  # ── Publish: npm release. Runs only after the guard passes. ──
+  # Quality gate mirrors ci.yml (typecheck + test); prepublishOnly runs the
+  # build (tsc declarations + tsdown bundles) before the package is packed.
+  # The tag is verified against package.json `version` so a stale tag can
+  # never publish the wrong version. Requires an npm registry token in the
+  # repository secret NPM_TOKEN.
+  publish:
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # matches ci.yml (pnpm 11 requires Node >= 22.13)
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify tag matches package version
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $expected — bump package.json first"
+            exit 1
+          fi
+          echo "✓ tag $GITHUB_REF_NAME matches package.json version"
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Publish to npm
+        run: pnpm publish --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
