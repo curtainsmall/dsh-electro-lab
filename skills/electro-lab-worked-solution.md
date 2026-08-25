@@ -1,5 +1,5 @@
 ---
-name: worked-solution
+name: electro-lab-worked-solution
 description: "Worked electrical/electronics solutions: analyse, plan, run solve_steps, narrate each step"
 whenToUse: "The user asks for a worked calculation with exact numbers, shown step by step"
 ---

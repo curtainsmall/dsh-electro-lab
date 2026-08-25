@@ -41,8 +41,10 @@ export function parseSkillFile(text: string): SkillFile {
 /** Package-relative skills directory (lib/.. = package root). */
 const SKILLS_DIR = new URL('../skills/', import.meta.url)
 
-/** Skill files shipped with the package, in registration order. */
-const SKILL_FILES = ['worked-solution.md']
+/** Skill files shipped with the package, in registration order. Skill names
+ *  carry the plugin prefix (electro-lab-*) so they never collide with
+ *  skills from other plugins in the shared registry. */
+const SKILL_FILES = ['electro-lab-worked-solution.md', 'electro-lab-grounded-calculation.md']
 
 /** Register every packaged skill; returns one disposer that unregisters all. */
 export function registerSkills(ctx: Context): () => void {

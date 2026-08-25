@@ -30,9 +30,9 @@ describe('parseSkillFile', () => {
   })
 
   it('parses the shipped skill file (format guard)', () => {
-    const text = readFileSync(new URL('../skills/worked-solution.md', import.meta.url), 'utf8')
+    const text = readFileSync(new URL('../skills/electro-lab-worked-solution.md', import.meta.url), 'utf8')
     const skill = parseSkillFile(text)
-    expect(skill.name).toBe('worked-solution')
+    expect(skill.name).toBe('electro-lab-worked-solution')
     expect(skill.description).toContain('solve_steps')
     expect(skill.whenToUse).toContain('worked calculation')
     expect(skill.content).toContain('# Worked Solution')
