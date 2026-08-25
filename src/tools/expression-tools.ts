@@ -14,7 +14,7 @@ import { defineJsonTool, createValueParam } from './helpers.ts'
 export const expressionTools = [
   defineJsonTool({
     name: 'calculate',
-    description: 'Evaluate a string math expression and return the complex result. Expression language: + - * / ^ (^ is right-associative, -2^2 = -4), parentheses, unary minus, scientific notation (1e6, 2.5e-3), complex literals with j or i suffix (3+4j, 2i; j/i alone is the imaginary unit), constants pi and e, and functions sin cos tan exp ln log10 sqrt abs arg conjugate real imag. Variables are bound via the variables array; every bound value must have kind "none". Use this for ALL arithmetic — never compute by hand.',
+    description: 'Evaluate a string math expression and return the complex result. Expression language: + - * / ^ (^ is right-associative, -2^2 = -4), parentheses, unary minus, scientific notation (1e6, 2.5e-3), complex literals with j or i suffix (3+4j, 2i; j/i alone is the imaginary unit), constants pi and e, and functions sin cos tan asin acos atan atan2 exp ln log10 sqrt abs arg conjugate real imag. atan2(y, x) is the angle of x + j·y — for real inputs the standard two-argument arctangent. Variables are bound via the variables array; every bound value must have kind "none". Use this for ALL arithmetic — never compute by hand.',
     parameters: {
       expression: { type: 'string', description: 'math expression to evaluate', required: true },
       variables: {

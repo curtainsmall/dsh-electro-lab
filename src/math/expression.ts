@@ -13,9 +13,10 @@
  *
  * Numbers: decimal with optional scientific exponent (1e6, 2.5e-3) and an
  * optional imaginary suffix (3+4j, 2i). 'j'/'i' alone is the imaginary unit.
- * Constants: pi, e. Functions: sin cos tan exp ln log10 sqrt abs arg
- * conjugate real imag. Everything else is a variable; unbound variables
- * error on evaluation.
+ * Constants: pi, e. Functions: sin cos tan asin acos atan atan2 exp ln log10
+ * sqrt abs arg conjugate real imag (atan2(y, x) = angle of x + j·y; real
+ * inputs give the standard two-argument arctangent). Everything else is a
+ * variable; unbound variables error on evaluation.
  */
 import { Complex } from 'complex.js'
 import {
@@ -66,7 +67,7 @@ type Expr =
   | { kind: ExprKind.Variable; name: string }
   | { kind: ExprKind.Negate; operand: Expr }
   | { kind: ExprKind.Binary; operator: BinaryOperator; left: Expr; right: Expr }
-  | { kind: ExprKind.Call; functionName: string; argument: Expr }
+  | { kind: ExprKind.Call; functionName: string; arguments: Expr[] }
 
 type Token =
   | { kind: TokenKind.Number; value: Complex }
@@ -92,11 +93,17 @@ const CONSTANTS: Record<string, Complex> = {
   i: new Complex(0, 1),
 }
 
-/** Unary functions callable in expressions; all complex-valued. */
-const FUNCTIONS: Record<string, (argument: Complex) => Complex> = {
+/** Functions callable in expressions; all complex-valued. Rest parameters
+ *  keep the declared arity (fn.length) available for argument-count checks. */
+const FUNCTIONS: Record<string, (...args: Complex[]) => Complex> = {
   sin: (z) => z.sin(),
   cos: (z) => z.cos(),
   tan: (z) => z.tan(),
+  asin: (z) => z.asin(),
+  acos: (z) => z.acos(),
+  atan: (z) => z.atan(),
+  // atan2(y, x) = arg(x + j·y); for real inputs this is Math.atan2(y, x)
+  atan2: (y, x) => new Complex(x.add(y.mul(new Complex(0, 1))).arg(), 0),
   exp: (z) => z.exp(),
   ln: (z) => z.log(),
   log10: (z) => z.log().div(Math.log(10)),
@@ -250,12 +257,19 @@ class Parser {
     if (token.kind === TokenKind.Identifier) {
       if (this.peek().kind === TokenKind.LeftParen) {
         this.next()
-        const argument = this.parseAddSub()
+        const callArguments: Expr[] = []
         if (this.peek().kind !== TokenKind.RightParen) {
-          throw new Error(`expected ')' after argument of ${token.value} in expression`)
+          callArguments.push(this.parseAddSub())
+          while (this.peek().kind === TokenKind.Comma) {
+            this.next()
+            callArguments.push(this.parseAddSub())
+          }
+        }
+        if (this.peek().kind !== TokenKind.RightParen) {
+          throw new Error(`expected ')' after arguments of ${token.value} in expression`)
         }
         this.next()
-        return { kind: ExprKind.Call, functionName: token.value, argument }
+        return { kind: ExprKind.Call, functionName: token.value, arguments: callArguments }
       }
       return { kind: ExprKind.Variable, name: token.value }
     }
@@ -317,7 +331,11 @@ function evaluate(expression: Expr, variables: Record<string, Complex>): Complex
       if (fn === undefined) {
         throw new Error(`unknown function '${expression.functionName}' — available: ${Object.keys(FUNCTIONS).join(', ')}`)
       }
-      return fn(evaluate(expression.argument, variables))
+      const values = expression.arguments.map((argument) => evaluate(argument, variables))
+      if (values.length !== fn.length) {
+        throw new Error(`function '${expression.functionName}' expects ${fn.length} argument(s), got ${values.length}`)
+      }
+      return fn(...values)
     }
   }
 }
@@ -347,7 +365,7 @@ function containsVariable(expression: Expr, name: string): boolean {
     case ExprKind.Binary:
       return containsVariable(expression.left, name) || containsVariable(expression.right, name)
     case ExprKind.Call:
-      return containsVariable(expression.argument, name)
+      return expression.arguments.some((argument) => containsVariable(argument, name))
   }
 }
 
@@ -441,10 +459,10 @@ function reduceRationalOf(expression: Expr, variable: string, parameters: Record
       throw new Error(`operator '${expression.operator}' is not supported in rational expansion`)
     }
     case ExprKind.Call: {
-      if (!containsVariable(expression.argument, variable)) {
+      if (expression.arguments.every((argument) => !containsVariable(argument, variable))) {
         return { numerator: [evaluate(expression, parameters)], denominator: [ONE] }
       }
-      throw new Error(`'${expression.functionName}(${variable})' is not a rational function of ${variable}`)
+      throw new Error(`'${expression.functionName}(…)' is not a rational function of ${variable}`)
     }
   }
 }

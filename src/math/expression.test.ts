@@ -79,6 +79,36 @@ describe('constants and functions', () => {
   })
 })
 
+describe('inverse trigonometric functions', () => {
+  it('evaluates asin, acos and atan on the real axis', () => {
+    expect(calcExpression('asin(1)').re).toBeCloseTo(Math.PI / 2, 10)
+    expect(calcExpression('asin(0)').re).toBeCloseTo(0, 10)
+    expect(calcExpression('acos(1)').re).toBeCloseTo(0, 10)
+    expect(calcExpression('acos(0)').re).toBeCloseTo(Math.PI / 2, 10)
+    expect(calcExpression('atan(1)').re).toBeCloseTo(Math.PI / 4, 10)
+    expect(calcExpression('atan(0)').re).toBeCloseTo(0, 10)
+  })
+
+  it('extends to complex arguments (asin(2) leaves the real axis)', () => {
+    const result = calcExpression('asin(2)')
+    expect(result.re).toBeCloseTo(Math.PI / 2, 10)
+    expect(result.im).toBeCloseTo(-Math.log(2 + Math.sqrt(3)), 10)
+  })
+
+  it('supports two-argument atan2(y, x) = angle of x + j·y', () => {
+    expect(calcExpression('atan2(1, 1)').re).toBeCloseTo(Math.PI / 4, 10)
+    expect(calcExpression('atan2(-1, -1)').re).toBeCloseTo(-3 * Math.PI / 4, 10)
+    expect(calcExpression('atan2(1, 0)').re).toBeCloseTo(Math.PI / 2, 10)
+    expect(calcExpression('atan2(0, -1)').re).toBeCloseTo(Math.PI, 10)
+  })
+
+  it('rejects a wrong argument count', () => {
+    expect(() => calcExpression('atan2(1)')).toThrow(/expects 2 argument/)
+    expect(() => calcExpression('sin(1, 2)')).toThrow(/expects 1 argument/)
+    expect(() => calcExpression('atan2()')).toThrow(/expects 2 argument/)
+  })
+})
+
 describe('variables', () => {
   it('substitutes variable bindings', () => {
     const result = calcExpression('x^2+2*x+1', { x: new Complex(3, 0) })
