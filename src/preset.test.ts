@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { installPresets } from './preset.ts'
@@ -26,20 +26,19 @@ describe('installPresets', () => {
     rmSync(home, { recursive: true, force: true })
   })
 
-  it('is idempotent and never overwrites an existing preset', () => {
+  it('always overwrites an existing preset with the packaged copy', () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-preset-test-'))
     process.env.DSH_HOME = home
+    const target = join(home, '.agent-presets', 'electro-lab')
     installPresets()
-    // a second call installs nothing new
-    expect(installPresets()).toEqual([])
-    // user edits survive
-    const target = join(home, '.agent-presets', 'electro-lab', 'preset.yml')
-    const edited = 'name: user-tweaked\n'
-    // (write through the fs we already imported)
-    const { writeFileSync } = require('node:fs') as typeof import('node:fs')
-    writeFileSync(target, edited)
-    installPresets()
-    expect(readFileSync(target, 'utf8')).toBe(edited)
+    // a local edit is discarded on the next sync — the preset is plugin-owned
+    const packaged = readFileSync(new URL('../presets/electro-lab/agent.cordis.yml', import.meta.url), 'utf8')
+    writeFileSync(join(target, 'agent.cordis.yml'), 'user-tampered\n')
+    expect(installPresets()).toContain('electro-lab')
+    expect(readFileSync(join(target, 'agent.cordis.yml'), 'utf8')).toBe(packaged)
+    expect(readFileSync(join(target, 'preset.yml'), 'utf8')).toBe(
+      readFileSync(new URL('../presets/electro-lab/preset.yml', import.meta.url), 'utf8'),
+    )
     rmSync(home, { recursive: true, force: true })
   })
 })
