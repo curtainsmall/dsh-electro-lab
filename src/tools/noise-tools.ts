@@ -5,14 +5,14 @@
 import { calcCascadeNoiseFigure, calcQuantizationSnr, calcThermalNoisePower } from '../math/noise.ts'
 import { convertDbLevels, DbUnit } from '../math/db.ts'
 import { toScalar, serializeReal } from '../math/convert.ts'
-import { Unit } from '../math/units.ts'
+import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 const dbArrayParam = (description: string) => ({
   type: 'array' as const,
   description,
-  items: createValueParam(Unit.Log, 'dB value'),
+  items: createValueParam(QuantityKind.Log, 'dB value'),
 })
 
 export const noiseTools = [
@@ -20,19 +20,19 @@ export const noiseTools = [
     name: 'thermal_noise',
     description: 'Thermal (Johnson) noise power in a bandwidth: P = k·T·B (k = 1.380649e−23 J/K). Returns watts and dBm. At 290 K in 1 MHz: −114 dBm (textbook floor).',
     parameters: {
-      temperature: { ...createValueParam(Unit.None, 'temperature in kelvin'), required: true },
-      bandwidth: { ...createValueParam(Unit.Frequency, 'bandwidth in Hz'), required: true },
+      temperature: { ...createValueParam(QuantityKind.None, 'temperature in kelvin'), required: true },
+      bandwidth: { ...createValueParam(QuantityKind.Frequency, 'bandwidth in Hz'), required: true },
     },
     execute: (args) => {
-      const temperature = toScalar(args.temperature, Unit.None)
-      const bandwidth = toScalar(args.bandwidth, Unit.Frequency)
+      const temperature = toScalar(args.temperature, QuantityKind.None)
+      const bandwidth = toScalar(args.bandwidth, QuantityKind.Frequency)
       const watts = calcThermalNoisePower(temperature, bandwidth)
       const out: Record<string, JsonValue> = {
-        temperature: serializeReal(temperature, Unit.None),
-        bandwidth: serializeReal(bandwidth, Unit.Frequency),
-        noisePowerWatts: serializeReal(watts, Unit.Power),
+        temperature: serializeReal(temperature, QuantityKind.None),
+        bandwidth: serializeReal(bandwidth, QuantityKind.Frequency),
+        noisePowerWatts: serializeReal(watts, QuantityKind.Power),
       }
-      out.noisePowerDbm = serializeReal(convertDbLevels(watts, DbUnit.Watt, 50).dbm, Unit.Log)
+      out.noisePowerDbm = serializeReal(convertDbLevels(watts, DbUnit.Power, 50).dbm, QuantityKind.Log)
       return out
     },
   }),
@@ -44,10 +44,10 @@ export const noiseTools = [
       gainDb: { ...dbArrayParam('per-stage gains in dB, first stage first'), required: true },
     },
     execute: (args) => {
-      const noiseFigureDb = args.noiseFigureDb.map((value) => toScalar(value, Unit.Log))
-      const gainDb = args.gainDb.map((value) => toScalar(value, Unit.Log))
+      const noiseFigureDb = args.noiseFigureDb.map((value) => toScalar(value, QuantityKind.Log))
+      const gainDb = args.gainDb.map((value) => toScalar(value, QuantityKind.Log))
       return {
-        totalNoiseFigureDb: serializeReal(calcCascadeNoiseFigure(noiseFigureDb, gainDb), Unit.Log),
+        totalNoiseFigureDb: serializeReal(calcCascadeNoiseFigure(noiseFigureDb, gainDb), QuantityKind.Log),
       }
     },
   }),
@@ -59,7 +59,7 @@ export const noiseTools = [
     },
     execute: (args) => {
       return {
-        snrDb: serializeReal(calcQuantizationSnr(args.bits), Unit.Log),
+        snrDb: serializeReal(calcQuantizationSnr(args.bits), QuantityKind.Log),
       }
     },
   }),

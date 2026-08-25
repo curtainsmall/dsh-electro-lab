@@ -44,7 +44,7 @@ const SKILLS_DIR = new URL('../skills/', import.meta.url)
 /** Skill files shipped with the package, in registration order. Skill names
  *  carry the plugin prefix (electro-lab-*) so they never collide with
  *  skills from other plugins in the shared registry. */
-const SKILL_FILES = ['electro-lab-worked-solution.md', 'electro-lab-grounded-calculation.md']
+const SKILL_FILES = ['electro-lab-template.md']
 
 /** Register every packaged skill; returns one disposer that unregisters all. */
 export function registerSkills(ctx: Context): () => void {

@@ -4,7 +4,7 @@
  */
 import { OpampConfiguration, calcLedResistor, calcOpamp, calcTimeConstant, calcVoltageDivider } from '../math/electronics.ts'
 import { toScalar, serializeReal, serializeComplex } from '../math/convert.ts'
-import { Unit } from '../math/units.ts'
+import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
@@ -27,28 +27,28 @@ export const electronicsTools = [
         description: 'circuit configuration',
         required: true,
       },
-      feedbackResistance: { ...createValueParam(Unit.Resistance, 'feedback resistance Rf') },
-      inputResistance: { ...createValueParam(Unit.Resistance, 'input resistance Rin (integrator: R)') },
-      inputVoltage: { ...createValueParam(Unit.Voltage, 'input voltage V₁'), required: true },
-      secondInputVoltage: { ...createValueParam(Unit.Voltage, 'second input voltage V₂ (summing/difference)') },
-      secondInputResistance: { ...createValueParam(Unit.Resistance, 'second input resistance R₂ (summing)') },
-      capacitance: { ...createValueParam(Unit.Capacitance, 'capacitance (integrator/differentiator)') },
-      frequency: { ...createValueParam(Unit.Frequency, 'frequency (integrator/differentiator)') },
+      feedbackResistance: { ...createValueParam(QuantityKind.Resistance, 'feedback resistance Rf') },
+      inputResistance: { ...createValueParam(QuantityKind.Resistance, 'input resistance Rin (integrator: R)') },
+      inputVoltage: { ...createValueParam(QuantityKind.Voltage, 'input voltage V₁'), required: true },
+      secondInputVoltage: { ...createValueParam(QuantityKind.Voltage, 'second input voltage V₂ (summing/difference)') },
+      secondInputResistance: { ...createValueParam(QuantityKind.Resistance, 'second input resistance R₂ (summing)') },
+      capacitance: { ...createValueParam(QuantityKind.Capacitance, 'capacitance (integrator/differentiator)') },
+      frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency (integrator/differentiator)') },
     },
     execute: (args) => {
-      const inputVoltage = toScalar(args.inputVoltage, Unit.Voltage)
+      const inputVoltage = toScalar(args.inputVoltage, QuantityKind.Voltage)
       const result = calcOpamp(args.configuration, {
-        feedbackResistance: args.feedbackResistance === undefined ? undefined : toScalar(args.feedbackResistance, Unit.Resistance),
-        inputResistance: args.inputResistance === undefined ? undefined : toScalar(args.inputResistance, Unit.Resistance),
+        feedbackResistance: args.feedbackResistance === undefined ? undefined : toScalar(args.feedbackResistance, QuantityKind.Resistance),
+        inputResistance: args.inputResistance === undefined ? undefined : toScalar(args.inputResistance, QuantityKind.Resistance),
         inputVoltage,
-        secondInputVoltage: args.secondInputVoltage === undefined ? undefined : toScalar(args.secondInputVoltage, Unit.Voltage),
-        secondInputResistance: args.secondInputResistance === undefined ? undefined : toScalar(args.secondInputResistance, Unit.Resistance),
-        capacitance: args.capacitance === undefined ? undefined : toScalar(args.capacitance, Unit.Capacitance),
-        frequency: args.frequency === undefined ? undefined : toScalar(args.frequency, Unit.Frequency),
+        secondInputVoltage: args.secondInputVoltage === undefined ? undefined : toScalar(args.secondInputVoltage, QuantityKind.Voltage),
+        secondInputResistance: args.secondInputResistance === undefined ? undefined : toScalar(args.secondInputResistance, QuantityKind.Resistance),
+        capacitance: args.capacitance === undefined ? undefined : toScalar(args.capacitance, QuantityKind.Capacitance),
+        frequency: args.frequency === undefined ? undefined : toScalar(args.frequency, QuantityKind.Frequency),
       })
       const out: Record<string, JsonValue> = { configuration: args.configuration }
-      if (result.gain !== undefined) out.gain = serializeComplex(result.gain, Unit.None)
-      if (result.outputVoltage !== undefined) out.outputVoltage = serializeComplex(result.outputVoltage, Unit.Voltage)
+      if (result.gain !== undefined) out.gain = serializeComplex(result.gain, QuantityKind.None)
+      if (result.outputVoltage !== undefined) out.outputVoltage = serializeComplex(result.outputVoltage, QuantityKind.Voltage)
       return out
     },
   }),
@@ -56,18 +56,18 @@ export const electronicsTools = [
     name: 'time_constant',
     description: 'Time constant and cutoff frequency: τ = RC (give capacitance) or τ = L/R (give inductance); exactly one of capacitance or inductance. cutoffFrequency = 1/(2πτ).',
     parameters: {
-      resistance: { ...createValueParam(Unit.Resistance, 'resistance'), required: true },
-      capacitance: { ...createValueParam(Unit.Capacitance, 'capacitance (RC)') },
-      inductance: { ...createValueParam(Unit.Inductance, 'inductance (RL)') },
+      resistance: { ...createValueParam(QuantityKind.Resistance, 'resistance'), required: true },
+      capacitance: { ...createValueParam(QuantityKind.Capacitance, 'capacitance (RC)') },
+      inductance: { ...createValueParam(QuantityKind.Inductance, 'inductance (RL)') },
     },
     execute: (args) => {
-      const resistance = toScalar(args.resistance, Unit.Resistance)
-      const capacitance = args.capacitance === undefined ? undefined : toScalar(args.capacitance, Unit.Capacitance)
-      const inductance = args.inductance === undefined ? undefined : toScalar(args.inductance, Unit.Inductance)
+      const resistance = toScalar(args.resistance, QuantityKind.Resistance)
+      const capacitance = args.capacitance === undefined ? undefined : toScalar(args.capacitance, QuantityKind.Capacitance)
+      const inductance = args.inductance === undefined ? undefined : toScalar(args.inductance, QuantityKind.Inductance)
       const { timeConstant, cutoffFrequency } = calcTimeConstant(resistance, capacitance, inductance)
       return {
-        timeConstant: serializeReal(timeConstant, Unit.Time),
-        cutoffFrequency: serializeReal(cutoffFrequency, Unit.Frequency),
+        timeConstant: serializeReal(timeConstant, QuantityKind.Time),
+        cutoffFrequency: serializeReal(cutoffFrequency, QuantityKind.Frequency),
       }
     },
   }),
@@ -75,24 +75,24 @@ export const electronicsTools = [
     name: 'voltage_divider',
     description: 'Resistive divider: outputVoltage = Vs·R2/(R1+R2). With a load resistance the divider uses R2∥RL (loaded output, load current returned). outputResistance is the Thévenin source resistance R1∥R2.',
     parameters: {
-      sourceVoltage: { ...createValueParam(Unit.Voltage, 'source voltage'), required: true },
-      resistance1: { ...createValueParam(Unit.Resistance, 'top resistor R1'), required: true },
-      resistance2: { ...createValueParam(Unit.Resistance, 'bottom resistor R2'), required: true },
-      loadResistance: { ...createValueParam(Unit.Resistance, 'load resistance (optional)') },
+      sourceVoltage: { ...createValueParam(QuantityKind.Voltage, 'source voltage'), required: true },
+      resistance1: { ...createValueParam(QuantityKind.Resistance, 'top resistor R1'), required: true },
+      resistance2: { ...createValueParam(QuantityKind.Resistance, 'bottom resistor R2'), required: true },
+      loadResistance: { ...createValueParam(QuantityKind.Resistance, 'load resistance (optional)') },
     },
     execute: (args) => {
-      const sourceVoltage = toScalar(args.sourceVoltage, Unit.Voltage)
-      const resistance1 = toScalar(args.resistance1, Unit.Resistance)
-      const resistance2 = toScalar(args.resistance2, Unit.Resistance)
-      const loadResistance = args.loadResistance === undefined ? undefined : toScalar(args.loadResistance, Unit.Resistance)
+      const sourceVoltage = toScalar(args.sourceVoltage, QuantityKind.Voltage)
+      const resistance1 = toScalar(args.resistance1, QuantityKind.Resistance)
+      const resistance2 = toScalar(args.resistance2, QuantityKind.Resistance)
+      const loadResistance = args.loadResistance === undefined ? undefined : toScalar(args.loadResistance, QuantityKind.Resistance)
       const result = calcVoltageDivider(sourceVoltage, resistance1, resistance2, loadResistance)
       const out: Record<string, JsonValue> = {
-        outputVoltage: serializeReal(result.outputVoltage, Unit.Voltage),
-        outputResistance: serializeReal(result.outputResistance, Unit.Resistance),
+        outputVoltage: serializeReal(result.outputVoltage, QuantityKind.Voltage),
+        outputResistance: serializeReal(result.outputResistance, QuantityKind.Resistance),
       }
       if (result.unloadedOutputVoltage !== undefined) {
-        out.unloadedOutputVoltage = serializeReal(result.unloadedOutputVoltage, Unit.Voltage)
-        out.loadCurrent = serializeReal(result.loadCurrent!, Unit.Current)
+        out.unloadedOutputVoltage = serializeReal(result.unloadedOutputVoltage, QuantityKind.Voltage)
+        out.loadCurrent = serializeReal(result.loadCurrent!, QuantityKind.Current)
       }
       return out
     },
@@ -101,18 +101,18 @@ export const electronicsTools = [
     name: 'led_resistor',
     description: 'LED series resistor: R = (Vs − Vf)/I and its dissipated power P = I²·R. Requires sourceVoltage > forwardVoltage.',
     parameters: {
-      sourceVoltage: { ...createValueParam(Unit.Voltage, 'supply voltage'), required: true },
-      forwardVoltage: { ...createValueParam(Unit.Voltage, 'LED forward voltage'), required: true },
-      current: { ...createValueParam(Unit.Current, 'desired LED current'), required: true },
+      sourceVoltage: { ...createValueParam(QuantityKind.Voltage, 'supply voltage'), required: true },
+      forwardVoltage: { ...createValueParam(QuantityKind.Voltage, 'LED forward voltage'), required: true },
+      current: { ...createValueParam(QuantityKind.Current, 'desired LED current'), required: true },
     },
     execute: (args) => {
-      const sourceVoltage = toScalar(args.sourceVoltage, Unit.Voltage)
-      const forwardVoltage = toScalar(args.forwardVoltage, Unit.Voltage)
-      const current = toScalar(args.current, Unit.Current)
+      const sourceVoltage = toScalar(args.sourceVoltage, QuantityKind.Voltage)
+      const forwardVoltage = toScalar(args.forwardVoltage, QuantityKind.Voltage)
+      const current = toScalar(args.current, QuantityKind.Current)
       const { resistance, power } = calcLedResistor(sourceVoltage, forwardVoltage, current)
       return {
-        resistance: serializeReal(resistance, Unit.Resistance),
-        power: serializeReal(power, Unit.Power),
+        resistance: serializeReal(resistance, QuantityKind.Resistance),
+        power: serializeReal(power, QuantityKind.Power),
       }
     },
   }),

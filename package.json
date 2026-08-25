@@ -25,6 +25,7 @@
   "files": [
     "lib",
     "skills",
+    "presets",
     "cordis.patch.yml",
     "dsh.plugin.json",
     "README.md"

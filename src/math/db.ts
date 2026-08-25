@@ -1,15 +1,15 @@
 /**
- * Decibel mathematics: absolute level conversion (power/voltage references)
+ * Log mathematics: absolute level conversion (power/voltage references)
  * and ratio conversion. Voltage↔power conversion assumes a reference
  * impedance (default 50 Ω).
  */
 
 /** Absolute level unit: the reference each value is measured against. */
 export enum DbUnit {
-  Watt = 'watt',
+  Power = 'watt',
   Dbm = 'dbm',
   Dbw = 'dbw',
-  Volt = 'volt',
+  Voltage = 'volt',
   Dbu = 'dbu',
   DbuV = 'dbuv',
 }
@@ -33,7 +33,7 @@ export function convertDbLevels(
   if (impedance <= 0) throw new Error('impedance must be positive (Ω)')
   let watts: number
   switch (unit) {
-    case DbUnit.Watt:
+    case DbUnit.Power:
       watts = value
       break
     case DbUnit.Dbm:
@@ -42,7 +42,7 @@ export function convertDbLevels(
     case DbUnit.Dbw:
       watts = 10 ** (value / 10)
       break
-    case DbUnit.Volt: {
+    case DbUnit.Voltage: {
       if (value < 0) throw new Error('voltage must be non-negative (V RMS)')
       watts = (value * value) / impedance
       break

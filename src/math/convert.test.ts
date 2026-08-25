@@ -1,105 +1,105 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { Form, expectUnit, serializeReal, serializeComplex, toComplex, toScalar } from './convert.ts'
-import { Unit } from './units.ts'
+import { Form, expectQuantity, serializeReal, serializeComplex, toComplex, toScalar } from './convert.ts'
+import { QuantityKind } from './quantity-kind.ts'
 
-function createRectValue(re: number, im: number, unit: Unit): { form: Form.Rect; re: number; im: number; unit: Unit } {
-  return { form: Form.Rect, re, im, unit }
+function createRectValue(re: number, im: number, kind: QuantityKind): { form: Form.Rect; re: number; im: number; kind: QuantityKind } {
+  return { form: Form.Rect, re, im, kind }
 }
 
-function createPolarDegreesValue(mag: number, angDeg: number, unit: Unit): { form: Form.Polar; mag: number; angDeg: number; unit: Unit } {
-  return { form: Form.Polar, mag, angDeg, unit }
+function createPolarDegreesValue(mag: number, angDeg: number, kind: QuantityKind): { form: Form.Polar; mag: number; angDeg: number; kind: QuantityKind } {
+  return { form: Form.Polar, mag, angDeg, kind }
 }
 
-function createPolarRadiansValue(mag: number, angRad: number, unit: Unit): { form: Form.Polar; mag: number; angRad: number; unit: Unit } {
-  return { form: Form.Polar, mag, angRad, unit }
+function createPolarRadiansValue(mag: number, angRad: number, kind: QuantityKind): { form: Form.Polar; mag: number; angRad: number; kind: QuantityKind } {
+  return { form: Form.Polar, mag, angRad, kind }
 }
 
-describe('toScalar — unwrap with unit validation', () => {
-  it('returns the real part when the unit matches', () => {
-    expect(toScalar(createRectValue(1000, 0, Unit.Frequency), Unit.Frequency)).toBe(1000)
-    expect(toScalar(createRectValue(1.5e-9, 0, Unit.Capacitance), Unit.Capacitance)).toBe(1.5e-9)
+describe('toScalar — unwrap with kind validation', () => {
+  it('returns the real part when the kind matches', () => {
+    expect(toScalar(createRectValue(1000, 0, QuantityKind.Frequency), QuantityKind.Frequency)).toBe(1000)
+    expect(toScalar(createRectValue(1.5e-9, 0, QuantityKind.Capacitance), QuantityKind.Capacitance)).toBe(1.5e-9)
   })
 
   it('accepts polar values sitting on the real axis (0° / 180°)', () => {
-    expect(toScalar(createPolarDegreesValue(5, 0, Unit.Voltage), Unit.Voltage)).toBe(5)
-    expect(toScalar(createPolarDegreesValue(5, 180, Unit.Voltage), Unit.Voltage)).toBe(-5)
-    expect(toScalar(createPolarRadiansValue(5, Math.PI, Unit.Voltage), Unit.Voltage)).toBe(-5)
+    expect(toScalar(createPolarDegreesValue(5, 0, QuantityKind.Voltage), QuantityKind.Voltage)).toBe(5)
+    expect(toScalar(createPolarDegreesValue(5, 180, QuantityKind.Voltage), QuantityKind.Voltage)).toBe(-5)
+    expect(toScalar(createPolarRadiansValue(5, Math.PI, QuantityKind.Voltage), QuantityKind.Voltage)).toBe(-5)
   })
 
-  it('rejects a mismatched unit', () => {
-    expect(() => toScalar(createRectValue(1000, 0, Unit.Resistance), Unit.Frequency)).toThrow(/unit mismatch/)
+  it('rejects a mismatched kind', () => {
+    expect(() => toScalar(createRectValue(1000, 0, QuantityKind.Resistance), QuantityKind.Frequency)).toThrow(/kind mismatch/)
   })
 
   it('rejects non-real values (createRectValue imaginary part, polar off-axis)', () => {
-    expect(() => toScalar(createRectValue(1000, 0.5, Unit.Frequency), Unit.Frequency)).toThrow(/expected a real value/)
-    expect(() => toScalar(createPolarDegreesValue(5, 45, Unit.Voltage), Unit.Voltage)).toThrow(/expected a real value/)
+    expect(() => toScalar(createRectValue(1000, 0.5, QuantityKind.Frequency), QuantityKind.Frequency)).toThrow(/expected a real value/)
+    expect(() => toScalar(createPolarDegreesValue(5, 45, QuantityKind.Voltage), QuantityKind.Voltage)).toThrow(/expected a real value/)
   })
 })
 
-describe('toComplex — unwrap with unit validation', () => {
+describe('toComplex — unwrap with kind validation', () => {
   it('returns the complex.js value from createRectValue input', () => {
-    const z = toComplex(createRectValue(50, 50, Unit.Resistance), Unit.Resistance)
+    const z = toComplex(createRectValue(50, 50, QuantityKind.Resistance), QuantityKind.Resistance)
     expect(z.re).toBe(50)
     expect(z.im).toBe(50)
   })
 
   it('converts polar input (degrees and radians)', () => {
-    const z1 = toComplex(createPolarDegreesValue(5, 90, Unit.Resistance), Unit.Resistance)
+    const z1 = toComplex(createPolarDegreesValue(5, 90, QuantityKind.Resistance), QuantityKind.Resistance)
     expect(z1.re).toBeCloseTo(0, 10)
     expect(z1.im).toBeCloseTo(5, 10)
-    const z2 = toComplex(createPolarRadiansValue(5, Math.PI / 2, Unit.Resistance), Unit.Resistance)
+    const z2 = toComplex(createPolarRadiansValue(5, Math.PI / 2, QuantityKind.Resistance), QuantityKind.Resistance)
     expect(z2.re).toBeCloseTo(0, 10)
     expect(z2.im).toBeCloseTo(5, 10)
   })
 
-  it('rejects a mismatched unit', () => {
-    expect(() => toComplex(createRectValue(50, 50, Unit.Voltage), Unit.Resistance)).toThrow(/unit mismatch/)
+  it('rejects a mismatched kind', () => {
+    expect(() => toComplex(createRectValue(50, 50, QuantityKind.Voltage), QuantityKind.Resistance)).toThrow(/kind mismatch/)
   })
 })
 
-describe('expectUnit', () => {
+describe('expectQuantity', () => {
   it('passes on match and throws on mismatch', () => {
-    expect(() => expectUnit(createRectValue(0, 0, Unit.Time), Unit.Time)).not.toThrow()
-    expect(() => expectUnit(createRectValue(0, 0, Unit.Time), Unit.Frequency)).toThrow(/unit mismatch/)
+    expect(() => expectQuantity(createRectValue(0, 0, QuantityKind.Time), QuantityKind.Time)).not.toThrow()
+    expect(() => expectQuantity(createRectValue(0, 0, QuantityKind.Time), QuantityKind.Frequency)).toThrow(/kind mismatch/)
   })
 })
 
 describe('serializeComplex — tool output', () => {
   it('exposes the complete snapshot (both projections, both angle units)', () => {
-    const output = serializeComplex(new Complex(50, 50), Unit.Resistance)
+    const output = serializeComplex(new Complex(50, 50), QuantityKind.Resistance)
     expect(output.re).toBe(50)
     expect(output.im).toBe(50)
-    expect(output.unit).toBe(Unit.Resistance)
+    expect(output.kind).toBe(QuantityKind.Resistance)
     expect(output.mag).toBeCloseTo(70.7107, 4)
     expect(output.angDeg).toBeCloseTo(45, 6)
     expect(output.angRad).toBeCloseTo(Math.PI / 4, 6)
   })
 
   it('round-trips: the output feeds straight back into toComplex (createRectValue or polar)', () => {
-    const output = serializeComplex(new Complex(50, 50), Unit.Resistance)
-    const backRect = toComplex(output, Unit.Resistance)
+    const output = serializeComplex(new Complex(50, 50), QuantityKind.Resistance)
+    const backRect = toComplex(output, QuantityKind.Resistance)
     expect(backRect.re).toBe(50)
     expect(backRect.im).toBe(50)
-    const backPolar = toComplex(createPolarDegreesValue(output.mag, output.angDeg, output.unit), Unit.Resistance)
+    const backPolar = toComplex(createPolarDegreesValue(output.mag, output.angDeg, output.kind), QuantityKind.Resistance)
     expect(backPolar.re).toBeCloseTo(50, 10)
     expect(backPolar.im).toBeCloseTo(50, 10)
   })
 
-  it('serializes to plain JSON (unit is a string value)', () => {
-    const output = serializeComplex(new Complex(10, -0.965), Unit.Resistance)
+  it('serializes to plain JSON (kind is a string value)', () => {
+    const output = serializeComplex(new Complex(10, -0.965), QuantityKind.Resistance)
     const json = JSON.parse(JSON.stringify(output))
-    expect(json.unit).toBe('resistance')
+    expect(json.kind).toBe('resistance')
     expect(json.re).toBeCloseTo(10, 12)
   })
 })
 
 describe('serializeReal — real result output', () => {
   it('wraps a real number as a complex value with zero imaginary part', () => {
-    const output = serializeReal(2400, Unit.Frequency)
+    const output = serializeReal(2400, QuantityKind.Frequency)
     expect(output.re).toBe(2400)
     expect(output.im).toBe(0)
-    expect(output.unit).toBe(Unit.Frequency)
+    expect(output.kind).toBe(QuantityKind.Frequency)
     expect(output.mag).toBe(2400)
     expect(output.angDeg).toBe(0)
   })

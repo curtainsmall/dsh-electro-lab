@@ -6,13 +6,13 @@
  */
 import { expandPowerSeries, findPolesZeros } from '../math/polynomial.ts'
 import { toComplex, serializeComplex } from '../math/convert.ts'
-import { Unit } from '../math/units.ts'
+import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 
 const createCoeffArrayParam = (description: string) => ({
   type: 'array' as const,
   description,
-  items: createValueParam(Unit.None, 'coefficient (unit none)'),
+  items: createValueParam(QuantityKind.None, 'coefficient (kind none)'),
 })
 
 export const polynomialTools = [
@@ -24,14 +24,14 @@ export const polynomialTools = [
       denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
-      const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
+      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
+      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
       const { zeros, poles } = findPolesZeros(numerator, denominator)
       return {
         numeratorDegree: numerator.length - 1,
         denominatorDegree: denominator.length - 1,
-        zeros: zeros.map((root) => serializeComplex(root, Unit.None)),
-        poles: poles.map((root) => serializeComplex(root, Unit.None)),
+        zeros: zeros.map((root) => serializeComplex(root, QuantityKind.None)),
+        poles: poles.map((root) => serializeComplex(root, QuantityKind.None)),
       }
     },
   }),
@@ -44,11 +44,11 @@ export const polynomialTools = [
       count: { type: 'integer', description: 'number of leading coefficients h[0]..h[count−1]', required: true },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
-      const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
+      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
+      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
       return {
         count: args.count,
-        coefficients: expandPowerSeries(numerator, denominator, args.count).map((coefficient) => serializeComplex(coefficient, Unit.None)),
+        coefficients: expandPowerSeries(numerator, denominator, args.count).map((coefficient) => serializeComplex(coefficient, QuantityKind.None)),
       }
     },
   }),

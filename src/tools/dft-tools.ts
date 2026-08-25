@@ -1,7 +1,7 @@
 /**
  * Frequency-domain tools: DFT/IDFT over complex sequences, Fourier series
  * of standard waveforms, and window functions. IO is JSON-and-complex-only;
- * sequences are arrays of unit-'none' value snapshots.
+ * sequences are arrays of kind-'none' value snapshots.
  */
 import { Complex } from 'complex.js'
 import {
@@ -15,13 +15,13 @@ import {
   calcWindowSamples,
 } from '../math/dft.ts'
 import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
-import { Unit } from '../math/units.ts'
+import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 
 const createSequenceParam = (description: string) => ({
   type: 'array' as const,
   description,
-  items: createValueParam(Unit.None, 'value (unit none)'),
+  items: createValueParam(QuantityKind.None, 'value (kind none)'),
 })
 
 export const dftTools = [
@@ -29,7 +29,7 @@ export const dftTools = [
     name: 'discrete_fourier_transform',
     description: 'DFT of a complex sample sequence: X[k] = Σ x[n]·e^(−j2πkn/N). Bin k corresponds to frequency k·fs/N with sample rate fs. Returns the complex spectrum (magnitude/phase per bin via the value snapshots).',
     parameters: {
-      samples: { ...createSequenceParam('time-domain samples, unit none'), required: true },
+      samples: { ...createSequenceParam('time-domain samples, kind none'), required: true },
       window: {
         type: 'string',
         enum: [WindowKind.None, WindowKind.Hann, WindowKind.Hamming, WindowKind.Blackman],
@@ -38,11 +38,11 @@ export const dftTools = [
     },
     execute: (args) => {
       const window = args.window ?? WindowKind.None
-      const samples = args.samples.map((sample) => toComplex(sample, Unit.None))
+      const samples = args.samples.map((sample) => toComplex(sample, QuantityKind.None))
       const weighted = applyWindow(samples, calcWindowSamples(window, samples.length))
       return {
         window,
-        spectrum: calcDiscreteFourierTransform(weighted).map((bin) => serializeComplex(bin, Unit.None)),
+        spectrum: calcDiscreteFourierTransform(weighted).map((bin) => serializeComplex(bin, QuantityKind.None)),
       }
     },
   }),
@@ -50,12 +50,12 @@ export const dftTools = [
     name: 'inverse_discrete_fourier_transform',
     description: 'IDFT of a spectrum: x[n] = (1/N)·Σ X[k]·e^(+j2πkn/N). Recovers the time-domain sequence (round-trip of discrete_fourier_transform).',
     parameters: {
-      spectrum: { ...createSequenceParam('spectral bins, unit none'), required: true },
+      spectrum: { ...createSequenceParam('spectral bins, kind none'), required: true },
     },
     execute: (args) => {
-      const spectrum = args.spectrum.map((bin) => toComplex(bin, Unit.None))
+      const spectrum = args.spectrum.map((bin) => toComplex(bin, QuantityKind.None))
       return {
-        samples: calcInvDiscreteFourierTransform(spectrum).map((sample) => serializeComplex(sample, Unit.None)),
+        samples: calcInvDiscreteFourierTransform(spectrum).map((sample) => serializeComplex(sample, QuantityKind.None)),
       }
     },
   }),
@@ -70,17 +70,17 @@ export const dftTools = [
         required: true,
       },
       harmonics: { type: 'number', description: 'number of harmonics to compute', required: true },
-      amplitude: { ...createValueParam(Unit.None, 'peak amplitude (default 1)') },
+      amplitude: { ...createValueParam(QuantityKind.None, 'peak amplitude (default 1)') },
     },
     execute: (args) => {
-      const amplitude = args.amplitude === undefined ? 1 : toScalar(args.amplitude, Unit.None)
+      const amplitude = args.amplitude === undefined ? 1 : toScalar(args.amplitude, QuantityKind.None)
       const coefficients = calcFourierSeriesCoeffs(args.waveform, args.harmonics, amplitude)
       return {
         waveform: args.waveform,
         harmonics: args.harmonics,
-        dc: serializeReal(coefficients.dc, Unit.None),
-        cosine: coefficients.cosine.map((value) => serializeReal(value, Unit.None)),
-        sine: coefficients.sine.map((value) => serializeReal(value, Unit.None)),
+        dc: serializeReal(coefficients.dc, QuantityKind.None),
+        cosine: coefficients.cosine.map((value) => serializeReal(value, QuantityKind.None)),
+        sine: coefficients.sine.map((value) => serializeReal(value, QuantityKind.None)),
       }
     },
   }),
@@ -100,7 +100,7 @@ export const dftTools = [
       return {
         window: args.window,
         length: args.length,
-        samples: calcWindowSamples(args.window, args.length).map((value) => serializeReal(value, Unit.None)),
+        samples: calcWindowSamples(args.window, args.length).map((value) => serializeReal(value, QuantityKind.None)),
       }
     },
   }),
@@ -108,7 +108,7 @@ export const dftTools = [
     name: 'signal_analysis',
     description: 'Signal statistics plus the windowed spectrum in one call: RMS, peak, peak-to-peak, DC component, and the DFT spectrum of the windowed samples (magnitude/phase per bin via the value snapshots).',
     parameters: {
-      samples: { ...createSequenceParam('time-domain samples, unit none'), required: true },
+      samples: { ...createSequenceParam('time-domain samples, kind none'), required: true },
       window: {
         type: 'string',
         enum: [WindowKind.None, WindowKind.Hann, WindowKind.Hamming, WindowKind.Blackman],
@@ -117,15 +117,15 @@ export const dftTools = [
     },
     execute: (args) => {
       const window = args.window ?? WindowKind.None
-      const samples = args.samples.map((sample) => toComplex(sample, Unit.None))
+      const samples = args.samples.map((sample) => toComplex(sample, QuantityKind.None))
       const result = calcSignalAnalysis(samples, window)
       return {
         window,
-        rms: serializeReal(result.rms, Unit.None),
-        peak: serializeReal(result.peak, Unit.None),
-        peakToPeak: serializeReal(result.peakToPeak, Unit.None),
-        dc: serializeReal(result.dc, Unit.None),
-        spectrum: result.spectrum.map((bin) => serializeComplex(bin, Unit.None)),
+        rms: serializeReal(result.rms, QuantityKind.None),
+        peak: serializeReal(result.peak, QuantityKind.None),
+        peakToPeak: serializeReal(result.peakToPeak, QuantityKind.None),
+        dc: serializeReal(result.dc, QuantityKind.None),
+        spectrum: result.spectrum.map((bin) => serializeComplex(bin, QuantityKind.None)),
       }
     },
   }),

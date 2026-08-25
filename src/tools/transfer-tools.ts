@@ -16,14 +16,14 @@ import {
   calcTransferResponse,
 } from '../math/transfer.ts'
 import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
-import { Unit } from '../math/units.ts'
+import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 const createCoeffArrayParam = (description: string) => ({
   type: 'array' as const,
   description,
-  items: createValueParam(Unit.None, 'coefficient (unit none)'),
+  items: createValueParam(QuantityKind.None, 'coefficient (kind none)'),
 })
 
 export const transferTools = [
@@ -35,17 +35,17 @@ export const transferTools = [
       denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
-      const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
+      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
+      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
       const result = expandPartialFraction(numerator, denominator)
       const terms: JsonValue[] = result.terms.map((term) => ({
-        pole: serializeComplex(term.pole, Unit.None),
+        pole: serializeComplex(term.pole, QuantityKind.None),
         order: term.order,
-        residue: serializeComplex(term.residue, Unit.None),
+        residue: serializeComplex(term.residue, QuantityKind.None),
       }))
       const out: Record<string, JsonValue> = { terms }
       if (result.polynomial.length > 0) {
-        out.polynomial = result.polynomial.map((coefficient) => serializeComplex(coefficient, Unit.None))
+        out.polynomial = result.polynomial.map((coefficient) => serializeComplex(coefficient, QuantityKind.None))
       }
       return out
     },
@@ -65,21 +65,21 @@ export const transferTools = [
       frequencies: {
         type: 'array' as const,
         description: 'frequency points in Hz',
-        items: createValueParam(Unit.Frequency, 'frequency in Hz'),
+        items: createValueParam(QuantityKind.Frequency, 'frequency in Hz'),
         required: true,
       },
-      sampleTime: { ...createValueParam(Unit.Time, 'sample time in seconds (required for variable "z")') },
+      sampleTime: { ...createValueParam(QuantityKind.Time, 'sample time in seconds (required for variable "z")') },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
-      const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
-      const frequencies = args.frequencies.map((value) => toScalar(value, Unit.Frequency))
-      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, Unit.Time)
+      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
+      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
+      const frequencies = args.frequencies.map((value) => toScalar(value, QuantityKind.Frequency))
+      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, QuantityKind.Time)
       const points = calcFreqPoints(args.variable, frequencies, sampleTime)
       return {
         variable: args.variable,
         frequencies,
-        responses: calcTransferResponse(numerator, denominator, points).map((value) => serializeComplex(value, Unit.None)),
+        responses: calcTransferResponse(numerator, denominator, points).map((value) => serializeComplex(value, QuantityKind.None)),
       }
     },
   }),
@@ -92,16 +92,16 @@ export const transferTools = [
       times: {
         type: 'array' as const,
         description: 'time points in seconds',
-        items: createValueParam(Unit.Time, 'time in seconds'),
+        items: createValueParam(QuantityKind.Time, 'time in seconds'),
         required: true,
       },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
-      const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
-      const times = args.times.map((value) => toScalar(value, Unit.Time))
+      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
+      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
+      const times = args.times.map((value) => toScalar(value, QuantityKind.Time))
       return {
-        values: calcStepResponse(numerator, denominator, times).map((value) => serializeComplex(value, Unit.None)),
+        values: calcStepResponse(numerator, denominator, times).map((value) => serializeComplex(value, QuantityKind.None)),
       }
     },
   }),
@@ -111,14 +111,14 @@ export const transferTools = [
     parameters: {
       a: { ...createCoeffArrayParam('recursive coefficients, Laurent order (a₀ = 1 for a normalized equation)'), required: true },
       b: { ...createCoeffArrayParam('feed-forward coefficients, Laurent order'), required: true },
-      input: { ...createSequenceParam('input samples x[n], unit none'), required: true },
+      input: { ...createSequenceParam('input samples x[n], kind none'), required: true },
     },
     execute: (args) => {
-      const a = args.a.map((value) => toComplex(value, Unit.None))
-      const b = args.b.map((value) => toComplex(value, Unit.None))
-      const input = args.input.map((value) => toComplex(value, Unit.None))
+      const a = args.a.map((value) => toComplex(value, QuantityKind.None))
+      const b = args.b.map((value) => toComplex(value, QuantityKind.None))
+      const input = args.input.map((value) => toComplex(value, QuantityKind.None))
       return {
-        output: solveDifferenceEquation(a, b, input).map((value) => serializeComplex(value, Unit.None)),
+        output: solveDifferenceEquation(a, b, input).map((value) => serializeComplex(value, QuantityKind.None)),
       }
     },
   }),
@@ -129,26 +129,26 @@ export const transferTools = [
       numerator: { ...createCoeffArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
       denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
       variable: { type: 'string', enum: [Variable.S, Variable.Z], description: 'transform variable (default "s")' },
-      frequencyStart: { ...createValueParam(Unit.Frequency, 'grid start frequency (Hz)'), required: true },
-      frequencyEnd: { ...createValueParam(Unit.Frequency, 'grid end frequency (Hz)'), required: true },
+      frequencyStart: { ...createValueParam(QuantityKind.Frequency, 'grid start frequency (Hz)'), required: true },
+      frequencyEnd: { ...createValueParam(QuantityKind.Frequency, 'grid end frequency (Hz)'), required: true },
       pointsPerDecade: { type: 'number', description: 'grid points per decade (default 10)' },
-      sampleTime: { ...createValueParam(Unit.Time, 'sample time in seconds (required for variable "z")') },
+      sampleTime: { ...createValueParam(QuantityKind.Time, 'sample time in seconds (required for variable "z")') },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, Unit.None))
-      const denominator = args.denominator.map((value) => toComplex(value, Unit.None))
+      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
+      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
       const variable = args.variable ?? Variable.S
-      const frequencyStart = toScalar(args.frequencyStart, Unit.Frequency)
-      const frequencyEnd = toScalar(args.frequencyEnd, Unit.Frequency)
+      const frequencyStart = toScalar(args.frequencyStart, QuantityKind.Frequency)
+      const frequencyEnd = toScalar(args.frequencyEnd, QuantityKind.Frequency)
       const pointsPerDecade = args.pointsPerDecade ?? 10
-      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, Unit.Time)
+      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, QuantityKind.Time)
       const result = calcBodeResponse(numerator, denominator, variable, frequencyStart, frequencyEnd, pointsPerDecade, sampleTime)
       return {
         variable,
         points: result.frequencies.map((frequency, index) => ({
-          frequency: serializeReal(frequency, Unit.Frequency),
-          magnitudeDb: serializeReal(result.magnitudesDb[index]!, Unit.Log),
-          phaseDeg: serializeReal(result.phasesDeg[index]!, Unit.Angle),
+          frequency: serializeReal(frequency, QuantityKind.Frequency),
+          magnitudeDb: serializeReal(result.magnitudesDb[index]!, QuantityKind.Log),
+          phaseDeg: serializeReal(result.phasesDeg[index]!, QuantityKind.Angle),
         })),
       }
     },
@@ -159,6 +159,6 @@ function createSequenceParam(description: string) {
   return {
     type: 'array' as const,
     description,
-    items: createValueParam(Unit.None, 'value (unit none)'),
+    items: createValueParam(QuantityKind.None, 'value (kind none)'),
   }
 }

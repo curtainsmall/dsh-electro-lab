@@ -17,7 +17,7 @@ import {
   type NetworkElement,
 } from '../math/circuits.ts'
 import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
-import { Unit } from '../math/units.ts'
+import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
@@ -28,11 +28,11 @@ export const circuitTools = [
     parameters: {
       kind: { type: 'string', enum: [ElementKind.Resistance, ElementKind.Inductance, ElementKind.Capacitance], description: 'element kind', required: true },
       value: { type: 'number', description: 'element value in base SI units (Ω for resistance, H for inductance, F for capacitance)', required: true },
-      frequency: { ...createValueParam(Unit.Frequency, 'frequency'), required: true },
+      frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency'), required: true },
     },
     execute: (args) => {
-      const frequency = toScalar(args.frequency, Unit.Frequency)
-      return serializeComplex(calcNetworkImpedance({ kind: args.kind, value: args.value }, frequency), Unit.Resistance)
+      const frequency = toScalar(args.frequency, QuantityKind.Frequency)
+      return serializeComplex(calcNetworkImpedance({ kind: args.kind, value: args.value }, frequency), QuantityKind.Resistance)
     },
   }),
   defineJsonTool({
@@ -43,12 +43,12 @@ export const circuitTools = [
         type: 'array',
         description: 'impedances to combine in series',
         required: true,
-        items: createValueParam(Unit.Resistance, 'impedance'),
+        items: createValueParam(QuantityKind.Resistance, 'impedance'),
       },
     },
     execute: (args) => {
-      const parts = args.impedances.map((item) => toComplex(item, Unit.Resistance))
-      return serializeComplex(combineSeriesImpedances(parts), Unit.Resistance)
+      const parts = args.impedances.map((item) => toComplex(item, QuantityKind.Resistance))
+      return serializeComplex(combineSeriesImpedances(parts), QuantityKind.Resistance)
     },
   }),
   defineJsonTool({
@@ -59,12 +59,12 @@ export const circuitTools = [
         type: 'array',
         description: 'impedances to combine in parallel',
         required: true,
-        items: createValueParam(Unit.Resistance, 'impedance'),
+        items: createValueParam(QuantityKind.Resistance, 'impedance'),
       },
     },
     execute: (args) => {
-      const parts = args.impedances.map((item) => toComplex(item, Unit.Resistance))
-      return serializeComplex(combineParallelImpedances(parts), Unit.Resistance)
+      const parts = args.impedances.map((item) => toComplex(item, QuantityKind.Resistance))
+      return serializeComplex(combineParallelImpedances(parts), QuantityKind.Resistance)
     },
   }),
   defineJsonTool({
@@ -72,32 +72,32 @@ export const circuitTools = [
     description: 'Total impedance of a (possibly nested) network at a frequency. The network is a tree: a leaf is {"kind": "resistance"|"inductance"|"capacitance", "value": number}; a group is {"topology": "series"|"parallel", "elements": [node, ...]}. Nested groups are allowed. Returns the driving-point impedance.',
     parameters: {
       network: { type: 'json', description: 'network tree, e.g. {"topology":"series","elements":[{"kind":"resistance","value":10},{"kind":"inductance","value":0.001}]}', required: true },
-      frequency: { ...createValueParam(Unit.Frequency, 'frequency'), required: true },
+      frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency'), required: true },
     },
     execute: (args) => {
-      const frequency = toScalar(args.frequency, Unit.Frequency)
+      const frequency = toScalar(args.frequency, QuantityKind.Frequency)
       const node = validateNetwork(args.network)
-      return serializeComplex(calcNetworkImpedance(node, frequency), Unit.Resistance)
+      return serializeComplex(calcNetworkImpedance(node, frequency), QuantityKind.Resistance)
     },
   }),
   defineJsonTool({
     name: 'resonance',
     description: 'Series/parallel LC resonance: resonantFrequency = 1/(2π√(LC)); with resistance also qualityFactor and bandwidth (bandwidth = resonantFrequency / qualityFactor). Series qualityFactor = (1/R)√(L/C); parallel qualityFactor = R√(C/L).',
     parameters: {
-      inductance: { ...createValueParam(Unit.Inductance, 'inductance'), required: true },
-      capacitance: { ...createValueParam(Unit.Capacitance, 'capacitance'), required: true },
-      resistance: { ...createValueParam(Unit.Resistance, 'resistance, required for qualityFactor and bandwidth') },
+      inductance: { ...createValueParam(QuantityKind.Inductance, 'inductance'), required: true },
+      capacitance: { ...createValueParam(QuantityKind.Capacitance, 'capacitance'), required: true },
+      resistance: { ...createValueParam(QuantityKind.Resistance, 'resistance, required for qualityFactor and bandwidth') },
       mode: { type: 'string', enum: [CircuitMode.Series, CircuitMode.Parallel], description: 'resonance mode (default series)' },
     },
     execute: (args) => {
-      const inductance = toScalar(args.inductance, Unit.Inductance)
-      const capacitance = toScalar(args.capacitance, Unit.Capacitance)
-      const resistance = args.resistance === undefined ? undefined : toScalar(args.resistance, Unit.Resistance)
+      const inductance = toScalar(args.inductance, QuantityKind.Inductance)
+      const capacitance = toScalar(args.capacitance, QuantityKind.Capacitance)
+      const resistance = args.resistance === undefined ? undefined : toScalar(args.resistance, QuantityKind.Resistance)
       const mode = args.mode ?? CircuitMode.Series
       const { resonantFrequency, qualityFactor, bandwidth } = calcResonance(inductance, capacitance, resistance, mode)
-      const out: Record<string, JsonValue> = { resonantFrequency: serializeReal(resonantFrequency, Unit.Frequency), mode }
-      if (qualityFactor !== undefined) out.qualityFactor = serializeReal(qualityFactor, Unit.None)
-      if (bandwidth !== undefined) out.bandwidth = serializeReal(bandwidth, Unit.Frequency)
+      const out: Record<string, JsonValue> = { resonantFrequency: serializeReal(resonantFrequency, QuantityKind.Frequency), mode }
+      if (qualityFactor !== undefined) out.qualityFactor = serializeReal(qualityFactor, QuantityKind.None)
+      if (bandwidth !== undefined) out.bandwidth = serializeReal(bandwidth, QuantityKind.Frequency)
       return out
     },
   }),
@@ -105,20 +105,20 @@ export const circuitTools = [
     name: 'ac_power',
     description: 'AC power from RMS values: apparent = V·I (power), real = apparent·cosφ (power), reactive = apparent·sinφ (power), powerFactor = cosφ. phaseAngleDegree is the phase angle between voltage and current (positive = inductive load).',
     parameters: {
-      rmsVoltage: { ...createValueParam(Unit.Voltage, 'RMS voltage'), required: true },
-      rmsCurrent: { ...createValueParam(Unit.Current, 'RMS current'), required: true },
-      phaseAngleDegree: { ...createValueParam(Unit.Angle, 'phase angle between V and I in degrees (default 0)') },
+      rmsVoltage: { ...createValueParam(QuantityKind.Voltage, 'RMS voltage'), required: true },
+      rmsCurrent: { ...createValueParam(QuantityKind.Current, 'RMS current'), required: true },
+      phaseAngleDegree: { ...createValueParam(QuantityKind.Angle, 'phase angle between V and I in degrees (default 0)') },
     },
     execute: (args) => {
-      const rmsVoltage = toScalar(args.rmsVoltage, Unit.Voltage)
-      const rmsCurrent = toScalar(args.rmsCurrent, Unit.Current)
-      const phaseAngleDegree = args.phaseAngleDegree === undefined ? 0 : toScalar(args.phaseAngleDegree, Unit.Angle)
+      const rmsVoltage = toScalar(args.rmsVoltage, QuantityKind.Voltage)
+      const rmsCurrent = toScalar(args.rmsCurrent, QuantityKind.Current)
+      const phaseAngleDegree = args.phaseAngleDegree === undefined ? 0 : toScalar(args.phaseAngleDegree, QuantityKind.Angle)
       const { apparent, real, reactive, powerFactor } = calcAcPower(rmsVoltage, rmsCurrent, phaseAngleDegree)
       return {
-        apparent: serializeReal(apparent, Unit.Power),
-        real: serializeReal(real, Unit.Power),
-        reactive: serializeReal(reactive, Unit.Power),
-        powerFactor: serializeReal(powerFactor, Unit.None),
+        apparent: serializeReal(apparent, QuantityKind.Power),
+        real: serializeReal(real, QuantityKind.Power),
+        reactive: serializeReal(reactive, QuantityKind.Power),
+        powerFactor: serializeReal(powerFactor, QuantityKind.None),
       }
     },
   }),
@@ -127,23 +127,23 @@ export const circuitTools = [
     description: 'RC transient at a moment in time. charge: capacitor charges from 0 toward sourceVoltage, voltage = sourceVoltage(1−e^(−time/timeConstant)); discharge: capacitor at initialVoltage discharges through resistance, voltage = initialVoltage·e^(−time/timeConstant). timeConstant = resistance·capacitance. Current: charge = (sourceVoltage − voltage)/resistance, discharge = voltage/resistance.',
     parameters: {
       mode: { type: 'string', enum: [SwitchingMode.Charge, SwitchingMode.Discharge], description: 'charge or discharge', required: true },
-      sourceVoltage: { ...createValueParam(Unit.Voltage, 'source voltage (charge mode)') },
-      initialVoltage: { ...createValueParam(Unit.Voltage, 'initial capacitor voltage (discharge mode)') },
-      resistance: { ...createValueParam(Unit.Resistance, 'resistance'), required: true },
-      capacitance: { ...createValueParam(Unit.Capacitance, 'capacitance'), required: true },
-      time: { ...createValueParam(Unit.Time, 'elapsed time'), required: true },
+      sourceVoltage: { ...createValueParam(QuantityKind.Voltage, 'source voltage (charge mode)') },
+      initialVoltage: { ...createValueParam(QuantityKind.Voltage, 'initial capacitor voltage (discharge mode)') },
+      resistance: { ...createValueParam(QuantityKind.Resistance, 'resistance'), required: true },
+      capacitance: { ...createValueParam(QuantityKind.Capacitance, 'capacitance'), required: true },
+      time: { ...createValueParam(QuantityKind.Time, 'elapsed time'), required: true },
     },
     execute: (args) => {
       const mode = args.mode
-      const resistance = toScalar(args.resistance, Unit.Resistance)
-      const capacitance = toScalar(args.capacitance, Unit.Capacitance)
-      const time = toScalar(args.time, Unit.Time)
-      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, Unit.Voltage)
-      const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage, Unit.Voltage)
+      const resistance = toScalar(args.resistance, QuantityKind.Resistance)
+      const capacitance = toScalar(args.capacitance, QuantityKind.Capacitance)
+      const time = toScalar(args.time, QuantityKind.Time)
+      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, QuantityKind.Voltage)
+      const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage, QuantityKind.Voltage)
       if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
       if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined) throw new Error('discharge mode requires initialVoltage')
       const { voltage, current, timeConstant } = calcRcTransientSeries(mode, sourceVoltage, initialVoltage, resistance, capacitance, [time])[0]!
-      return { voltage: serializeReal(voltage, Unit.Voltage), current: serializeReal(current, Unit.Current), timeConstant: serializeReal(timeConstant, Unit.Time), mode }
+      return { voltage: serializeReal(voltage, QuantityKind.Voltage), current: serializeReal(current, QuantityKind.Current), timeConstant: serializeReal(timeConstant, QuantityKind.Time), mode }
     },
   }),
   defineJsonTool({
@@ -151,23 +151,23 @@ export const circuitTools = [
     description: 'RL transient at a moment in time. charge: current rises from 0 toward sourceVoltage/resistance, current = (sourceVoltage/resistance)(1−e^(−time/timeConstant)); discharge: current at initialCurrent decays, current = initialCurrent·e^(−time/timeConstant). timeConstant = inductance/resistance. Inductor voltage: charge = sourceVoltage·e^(−time/timeConstant), discharge = initialCurrent·resistance·e^(−time/timeConstant).',
     parameters: {
       mode: { type: 'string', enum: [SwitchingMode.Charge, SwitchingMode.Discharge], description: 'charge or discharge', required: true },
-      sourceVoltage: { ...createValueParam(Unit.Voltage, 'source voltage (charge mode)') },
-      initialCurrent: { ...createValueParam(Unit.Current, 'initial inductor current (discharge mode)') },
-      resistance: { ...createValueParam(Unit.Resistance, 'resistance'), required: true },
-      inductance: { ...createValueParam(Unit.Inductance, 'inductance'), required: true },
-      time: { ...createValueParam(Unit.Time, 'elapsed time'), required: true },
+      sourceVoltage: { ...createValueParam(QuantityKind.Voltage, 'source voltage (charge mode)') },
+      initialCurrent: { ...createValueParam(QuantityKind.Current, 'initial inductor current (discharge mode)') },
+      resistance: { ...createValueParam(QuantityKind.Resistance, 'resistance'), required: true },
+      inductance: { ...createValueParam(QuantityKind.Inductance, 'inductance'), required: true },
+      time: { ...createValueParam(QuantityKind.Time, 'elapsed time'), required: true },
     },
     execute: (args) => {
       const mode = args.mode
-      const resistance = toScalar(args.resistance, Unit.Resistance)
-      const inductance = toScalar(args.inductance, Unit.Inductance)
-      const time = toScalar(args.time, Unit.Time)
-      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, Unit.Voltage)
-      const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent, Unit.Current)
+      const resistance = toScalar(args.resistance, QuantityKind.Resistance)
+      const inductance = toScalar(args.inductance, QuantityKind.Inductance)
+      const time = toScalar(args.time, QuantityKind.Time)
+      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, QuantityKind.Voltage)
+      const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent, QuantityKind.Current)
       if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
       if (mode === SwitchingMode.Discharge && args.initialCurrent === undefined) throw new Error('discharge mode requires initialCurrent')
       const { current, voltage, timeConstant } = calcRlTransientSeries(mode, sourceVoltage, initialCurrent, resistance, inductance, [time])[0]!
-      return { current: serializeReal(current, Unit.Current), voltage: serializeReal(voltage, Unit.Voltage), timeConstant: serializeReal(timeConstant, Unit.Time), mode }
+      return { current: serializeReal(current, QuantityKind.Current), voltage: serializeReal(voltage, QuantityKind.Voltage), timeConstant: serializeReal(timeConstant, QuantityKind.Time), mode }
     },
   }),
   defineJsonTool({
@@ -176,34 +176,34 @@ export const circuitTools = [
     parameters: {
       kind: { type: 'string', enum: [TransientKind.Rc, TransientKind.Rl], description: 'circuit kind', required: true },
       mode: { type: 'string', enum: [SwitchingMode.Charge, SwitchingMode.Discharge], description: 'charge or discharge', required: true },
-      sourceVoltage: { ...createValueParam(Unit.Voltage, 'source voltage (charge mode)') },
-      initialVoltage: { ...createValueParam(Unit.Voltage, 'initial capacitor voltage (rc discharge mode)') },
-      initialCurrent: { ...createValueParam(Unit.Current, 'initial inductor current (rl discharge mode)') },
-      resistance: { ...createValueParam(Unit.Resistance, 'resistance'), required: true },
-      capacitance: { ...createValueParam(Unit.Capacitance, 'capacitance (rc)') },
-      inductance: { ...createValueParam(Unit.Inductance, 'inductance (rl)') },
+      sourceVoltage: { ...createValueParam(QuantityKind.Voltage, 'source voltage (charge mode)') },
+      initialVoltage: { ...createValueParam(QuantityKind.Voltage, 'initial capacitor voltage (rc discharge mode)') },
+      initialCurrent: { ...createValueParam(QuantityKind.Current, 'initial inductor current (rl discharge mode)') },
+      resistance: { ...createValueParam(QuantityKind.Resistance, 'resistance'), required: true },
+      capacitance: { ...createValueParam(QuantityKind.Capacitance, 'capacitance (rc)') },
+      inductance: { ...createValueParam(QuantityKind.Inductance, 'inductance (rl)') },
       times: {
         type: 'array',
         description: 'time points to evaluate',
         required: true,
-        items: createValueParam(Unit.Time, 'time'),
+        items: createValueParam(QuantityKind.Time, 'time'),
       },
     },
     execute: (args) => {
       const mode = args.mode
-      const resistance = toScalar(args.resistance, Unit.Resistance)
-      const times = args.times.map((item) => toScalar(item, Unit.Time))
-      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, Unit.Voltage)
+      const resistance = toScalar(args.resistance, QuantityKind.Resistance)
+      const times = args.times.map((item) => toScalar(item, QuantityKind.Time))
+      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, QuantityKind.Voltage)
       const serialize = (point: { time: number; voltage: number; current: number }) => ({
-        time: serializeReal(point.time, Unit.Time),
-        voltage: serializeReal(point.voltage, Unit.Voltage),
-        current: serializeReal(point.current, Unit.Current),
+        time: serializeReal(point.time, QuantityKind.Time),
+        voltage: serializeReal(point.voltage, QuantityKind.Voltage),
+        current: serializeReal(point.current, QuantityKind.Current),
       })
       switch (args.kind) {
         case TransientKind.Rl: {
           if (args.inductance === undefined) throw new Error('rl kind requires inductance')
-          const inductance = toScalar(args.inductance, Unit.Inductance)
-          const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent, Unit.Current)
+          const inductance = toScalar(args.inductance, QuantityKind.Inductance)
+          const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent, QuantityKind.Current)
           if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
           if (mode === SwitchingMode.Discharge && args.initialCurrent === undefined) throw new Error('discharge mode requires initialCurrent')
           const points = calcRlTransientSeries(mode, sourceVoltage, initialCurrent, resistance, inductance, times)
@@ -211,8 +211,8 @@ export const circuitTools = [
         }
         case TransientKind.Rc: {
           if (args.capacitance === undefined) throw new Error('rc kind requires capacitance')
-          const capacitance = toScalar(args.capacitance, Unit.Capacitance)
-          const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage, Unit.Voltage)
+          const capacitance = toScalar(args.capacitance, QuantityKind.Capacitance)
+          const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage, QuantityKind.Voltage)
           if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
           if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined) throw new Error('discharge mode requires initialVoltage')
           const points = calcRcTransientSeries(mode, sourceVoltage, initialVoltage, resistance, capacitance, times)

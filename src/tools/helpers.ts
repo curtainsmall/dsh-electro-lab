@@ -4,16 +4,16 @@
  */
 import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec, type ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolRunContext } from '@deepseek-ai/dsh-tools'
-import type { Unit } from '../math/units.ts'
+import type { QuantityKind } from '../math/quantity-kind.ts'
 import { Form } from '../math/convert.ts'
 
 /**
  * The one parameter shape: a self-describing value, enum-union of three
  * mutually exclusive forms (rect | polar-degrees | polar-radians). The
- * expected unit is baked into each branch as an enum and the form into
+ * expected kind is baked into each branch as an enum and the form into
  * consts, so mismatches fail framework validation before execute runs.
  */
-export function createValueParam<const U extends Unit>(unit: U, description: string): {
+export function createValueParam<const U extends QuantityKind>(kind: U, description: string): {
   oneOf: [
     {
       type: 'object'
@@ -23,7 +23,7 @@ export function createValueParam<const U extends Unit>(unit: U, description: str
         form: { type: 'string'; const: Form.Rect; description: string; required: true }
         re: { type: 'number'; description: string; required: true }
         im: { type: 'number'; description: string; required: true }
-        unit: { type: 'string'; enum: [U]; description: string; required: true }
+        kind: { type: 'string'; enum: [U]; description: string; required: true }
       }
     },
     {
@@ -34,7 +34,7 @@ export function createValueParam<const U extends Unit>(unit: U, description: str
         form: { type: 'string'; const: Form.Polar; description: string; required: true }
         mag: { type: 'number'; description: string; required: true }
         angDeg: { type: 'number'; description: string; required: true }
-        unit: { type: 'string'; enum: [U]; description: string; required: true }
+        kind: { type: 'string'; enum: [U]; description: string; required: true }
       }
     },
     {
@@ -45,7 +45,7 @@ export function createValueParam<const U extends Unit>(unit: U, description: str
         form: { type: 'string'; const: Form.Polar; description: string; required: true }
         mag: { type: 'number'; description: string; required: true }
         angRad: { type: 'number'; description: string; required: true }
-        unit: { type: 'string'; enum: [U]; description: string; required: true }
+        kind: { type: 'string'; enum: [U]; description: string; required: true }
       }
     },
   ]
@@ -60,7 +60,7 @@ export function createValueParam<const U extends Unit>(unit: U, description: str
           form: { type: 'string', const: Form.Rect, description: 'rectangular form', required: true },
           re: { type: 'number', description: 'real part in base SI units', required: true },
           im: { type: 'number', description: 'imaginary part in base SI units (0 for real values)', required: true },
-          unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },
+          kind: { type: 'string', enum: [kind], description: `kind (fixed): ${kind}`, required: true },
         },
       },
       {
@@ -71,7 +71,7 @@ export function createValueParam<const U extends Unit>(unit: U, description: str
           form: { type: 'string', const: Form.Polar, description: 'polar form', required: true },
           mag: { type: 'number', description: 'mag in base SI units', required: true },
           angDeg: { type: 'number', description: 'phase angle in degrees', required: true },
-          unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },
+          kind: { type: 'string', enum: [kind], description: `kind (fixed): ${kind}`, required: true },
         },
       },
       {
@@ -82,7 +82,7 @@ export function createValueParam<const U extends Unit>(unit: U, description: str
           form: { type: 'string', const: Form.Polar, description: 'polar form', required: true },
           mag: { type: 'number', description: 'mag in base SI units', required: true },
           angRad: { type: 'number', description: 'phase angle in radians', required: true },
-          unit: { type: 'string', enum: [unit], description: `unit (fixed): ${unit}`, required: true },
+          kind: { type: 'string', enum: [kind], description: `kind (fixed): ${kind}`, required: true },
         },
       },
     ],

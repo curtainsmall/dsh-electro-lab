@@ -19,12 +19,12 @@ describe('resolveReferences', () => {
   })
 
   it('replaces "@stepN" with the stored output snapshot', () => {
-    const outputs: JsonValue[] = [{ re: 0.2, im: 0.4, unit: 'none' }]
+    const outputs: JsonValue[] = [{ re: 0.2, im: 0.4, kind: 'none' }]
     expect(resolveReferences('@step0', outputs)).toEqual(outputs[0])
   })
 
   it('resolves recursively inside objects and arrays', () => {
-    const outputs: JsonValue[] = [{ re: 50, im: 50, unit: 'resistance' }]
+    const outputs: JsonValue[] = [{ re: 50, im: 50, kind: 'resistance' }]
     const resolved = resolveReferences(
       {
         impedance: '@step0',
@@ -41,7 +41,7 @@ describe('resolveReferences', () => {
   })
 
   it('raises for out-of-range references', () => {
-    expect(() => resolveReferences('@step1', [{ re: 1, im: 0, unit: 'none' }])).toThrow(/beyond the last computed step/)
+    expect(() => resolveReferences('@step1', [{ re: 1, im: 0, kind: 'none' }])).toThrow(/beyond the last computed step/)
     expect(() => resolveReferences('@step5', [])).toThrow(/beyond the last computed step/)
   })
 
@@ -85,15 +85,15 @@ describe('createSolveStepsTool', () => {
 
   it('runs steps serially and returns stepResults with inputs and outputs', async () => {
     const { ctx, calls } = fakeCtx((input) => {
-      if (input.name === 'impedance_to_reflection') return { re: 0.2, im: 0.4, unit: 'none' }
-      if (input.name === 'reflection_to_vswr') return { re: 2.618, im: 0, unit: 'none' }
-      return { re: 6.99, im: 0, unit: 'log' }
+      if (input.name === 'impedance_to_reflection') return { re: 0.2, im: 0.4, kind: 'none' }
+      if (input.name === 'reflection_to_vswr') return { re: 2.618, im: 0, kind: 'none' }
+      return { re: 6.99, im: 0, kind: 'log' }
     })
     const tool = createSolveStepsTool(ctx as never)
     const result = await tool.execute(
       {
         steps: [
-          { tool: 'impedance_to_reflection', args: { impedance: { form: 'rect', re: 50, im: 50, unit: 'resistance' } } },
+          { tool: 'impedance_to_reflection', args: { impedance: { form: 'rect', re: 50, im: 50, kind: 'resistance' } } },
           { tool: 'reflection_to_vswr', args: { reflectionCoefficient: '@step0' } },
           { tool: 'return_loss', args: { reflectionCoefficient: '@step0' } },
         ],
@@ -103,14 +103,14 @@ describe('createSolveStepsTool', () => {
 
     expect(result).toEqual({
       stepResults: [
-        { tool: 'impedance_to_reflection', input: { impedance: { form: 'rect', re: 50, im: 50, unit: 'resistance' } }, output: { re: 0.2, im: 0.4, unit: 'none' } },
-        { tool: 'reflection_to_vswr', input: { reflectionCoefficient: '@step0' }, output: { re: 2.618, im: 0, unit: 'none' } },
-        { tool: 'return_loss', input: { reflectionCoefficient: '@step0' }, output: { re: 6.99, im: 0, unit: 'log' } },
+        { tool: 'impedance_to_reflection', input: { impedance: { form: 'rect', re: 50, im: 50, kind: 'resistance' } }, output: { re: 0.2, im: 0.4, kind: 'none' } },
+        { tool: 'reflection_to_vswr', input: { reflectionCoefficient: '@step0' }, output: { re: 2.618, im: 0, kind: 'none' } },
+        { tool: 'return_loss', input: { reflectionCoefficient: '@step0' }, output: { re: 6.99, im: 0, kind: 'log' } },
       ],
     })
     // @step0 was resolved before dispatch: the second call received the first output object
-    expect(calls[1]!.arguments).toEqual({ reflectionCoefficient: { re: 0.2, im: 0.4, unit: 'none' } })
-    expect(calls[2]!.arguments).toEqual({ reflectionCoefficient: { re: 0.2, im: 0.4, unit: 'none' } })
+    expect(calls[1]!.arguments).toEqual({ reflectionCoefficient: { re: 0.2, im: 0.4, kind: 'none' } })
+    expect(calls[2]!.arguments).toEqual({ reflectionCoefficient: { re: 0.2, im: 0.4, kind: 'none' } })
     expect(calls).toHaveLength(3)
   })
 
