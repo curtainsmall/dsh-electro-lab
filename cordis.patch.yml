@@ -1,0 +1,13 @@
+# dsh-electro-lab bundle patch
+#
+# This file is the `dsh.bundle.patch` layer of the published npm package:
+# when the plugin is installed through the official CLI —
+#
+#   dsh plugin --profile <name> add dsh-electro-lab@<version>
+#
+# — the command reconciles `dsh.profile.bundles` against installed packages
+# and appends `dsh-electro-lab` to the bundle stack. The profile boot then
+# merges THIS patch (a single `insert` of the plugin row).
+- insert:
+    - id: electro-lab
+      name: 'dsh-electro-lab'

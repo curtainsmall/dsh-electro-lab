@@ -1,0 +1,259 @@
+/**
+ * Smith-chart mathematics. SI base units; plain complex.js values.
+ *
+ * Declaration order: enums, then types and pure mappings, then public
+ * functions grouped by concept (reflection trio, transformer, matching).
+ */
+import { Complex } from 'complex.js'
+
+// ── Enums ────────────────────────────────────────────────────────────────
+
+/** Which side of a match the network element sits on. */
+export enum MatchSide {
+  Source = 'source',
+  Load = 'load',
+}
+
+/** Matching topology. */
+export enum MatchTopology {
+  L = 'l',
+  Pi = 'pi',
+  T = 't',
+}
+
+/** Role of one element inside a matching network. */
+export enum ElementRole {
+  ShuntSource = 'shunt-source',
+  Series = 'series',
+  ShuntLoad = 'shunt-load',
+  SeriesSource = 'series-source',
+  SeriesLoad = 'series-load',
+}
+
+/** Which conjugate solution a matching design represents. */
+export enum MatchVariant {
+  LowPass = 'low-pass',
+  HighPass = 'high-pass',
+}
+
+// ── Types and pure mappings ──────────────────────────────────────────────
+
+/** One signed reactance in a matching network (positive = inductive). */
+export interface MatchElement {
+  role: ElementRole
+  reactance: number
+}
+
+/** Pure mappings: match side → element role (used by designLNetworkMatch). */
+const SHUNT_ROLE: Record<MatchSide, ElementRole.ShuntSource | ElementRole.ShuntLoad> = {
+  [MatchSide.Source]: ElementRole.ShuntSource,
+  [MatchSide.Load]: ElementRole.ShuntLoad,
+}
+
+const SERIES_ROLE: Record<MatchSide, ElementRole.SeriesSource | ElementRole.SeriesLoad> = {
+  [MatchSide.Source]: ElementRole.SeriesSource,
+  [MatchSide.Load]: ElementRole.SeriesLoad,
+}
+
+// ── Reflection trio ──────────────────────────────────────────────────────
+
+/** Reflection coefficient: Γ = (Z − Z0) / (Z + Z0). */
+export function convertImpedanceToReflection(impedance: Complex, referenceImpedance: number): Complex {
+  if (!Number.isFinite(referenceImpedance) || referenceImpedance <= 0) throw new Error('reference impedance must be a positive number (Ω)')
+  return impedance.sub(referenceImpedance).div(impedance.add(referenceImpedance))
+}
+
+/** VSWR = (1 + |Γ|) / (1 − |Γ|); |Γ| = 1 (open/short) yields Infinity. */
+export function convertReflectionToVswr(reflectionCoefficient: Complex): number {
+  const magnitude = reflectionCoefficient.abs()
+  if (magnitude === 1) return Number.POSITIVE_INFINITY
+  if (magnitude > 1) throw new Error(`|Γ| = ${magnitude} > 1 — passive load reflection cannot exceed unity`)
+  return (1 + magnitude) / (1 - magnitude)
+}
+
+/** Return loss in dB: −20·log10(|Γ|). |Γ| = 0 yields +Infinity (no reflection). */
+export function calcReturnLossDb(reflectionCoefficient: Complex): number {
+  const magnitude = reflectionCoefficient.abs()
+  if (magnitude === 0) return Number.POSITIVE_INFINITY
+  return -20 * Math.log10(magnitude)
+}
+
+// ── Transformer ──────────────────────────────────────────────────────────
+
+/** Quarter-wave transformer: Z1 = √(Z0·ZL). ZL must be real and positive. */
+export function calcQuarterWaveImpedance(lineImpedance: number, loadImpedance: number): number {
+  if (lineImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
+  return Math.sqrt(lineImpedance * loadImpedance)
+}
+
+// ── Reactance ↔ element values ───────────────────────────────────────────
+
+/** Inductance (H) for a positive reactance at ω; undefined for a negative one. */
+export function calcInductanceFromReactance(reactance: number, angularFrequency: number): number | undefined {
+  return reactance > 0 ? reactance / angularFrequency : undefined
+}
+
+/** Capacitance (F) for a negative reactance at ω; undefined for a positive one. */
+export function calcCapacitanceFromReactance(reactance: number, angularFrequency: number): number | undefined {
+  return reactance < 0 ? -1 / (angularFrequency * reactance) : undefined
+}
+
+// ── Matching networks ────────────────────────────────────────────────────
+
+/**
+ * L-network matching between two real resistances.
+ * Q = √(Rl/Rs − 1); series element (X = Q·Rs) sits next to the SMALLER, shunt element (X = Rl/Q) next to the LARGER one.
+ * Two conjugate solutions (low-pass / high-pass variants) are returned as ordered element lists.
+ */
+function designLNetworkMatch(sourceImpedance: number, loadImpedance: number, frequency: number): {
+  matched: boolean
+  qualityFactor?: number
+  seriesSide: MatchSide
+  shuntSide: MatchSide
+  solutions?: Record<MatchVariant, MatchElement[]>
+} {
+  if (sourceImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
+  if (frequency <= 0) throw new Error('frequency must be positive (Hz)')
+  if (sourceImpedance === loadImpedance) return { matched: true, seriesSide: MatchSide.Source, shuntSide: MatchSide.Load }
+  const smaller = Math.min(sourceImpedance, loadImpedance)
+  const larger = Math.max(sourceImpedance, loadImpedance)
+  const seriesSide = sourceImpedance < loadImpedance ? MatchSide.Source : MatchSide.Load
+  const shuntSide = sourceImpedance < loadImpedance ? MatchSide.Load : MatchSide.Source
+  const qualityFactor = Math.sqrt(larger / smaller - 1)
+  const seriesReactance = qualityFactor * smaller
+  const shuntReactance = larger / qualityFactor
+  const seriesRole = SERIES_ROLE[seriesSide]
+  const shuntRole = SHUNT_ROLE[shuntSide]
+  return {
+    matched: false,
+    qualityFactor,
+    seriesSide,
+    shuntSide,
+    solutions: {
+      [MatchVariant.LowPass]: [
+        { role: seriesRole, reactance: seriesReactance },
+        { role: shuntRole, reactance: -shuntReactance },
+      ],
+      [MatchVariant.HighPass]: [
+        { role: seriesRole, reactance: -seriesReactance },
+        { role: shuntRole, reactance: shuntReactance },
+      ],
+    },
+  }
+}
+
+/**
+ * Design a pi network matching two real resistances with a specified Q.
+ * Formulas (Bowick): with Rs < Rl and Q > QL = √(Rl/Rs − 1):
+ *   Rint = Rs/(1+Q²); Xp1 = Rs/Q; Q2 = √(Rl/Rint − 1);
+ *   Xp2 = Rl/Q2; Xs = Rint·(Q + Q2).
+ */
+function designPiNetworkMatch(sourceImpedance: number, loadImpedance: number, qualityFactor: number): Record<MatchVariant, MatchElement[]> {
+  const [small, large, flipped] = sourceImpedance <= loadImpedance
+    ? [sourceImpedance, loadImpedance, false]
+    : [loadImpedance, sourceImpedance, true]
+  const minimumQ = Math.sqrt(large / small - 1)
+  if (qualityFactor <= minimumQ) {
+    throw new Error(`pi network: qualityFactor ${qualityFactor} must exceed the L-network minimum ${minimumQ.toFixed(3)}`)
+  }
+  const q = qualityFactor
+  const rint = small / (1 + q * q)
+  const q2 = Math.sqrt(large / rint - 1)
+  const xp1 = small / q
+  const xp2 = large / q2
+  const xs = rint * (q + q2)
+  const shuntSource = flipped ? ElementRole.ShuntLoad : ElementRole.ShuntSource
+  const shuntLoad = flipped ? ElementRole.ShuntSource : ElementRole.ShuntLoad
+  return {
+    [MatchVariant.LowPass]: [
+      { role: shuntSource, reactance: -xp1 },
+      { role: ElementRole.Series, reactance: xs },
+      { role: shuntLoad, reactance: -xp2 },
+    ],
+    [MatchVariant.HighPass]: [
+      { role: shuntSource, reactance: xp1 },
+      { role: ElementRole.Series, reactance: -xs },
+      { role: shuntLoad, reactance: xp2 },
+    ],
+  }
+}
+
+/**
+ * Design a T network matching two real resistances with a specified Q.
+ *
+ * A T network is two back-to-back L networks sharing an intermediate
+ * resistance Rp (Rs → Rp step-up, then Rp → Rl step-down). The two shunt
+ * elements sit at the same junction and merge into one:
+ *   Q1 = √(Rp/Rs − 1), Q2 = √(Rp/Rl − 1), Q = Q1 + Q2
+ * Rp is solved implicitly from the specified Q (bisection), then:
+ *   Xs1 = Q1·Rs; Xs2 = Q2·Rl; Xp = Rp/Q.
+ */
+function designTNetworkMatch(sourceImpedance: number, loadImpedance: number, qualityFactor: number): Record<MatchVariant, MatchElement[]> {
+  const [small, large, flipped] = sourceImpedance <= loadImpedance
+    ? [sourceImpedance, loadImpedance, false]
+    : [loadImpedance, sourceImpedance, true]
+  const minimumQ = Math.sqrt(large / small - 1)
+  if (qualityFactor <= minimumQ) {
+    throw new Error(`t network: qualityFactor ${qualityFactor} must exceed the L-network minimum ${minimumQ.toFixed(3)}`)
+  }
+  // Solve √(Rp/small − 1) + √(Rp/large − 1) = qualityFactor for Rp.
+  const target = (rp: number) => Math.sqrt(rp / small - 1) + Math.sqrt(rp / large - 1) - qualityFactor
+  let lower = large
+  let upper = large
+  while (target(upper) < 0) upper *= 2
+  for (let i = 0; i < 80; i++) {
+    const mid = (lower + upper) / 2
+    if (target(mid) < 0) lower = mid
+    else upper = mid
+  }
+  const rp = (lower + upper) / 2
+  const q1 = Math.sqrt(rp / small - 1)
+  const q2 = Math.sqrt(rp / large - 1)
+  const xs1 = q1 * small
+  const xs2 = q2 * large
+  const xp = rp / qualityFactor
+  const seriesSource = flipped ? ElementRole.SeriesLoad : ElementRole.SeriesSource
+  const seriesLoad = flipped ? ElementRole.SeriesSource : ElementRole.SeriesLoad
+  return {
+    [MatchVariant.LowPass]: [
+      { role: seriesSource, reactance: xs1 },
+      { role: ElementRole.ShuntSource, reactance: -xp },
+      { role: seriesLoad, reactance: xs2 },
+    ],
+    [MatchVariant.HighPass]: [
+      { role: seriesSource, reactance: -xs1 },
+      { role: ElementRole.ShuntSource, reactance: xp },
+      { role: seriesLoad, reactance: -xs2 },
+    ],
+  }
+}
+
+/** Design any supported matching topology; 'l' uses the implied Q, 'pi'/'t' need a specified Q. */
+export function designMatch(
+  topology: MatchTopology,
+  sourceImpedance: number,
+  loadImpedance: number,
+  frequency: number,
+  qualityFactor?: number,
+): { topology: MatchTopology; qualityFactor: number; solutions: Record<MatchVariant, MatchElement[]> } {
+  if (sourceImpedance <= 0 || loadImpedance <= 0) throw new Error('impedances must be positive (Ω)')
+  if (frequency <= 0) throw new Error('frequency must be positive (Hz)')
+  if (sourceImpedance === loadImpedance) {
+    throw new Error('source and load are already equal — no network needed')
+  }
+  switch (topology) {
+    case MatchTopology.Pi: {
+      if (qualityFactor === undefined) throw new Error('pi network requires a qualityFactor')
+      return { topology, qualityFactor, solutions: designPiNetworkMatch(sourceImpedance, loadImpedance, qualityFactor) }
+    }
+    case MatchTopology.T: {
+      if (qualityFactor === undefined) throw new Error('t network requires a qualityFactor')
+      return { topology, qualityFactor, solutions: designTNetworkMatch(sourceImpedance, loadImpedance, qualityFactor) }
+    }
+    case MatchTopology.L: {
+      const result = designLNetworkMatch(sourceImpedance, loadImpedance, frequency)
+      if (result.matched) throw new Error('source and load are already equal — no network needed')
+      return { topology, qualityFactor: result.qualityFactor!, solutions: result.solutions! }
+    }
+  }
+}

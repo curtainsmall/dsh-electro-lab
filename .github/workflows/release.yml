@@ -1,0 +1,117 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write # npm trusted publishing (OIDC) — unused when falling back to token
+
+jobs:
+  # ── Guard: a release tag must be on main and self-consistent. ──
+  # A v* tag on develop/feature (accidental trigger), or one whose version
+  # disagrees with package.json or the latest CHANGELOG.md entry, fails fast
+  # here and nothing downstream ever runs.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      on_main: ${{ steps.check.outputs.on_main }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so ancestry can be verified
+      - name: Verify tag is on main
+        id: check
+        run: |
+          if git merge-base --is-ancestor HEAD origin/main; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+            echo "✓ tag $GITHUB_REF_NAME ($(git rev-parse --short HEAD)) is reachable from main"
+          else
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+            echo "::error::tag $GITHUB_REF_NAME is NOT on main — release aborted (accidental tag?)"
+            exit 1
+          fi
+      # Single normalization point: GITHUB_REF_NAME "v0.1.0" → "0.1.0".
+      # Consumed by every version check below — package.json and changelog
+      # entries carry no v prefix.
+      - name: Strip tag prefix
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Verify tag matches package.json and dsh.plugin.json versions
+        run: |
+          pkg="$(node -p "require('./package.json').version")"
+          manifest="$(node -p "require('./dsh.plugin.json').version")"
+          if [ "$pkg" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version v$pkg — bump package.json first"
+            exit 1
+          fi
+          if [ "$manifest" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match dsh.plugin.json version v$manifest — bump the manifest first"
+            exit 1
+          fi
+          echo "✓ tag $GITHUB_REF_NAME matches package.json and dsh.plugin.json versions"
+      - name: Verify changelog entry exists for the tag
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          version: ${{ steps.ver.outputs.version }}
+          path: ./CHANGELOG.md
+      - name: Verify tag matches the latest changelog entry
+        run: |
+          latest="$(awk '/^## \[[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\]/{ v=$0; sub(/^## \[/, "", v); sub(/\].*$/, "", v); print v; exit }' CHANGELOG.md)"
+          if [ -z "$latest" ]; then
+            echo "::error::no versioned entry (## [x.y.z]) found in CHANGELOG.md — add one before releasing"
+            exit 1
+          fi
+          if [ "$latest" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the latest CHANGELOG.md entry v$latest — the newest entry must describe this release"
+            exit 1
+          fi
+          echo "✓ tag $GITHUB_REF_NAME matches the latest CHANGELOG.md entry"
+
+  # ── Publish: npm release. Runs only after the guard passes. ──
+  # Tag/main/version consistency is enforced by the guard job; here we only
+  # build and test (mirroring ci.yml) and publish — prepublishOnly runs the
+  # build (tsc declarations + tsdown bundles) before the package is packed.
+  # OIDC trusted publishing is the default (the npmjs.com publisher must be
+  # authorized for this repository + workflow); if the OIDC exchange fails —
+  # e.g. the publisher is not configured yet — the step falls back to the
+  # NPM_TOKEN secret. An already-published version is skipped (safe tag
+  # replay), and prerelease versions publish under the `beta` dist-tag.
+  publish:
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # matches ci.yml (pnpm 11 requires Node >= 22.13)
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Publish to npm (OIDC, token fallback)
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          TAG=latest
+          [[ "$VER" == *-* ]] && TAG=beta
+          if npm view "dsh-electro-lab@$VER" version >/dev/null 2>&1; then
+            echo "dsh-electro-lab@$VER already published — skipping (tag replay)"
+          elif pnpm publish --no-git-checks --access public --provenance --tag "$TAG"; then
+            echo "published dsh-electro-lab@$VER via OIDC trusted publishing"
+          else
+            echo "::warning::OIDC publish failed — falling back to NPM_TOKEN"
+            if npm view "dsh-electro-lab@$VER" version >/dev/null 2>&1; then
+              echo "dsh-electro-lab@$VER was actually published — skipping fallback"
+            elif [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+              echo "::error::OIDC publish failed and NODE_AUTH_TOKEN is not set — cannot fall back"
+              exit 1
+            else
+              pnpm publish --no-git-checks --access public --tag "$TAG"
+            fi
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
