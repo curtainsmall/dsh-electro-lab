@@ -1,80 +1,59 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
 import {
-  OpampConfiguration,
+  calcDifferentiatorOpamp,
+  calcDifferenceOpamp,
+  calcIntegratorOpamp,
+  calcInvertingOpamp,
   calcLedResistor,
-  calcOpamp,
+  calcNonInvertingOpamp,
+  calcSummingOpamp,
   calcTimeConstant,
   calcVoltageDivider,
+  calcVoltageFollowerOpamp,
 } from '../../src/math/electronics.ts'
 
 describe('op-amp configurations (known-value checks)', () => {
   it('inverting: gain = −Rf/Rin', () => {
-    const result = calcOpamp(OpampConfiguration.Inverting, { feedbackResistance: 10e3, inputResistance: 1e3, inputVoltage: 0.5 })
-    expect(result.gain!.re).toBeCloseTo(-10, 10)
-    expect(result.outputVoltage!.re).toBeCloseTo(-5, 10)
+    const { gain, outputVoltage } = calcInvertingOpamp(0.5, 10e3, 1e3)
+    expect(gain.re).toBeCloseTo(-10, 10)
+    expect(outputVoltage.re).toBeCloseTo(-5, 10)
   })
 
   it('non-inverting: gain = 1 + Rf/Rin', () => {
-    const result = calcOpamp(OpampConfiguration.NonInverting, { feedbackResistance: 9e3, inputResistance: 1e3, inputVoltage: 0.5 })
-    expect(result.gain!.re).toBeCloseTo(10, 10)
-    expect(result.outputVoltage!.re).toBeCloseTo(5, 10)
+    const { gain, outputVoltage } = calcNonInvertingOpamp(0.5, 9e3, 1e3)
+    expect(gain.re).toBeCloseTo(10, 10)
+    expect(outputVoltage.re).toBeCloseTo(5, 10)
   })
 
   it('voltage follower: gain 1', () => {
-    const result = calcOpamp(OpampConfiguration.VoltageFollower, { inputVoltage: 3.3 })
-    expect(result.gain!.re).toBeCloseTo(1, 10)
-    expect(result.outputVoltage!.re).toBeCloseTo(3.3, 10)
+    const { gain, outputVoltage } = calcVoltageFollowerOpamp(3.3)
+    expect(gain.re).toBeCloseTo(1, 10)
+    expect(outputVoltage.re).toBeCloseTo(3.3, 10)
   })
 
   it('summing: Vout = −Rf(V₁/R₁ + V₂/R₂)', () => {
-    const result = calcOpamp(OpampConfiguration.Summing, {
-      feedbackResistance: 10e3,
-      inputResistance: 10e3,
-      secondInputResistance: 5e3,
-      inputVoltage: 1,
-      secondInputVoltage: 2,
-    })
-    expect(result.outputVoltage!.re).toBeCloseTo(-10e3 * (1 / 10e3 + 2 / 5e3), 8) // −5 V
+    const { outputVoltage } = calcSummingOpamp(1, 2, 10e3, 10e3, 5e3)
+    expect(outputVoltage.re).toBeCloseTo(-10e3 * (1 / 10e3 + 2 / 5e3), 8) // −5 V
   })
 
   it('difference: Vout = (Rf/R1)(V₂−V₁)', () => {
-    const result = calcOpamp(OpampConfiguration.Difference, {
-      feedbackResistance: 10e3,
-      inputResistance: 10e3,
-      inputVoltage: 1,
-      secondInputVoltage: 3,
-    })
-    expect(result.gain!.re).toBeCloseTo(1, 10)
-    expect(result.outputVoltage!.re).toBeCloseTo(2, 10)
+    const { gain, outputVoltage } = calcDifferenceOpamp(1, 3, 10e3, 10e3)
+    expect(gain.re).toBeCloseTo(1, 10)
+    expect(outputVoltage.re).toBeCloseTo(2, 10)
   })
 
-  it('integrator: H(jω) = −1/(jωRC) → magnitude 1/(ωRC), phase −90°', () => {
+  it('integrator: H(jω) = −1/(jωRC) → magnitude 1/(ωRC), phase +90°', () => {
     // R = 10 kΩ, C = 1 nF, f = 15.9 kHz → ωRC = 1
-    const result = calcOpamp(OpampConfiguration.Integrator, {
-      inputResistance: 10e3,
-      capacitance: 1e-9,
-      frequency: 15915.5,
-      inputVoltage: 1,
-    })
-    expect(result.gain!.abs()).toBeCloseTo(1, 1)
-    expect(result.gain!.arg()).toBeCloseTo(Math.PI / 2, 4) // 1/(−j) = +j → +90°
+    const { gain } = calcIntegratorOpamp(1, 10e3, 1e-9, 15915.5)
+    expect(gain.abs()).toBeCloseTo(1, 1)
+    expect(gain.arg()).toBeCloseTo(Math.PI / 2, 4) // 1/(−j) = +j → +90°
   })
 
   it('differentiator: H(jω) = −jωRC → phase −90°', () => {
-    const result = calcOpamp(OpampConfiguration.Differentiator, {
-      feedbackResistance: 10e3,
-      capacitance: 1e-9,
-      frequency: 15915.5,
-      inputVoltage: 1,
-    })
-    expect(result.gain!.abs()).toBeCloseTo(1, 1)
-    expect(result.gain!.arg()).toBeCloseTo(-Math.PI / 2, 4)
-  })
-
-  it('rejects missing parameters per configuration', () => {
-    expect(() => calcOpamp(OpampConfiguration.Inverting, { inputVoltage: 1 })).toThrow(/inverting configuration/)
-    expect(() => calcOpamp(OpampConfiguration.Summing, { inputVoltage: 1 })).toThrow(/summing/)
+    const { gain } = calcDifferentiatorOpamp(1, 10e3, 1e-9, 15915.5)
+    expect(gain.abs()).toBeCloseTo(1, 1)
+    expect(gain.arg()).toBeCloseTo(-Math.PI / 2, 4)
   })
 })
 
