@@ -2,6 +2,7 @@
  * Concept-level circuit tools: primitives (element/series/parallel/circuit
  * impedance) plus scalar concepts. IO is JSON-and-complex-only.
  */
+import { Complex } from 'complex.js'
 import {
   CircuitMode,
   ElementKind,
@@ -23,35 +24,32 @@ import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const circuitTools = [
   defineJsonTool({
-    name: 'series_impedance',
-    description: 'Total impedance of impedances in series: Z = Σ Zi. Pass each impedance as a complex value object; earlier step outputs may be referenced with @stepN in solve_steps.',
+    name: 'equivalent_impedance',
+    description: 'Total impedance of a set of impedances combined in series (Z = Σ Zi) or in parallel (1/Z = Σ 1/Zi). Pass each impedance as a complex value object; earlier step outputs may be referenced with @stepN in solve_steps.',
     parameters: {
+      topology: { type: 'string', enum: [CircuitMode.Series, CircuitMode.Parallel], description: 'how to combine the impedances', required: true },
       impedances: {
         type: 'array',
-        description: 'impedances to combine in series',
+        description: 'impedances to combine',
         required: true,
         items: createValueParam(QuantityKind.Resistance, 'impedance'),
       },
     },
     execute: (args) => {
       const parts = args.impedances.map((item) => toComplex(item, QuantityKind.Resistance))
-      return serializeComplex(combineSeriesImpedances(parts), QuantityKind.Resistance)
-    },
-  }),
-  defineJsonTool({
-    name: 'parallel_impedance',
-    description: 'Total impedance of impedances in parallel: 1/Z = Σ 1/Zi. Pass each impedance as a complex value object.',
-    parameters: {
-      impedances: {
-        type: 'array',
-        description: 'impedances to combine in parallel',
-        required: true,
-        items: createValueParam(QuantityKind.Resistance, 'impedance'),
-      },
-    },
-    execute: (args) => {
-      const parts = args.impedances.map((item) => toComplex(item, QuantityKind.Resistance))
-      return serializeComplex(combineParallelImpedances(parts), QuantityKind.Resistance)
+      let total: Complex
+      switch (args.topology) {
+        case CircuitMode.Series:
+          total = combineSeriesImpedances(parts)
+          break
+        case CircuitMode.Parallel:
+          total = combineParallelImpedances(parts)
+          break
+        default:
+          // unreachable: the framework schema restricts topology to series/parallel
+          throw new Error(`unknown topology "${args.topology}"`)
+      }
+      return serializeComplex(total, QuantityKind.Resistance)
     },
   }),
   defineJsonTool({
@@ -202,12 +200,16 @@ export function validateNetwork(input: unknown): NetworkElement {
     }
     return { kind, value }
   }
-  if (node['topology'] === CircuitMode.Series || node['topology'] === CircuitMode.Parallel) {
-    const elements = node['elements']
-    if (!Array.isArray(elements) || elements.length === 0) {
-      throw new Error('a group needs a non-empty elements array')
+  switch (node['topology']) {
+    case CircuitMode.Series:
+    case CircuitMode.Parallel: {
+      const elements = node['elements']
+      if (!Array.isArray(elements) || elements.length === 0) {
+        throw new Error('a group needs a non-empty elements array')
+      }
+      return { topology: node['topology'] as CircuitMode, elements: elements.map((child) => validateNetwork(child)) }
     }
-    return { topology: node['topology'] as CircuitMode, elements: elements.map((child) => validateNetwork(child)) }
+    default:
+      throw new Error('network node must be {"kind": ...} or {"topology": ..., "elements": [...]}')
   }
-  throw new Error('network node must be {"kind": ...} or {"topology": ..., "elements": [...]}')
 }

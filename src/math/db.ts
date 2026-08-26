@@ -84,12 +84,29 @@ export function convertDecibelRatio(
     throw new Error('provide exactly one of ratio or db')
   }
   if (db !== undefined) {
-    if (kind === RatioKind.Power) return { db, ratio: 10 ** (db / 10) }
-    return { db, ratio: 10 ** (db / 20) }
+    let ratio: number
+    switch (kind) {
+      case RatioKind.Power:
+        ratio = 10 ** (db / 10)
+        break
+      case RatioKind.Voltage:
+        ratio = 10 ** (db / 20)
+        break
+    }
+    return { db, ratio }
   }
   const value = ratio!
   if (value <= 0) throw new Error('ratio must be positive')
-  return { ratio: value, db: kind === RatioKind.Power ? 10 * Math.log10(value) : 20 * Math.log10(value) }
+  let dbValue: number
+  switch (kind) {
+    case RatioKind.Power:
+      dbValue = 10 * Math.log10(value)
+      break
+    case RatioKind.Voltage:
+      dbValue = 20 * Math.log10(value)
+      break
+  }
+  return { ratio: value, db: dbValue }
 }
 
 /** Magnitude to decibels: 20·log₁₀(magnitude); zero maps to −Infinity. */
