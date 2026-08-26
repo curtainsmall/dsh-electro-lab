@@ -5,12 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-beta.1] - 2026-08-26
-
-### Added
-
-- First public beta of the ElectroLab workbench: the complete feature set listed under [0.1.0] below, published to npm under the `beta` dist-tag.
-
 ## [0.1.0] - 2026-08-26
 
 ### Added
@@ -24,8 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Noise and dB tools: thermal noise, Friis cascade noise figure, quantization SNR, dB level conversions (dBm/dBu/dBµV/dBW) and power/voltage ratio conversions.
 - `solve_steps` multi-step solver with `@stepN` result references and nested field paths.
 - Client UI: workbench panel and interactive Smith chart.
-- Packaged skills and preset: `electro-lab-template` (mandatory five-part answer template) and `electro-lab-interface` (toolset interface); the preset persona gates every request before any tool call — missing conditions stop with no tool call, textbook defaults are never assumed.
-- CI: typecheck/test/build on pull requests and `develop` pushes; release workflow that verifies a `v*` tag sits on `main` and matches `package.json` version, then publishes to npm.
+- Packaged skills and preset: `electro-lab-template` (mandatory five-part answer template) and `electro-lab-interface` (toolset interface); the preset persona gates every request before any tool call — missing conditions stop with no tool call.
+- CI: typecheck/test/build on pull requests and `develop` pushes; release workflow guards that a `v*` tag is on `main` and consistent across `package.json`, `dsh.plugin.json` and the latest `CHANGELOG.md` entry, publishes to npm (OIDC trusted publishing with `NPM_TOKEN` fallback; prereleases on the `beta` dist-tag) and creates a GitHub Release.
+- Documentation: dual-language README and contributing guide (en-US + zh-CN).
+
+### Changed
+
+- Stable release of the 0.1.0 series; no user-facing changes since 0.1.0-beta.1.
+
+## [0.1.0-beta.1] - 2026-08-26
+
+### Added
+
+- First public beta of the ElectroLab workbench: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
 [0.1.0-beta.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.1.0-beta.1
 [0.1.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.1.0
