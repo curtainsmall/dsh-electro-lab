@@ -148,15 +148,16 @@ export function calcResonance(
   };
 }
 
-/** AC power from RMS values: S = V·I, P = S·cosφ, Q = S·sinφ, pf = cosφ. */
+/** AC power from RMS values: S = V·I, P = S·cosφ, Q = S·sinφ, pf = cosφ.
+ *  The phase angle is in radians (SI). */
 export function calcAcPower(
   rmsVoltage: number,
   rmsCurrent: number,
-  phaseAngleDegree = 0,
+  phaseAngle = 0,
 ): { apparent: number; real: number; reactive: number; powerFactor: number } {
   if (rmsVoltage < 0 || rmsCurrent < 0)
     throw new Error("RMS values must be non-negative");
-  const phi = (phaseAngleDegree * Math.PI) / 180;
+  const phi = phaseAngle;
   const apparent = rmsVoltage * rmsCurrent;
   return {
     apparent,

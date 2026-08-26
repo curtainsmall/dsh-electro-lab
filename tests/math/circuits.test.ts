@@ -27,7 +27,7 @@ describe('calcResonance', () => {
 
 describe('AC Power', () => {
   it('computes S, P, Q, and Power factor (known-value check)', () => {
-    const { apparent, real, reactive, powerFactor } = calcAcPower(100, 2, 30)
+    const { apparent, real, reactive, powerFactor } = calcAcPower(100, 2, Math.PI / 6) // 30° in radians
     expect(apparent).toBeCloseTo(200, 12)
     expect(real).toBeCloseTo(173.205, 3)
     expect(reactive).toBeCloseTo(100, 6)

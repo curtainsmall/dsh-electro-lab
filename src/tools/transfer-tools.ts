@@ -124,7 +124,7 @@ export const transferTools = [
   }),
   defineJsonTool({
     name: 'bode_response',
-    description: 'Bode plot of a transfer function in ratio form: magnitude in dB and phase in degrees on a logarithmic frequency grid (pointsPerDecade, default 10). Composes the grid, the frequency points and the response in one call. variable "z" requires sampleTime.',
+    description: 'Bode plot of a transfer function in ratio form: magnitude in dB and phase in radians on a logarithmic frequency grid (pointsPerDecade, default 10). Composes the grid, the frequency points and the response in one call. variable "z" requires sampleTime.',
     parameters: {
       numerator: { ...createCoeffArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
       denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
@@ -148,7 +148,7 @@ export const transferTools = [
         points: result.frequencies.map((frequency, index) => ({
           frequency: serializeReal(frequency, QuantityKind.Frequency),
           magnitudeDb: serializeReal(result.magnitudesDb[index]!, QuantityKind.Log),
-          phaseDeg: serializeReal(result.phasesDeg[index]!, QuantityKind.Angle),
+          phase: serializeReal((result.phasesDeg[index]! * Math.PI) / 180, QuantityKind.Angle),
         })),
       }
     },

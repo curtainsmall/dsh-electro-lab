@@ -55,7 +55,7 @@ export const smithTools = [
     execute: (args) => {
       const reflectionCoefficient = toComplex(args.reflectionCoefficient, QuantityKind.None)
       const db = calcReturnLossDb(reflectionCoefficient)
-      return { calcReturnLossDb: serializeReal(db, QuantityKind.Log), infinite: db === Number.POSITIVE_INFINITY }
+      return { returnLossDb: serializeReal(db, QuantityKind.Log), infinite: db === Number.POSITIVE_INFINITY }
     },
   }),
   defineJsonTool({

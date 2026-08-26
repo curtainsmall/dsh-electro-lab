@@ -12,6 +12,7 @@
 - **Circuit tools** — nested-network impedance, L/π/T matching networks, Butterworth filter design, RC/RL transients, resonance.
 - **Electronics tools** — op-amp configurations, voltage dividers, LED resistors, time constants, transmission-line primitives (coaxial, quarter-wave transformer, rise time/bandwidth), reflection coefficient/VSWR/return loss.
 - **Noise & dB** — thermal noise, Friis cascade, quantization SNR, dB level and ratio conversions.
+- **Unit conversion** — common non-SI units (°C/°F, bar/psi/atm, cal/kWh, hp, inch/mile, lb/oz) to their SI base quantities.
 - **`solve_steps`** — multi-step solver chaining tool results with `@stepN` references.
 - **Client UI** — workbench panel and interactive Smith chart.
 - **Packaged agent preset & skills** — the `electro-lab` preset gates every request before any tool call; skills `electro-lab-template` and `electro-lab-interface` ship with the plugin.

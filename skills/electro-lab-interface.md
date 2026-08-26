@@ -10,7 +10,7 @@ The operational details of the electro-lab toolset. This skill is template-indep
 
 ## Value format
 
-Values are complex value objects in SI base units: rectangular `{"form": "rect", "re": …, "im": 0, "kind": "frequency"}` or polar `{"form": "polar", "mag": …, "angDeg": …, "kind": "frequency"}` (or `angRad`). `kind` is the quantity category (`frequency`, `resistance`, `capacitance`, `inductance`, `voltage`, `current`, `power`, `time`, `none`, `angle`, `log`).
+Values are complex value objects in SI base units: rectangular `{"form": "rect", "re": …, "im": 0, "kind": "frequency"}` or polar `{"form": "polar", "mag": …, "angRad": …, "kind": "frequency"}`. Angles are always radians (SI). `kind` is the quantity category (`frequency`, `resistance`, `capacitance`, `inductance`, `voltage`, `current`, `power`, `time`, `none`, `angle`, `log`).
 
 ## Tool-call discipline
 
