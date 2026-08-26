@@ -11,7 +11,7 @@ import {
   calcTransferResponse,
 } from '../../src/math/transfer.ts'
 
-describe('calcTransferResponse (textbook checks)', () => {
+describe('calcTransferResponse (known-value checks)', () => {
   it('RC low-pass: |H| = 1/√2 and −45° at the cutoff frequency', () => {
     // H(s) = 1/(1 + s·RC), RC = 1 → denominator [1, 1]
     const cutoff = 1 / (2 * Math.PI) // ω = 1 rad/s
@@ -28,7 +28,7 @@ describe('calcTransferResponse (textbook checks)', () => {
   })
 })
 
-describe('expandPartialFraction (textbook checks)', () => {
+describe('expandPartialFraction (known-value checks)', () => {
   it('distinct real poles: 1/((s+1)(s+2)) = 1/(s+1) − 1/(s+2)', () => {
     const result = expandPartialFraction([new Complex(1, 0)], [new Complex(1, 0), new Complex(3, 0), new Complex(2, 0)])
     expect(result.polynomial).toEqual([])
@@ -66,7 +66,7 @@ describe('expandPartialFraction (textbook checks)', () => {
   })
 })
 
-describe('calcStepResponse (textbook checks)', () => {
+describe('calcStepResponse (known-value checks)', () => {
   it('first-order system: y(t) = 1 − e^(−t/τ) with τ = 1', () => {
     const values = calcStepResponse([new Complex(1, 0)], [new Complex(1, 0), new Complex(1, 0)], [0, 1, 2, 3])
     expect(values[0]!.re).toBeCloseTo(0, 6)
@@ -92,7 +92,7 @@ describe('calcStepResponse (textbook checks)', () => {
   })
 })
 
-describe('solveDifferenceEquation (textbook checks)', () => {
+describe('solveDifferenceEquation (known-value checks)', () => {
   it('first-order low-pass: impulse response 0.5·0.5ⁿ', () => {
     // y[n] = 0.5·x[n] + 0.5·y[n−1] → a = [1, −0.5], b = [0.5]
     const a = [new Complex(1, 0), new Complex(-0.5, 0)]
@@ -164,7 +164,7 @@ describe('calcLogarithmicFrequencyGrid', () => {
   })
 })
 
-describe('calcBodeResponse (textbook checks)', () => {
+describe('calcBodeResponse (known-value checks)', () => {
   it('RC low-pass H(s) = 1/(1+s): −3.01 dB and −45° at the cutoff', () => {
     // grid starts exactly at the cutoff frequency f = 1/(2π)
     const cutoff = 1 / (2 * Math.PI)

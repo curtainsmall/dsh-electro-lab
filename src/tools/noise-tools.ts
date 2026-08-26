@@ -18,7 +18,7 @@ const dbArrayParam = (description: string) => ({
 export const noiseTools = [
   defineJsonTool({
     name: 'thermal_noise',
-    description: 'Thermal (Johnson) noise power in a bandwidth: P = k·T·B (k = 1.380649e−23 J/K). Returns watts and dBm. At 290 K in 1 MHz: −114 dBm (textbook floor).',
+    description: 'Thermal (Johnson) noise power in a bandwidth: P = k·T·B (k = 1.380649e−23 J/K). Returns watts and dBm. At 290 K in 1 MHz: −114 dBm.',
     parameters: {
       temperature: { ...createValueParam(QuantityKind.None, 'temperature in kelvin'), required: true },
       bandwidth: { ...createValueParam(QuantityKind.Frequency, 'bandwidth in Hz'), required: true },

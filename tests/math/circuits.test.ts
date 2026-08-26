@@ -10,7 +10,7 @@ import {
 } from '../../src/math/circuits.ts'
 
 describe('calcResonance', () => {
-  it('computes f0, Q, and bandwidth (textbook check)', () => {
+  it('computes f0, Q, and bandwidth (known-value check)', () => {
     // L = 1 mH, C = 1 nF → f0 = 159.15 kHz; series Q = (1/10)√(1e-3/1e-9) = 100
     const { resonantFrequency, qualityFactor, bandwidth } = calcResonance(1e-3, 1e-9, 10, CircuitMode.Series)
     expect(resonantFrequency).toBeCloseTo(159154.9, 1)
@@ -26,8 +26,8 @@ describe('calcResonance', () => {
 })
 
 describe('AC Power', () => {
-  it('computes S, P, Q, and Power factor (textbook check)', () => {
-    const { apparent, real, reactive, powerFactor } = calcAcPower(100, 2, 30)
+  it('computes S, P, Q, and Power factor (known-value check)', () => {
+    const { apparent, real, reactive, powerFactor } = calcAcPower(100, 2, Math.PI / 6) // 30° in radians
     expect(apparent).toBeCloseTo(200, 12)
     expect(real).toBeCloseTo(173.205, 3)
     expect(reactive).toBeCloseTo(100, 6)
@@ -36,7 +36,7 @@ describe('AC Power', () => {
 })
 
 describe('RC transient', () => {
-  it('charges to 63.2% after one time constant (textbook check)', () => {
+  it('charges to 63.2% after one time constant (known-value check)', () => {
     // τ = RC = 1 ms; at t = τ: v = 5·(1 − e⁻¹) ≈ 3.1606 V
     const { voltage, current, timeConstant } = calcRcTransientSeries(SwitchingMode.Charge, 5, 0, 1e3, 1e-6, [1e-3])[0]!
     expect(timeConstant).toBeCloseTo(1e-3, 12)

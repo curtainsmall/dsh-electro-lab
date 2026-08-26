@@ -1,5 +1,5 @@
 /**
- * Concept-level Smith-chart tools: one textbook concept per tool.
+ * Concept-level Smith-chart tools: one standard concept per tool.
  * IO is JSON-and-complex-only: every value is { re, im, kind }.
  */
 import { Complex } from 'complex.js'
@@ -55,7 +55,7 @@ export const smithTools = [
     execute: (args) => {
       const reflectionCoefficient = toComplex(args.reflectionCoefficient, QuantityKind.None)
       const db = calcReturnLossDb(reflectionCoefficient)
-      return { calcReturnLossDb: serializeReal(db, QuantityKind.Log), infinite: db === Number.POSITIVE_INFINITY }
+      return { returnLossDb: serializeReal(db, QuantityKind.Log), infinite: db === Number.POSITIVE_INFINITY }
     },
   }),
   defineJsonTool({

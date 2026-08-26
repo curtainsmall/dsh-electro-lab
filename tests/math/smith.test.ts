@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
 import { ElementRole, MatchTopology, MatchVariant, calcCapacitanceFromReactance, designMatch, calcInductanceFromReactance, calcQuarterWaveImpedance, calcReturnLossDb, convertImpedanceToReflection, convertReflectionToVswr } from '../../src/math/smith.ts'
 
-describe('impedance_to_reflection (textbook check)', () => {
+describe('impedance_to_reflection (known-value check)', () => {
   it('Z = 50 + j50 Ω on a 50 Ω line → Γ = 0.447∠63.43°', () => {
     const g = convertImpedanceToReflection(new Complex(50, 50), 50)
     // Γ = 50j / (100 + 50j) = 0.2 + 0.4j
@@ -23,7 +23,7 @@ describe('impedance_to_reflection (textbook check)', () => {
 })
 
 describe('VSWR and return loss', () => {
-  it('Γ = 0.4472 → VSWR 2.62 (textbook check)', () => {
+  it('Γ = 0.4472 → VSWR 2.62 (known-value check)', () => {
     const g = convertImpedanceToReflection(new Complex(50, 50), 50)
     expect(convertReflectionToVswr(g)).toBeCloseTo(2.618, 3)
   })
@@ -32,7 +32,7 @@ describe('VSWR and return loss', () => {
     expect(convertReflectionToVswr(new Complex(1, 0))).toBe(Number.POSITIVE_INFINITY)
   })
 
-  it('Γ = 0.4472 → return loss ≈ 6.99 dB (textbook check)', () => {
+  it('Γ = 0.4472 → return loss ≈ 6.99 dB (known-value check)', () => {
     const g = convertImpedanceToReflection(new Complex(50, 50), 50)
     expect(calcReturnLossDb(g)).toBeCloseTo(6.9897, 3)
   })
@@ -43,7 +43,7 @@ describe('VSWR and return loss', () => {
 })
 
 describe('quarter-wave transformer', () => {
-  it('Z1 = √(Z0·ZL) (textbook check)', () => {
+  it('Z1 = √(Z0·ZL) (known-value check)', () => {
     // 50 Ω line to 100 Ω load → Z1 = √5000 ≈ 70.71 Ω
     expect(calcQuarterWaveImpedance(50, 100)).toBeCloseTo(70.7107, 4)
   })

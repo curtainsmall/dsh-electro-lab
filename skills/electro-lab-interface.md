@@ -10,7 +10,7 @@ The operational details of the electro-lab toolset. This skill is template-indep
 
 ## Value format
 
-Values are complex value objects in SI base units: rectangular `{"form": "rect", "re": …, "im": 0, "kind": "frequency"}` or polar `{"form": "polar", "mag": …, "angDeg": …, "kind": "frequency"}` (or `angRad`). `kind` is the quantity category (`frequency`, `resistance`, `capacitance`, `inductance`, `voltage`, `current`, `power`, `time`, `none`, `angle`, `log`).
+Values are complex value objects in SI base units: rectangular `{"form": "rect", "re": …, "im": 0, "kind": "frequency"}` or polar `{"form": "polar", "mag": …, "angRad": …, "kind": "frequency"}`. Angles are always radians (SI). `kind` is the quantity category (`frequency`, `resistance`, `capacitance`, `inductance`, `voltage`, `current`, `power`, `time`, `none`, `angle`, `log`).
 
 ## Tool-call discipline
 
@@ -22,7 +22,7 @@ For multi-step chains, one call may use the `solve_steps` orchestrator whose ste
 
 ## Stop procedure
 
-Check conditions BEFORE any tool call: list the quantities the user actually gave. If any quantity the computation needs is missing, stop without calling any tool — state exactly what is missing and which tool would be needed. Never invent values, never assume textbook defaults (50 Ω, 1 GHz, …), and never continue with fabricated conditions.
+Check conditions BEFORE any tool call: list the quantities the user actually gave. If any quantity the computation needs is missing, stop without calling any tool — state exactly what is missing and which tool would be needed. Never invent values and never continue with fabricated conditions.
 
 ## Rules
 

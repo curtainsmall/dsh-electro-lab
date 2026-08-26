@@ -41,7 +41,7 @@ export const dbTools = [
   }),
   defineJsonTool({
     name: 'decibel_ratio',
-    description: 'Convert between a ratio and decibels. Provide exactly one of ratio or db; the other is returned. Power ratios use 10·log₁₀ (10 dB = ×10 power), voltage ratios 20·log₁₀ (20 dB = ×10 voltage).',
+    description: 'Convert between a ratio and decibels. Provide exactly one of ratio or db (the level in dB); the other is returned. Power ratios use 10·log₁₀ (10 dB = ×10 power), voltage ratios 20·log₁₀ (20 dB = ×10 voltage).',
     parameters: {
       kind: {
         type: 'string',

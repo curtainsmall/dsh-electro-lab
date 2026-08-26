@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { calcCascadeNoiseFigure, calcQuantizationSnr, calcThermalNoisePower } from '../../src/math/noise.ts'
 
-describe('thermal noise (textbook checks)', () => {
+describe('thermal noise (known-value checks)', () => {
   it('290 K in 1 MHz ≈ −114 dBm', () => {
     const watts = calcThermalNoisePower(290, 1e6)
     expect(watts).toBeCloseTo(1.380649e-23 * 290 * 1e6, 25)
@@ -15,7 +15,7 @@ describe('thermal noise (textbook checks)', () => {
   })
 })
 
-describe('quantization SNR (textbook checks)', () => {
+describe('quantization SNR (known-value checks)', () => {
   it('16 bits ≈ 98 dB', () => {
     expect(calcQuantizationSnr(16)).toBeCloseTo(6.02 * 16 + 1.76, 6) // 98.08
   })
@@ -26,7 +26,7 @@ describe('quantization SNR (textbook checks)', () => {
   })
 })
 
-describe('cascade noise figure (textbook checks)', () => {
+describe('cascade noise figure (known-value checks)', () => {
   it('3 dB NF at 10 dB gain followed by 5 dB NF → ≈ 3.45 dB', () => {
     // F₁ = 10^0.3 = 1.995, G₁ = 10, F₂ = 10^0.5 = 3.162 → F = 2.2115 → 3.447 dB
     const total = calcCascadeNoiseFigure([3, 5], [10, 0])

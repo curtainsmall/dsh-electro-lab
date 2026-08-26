@@ -103,17 +103,17 @@ export const circuitTools = [
   }),
   defineJsonTool({
     name: 'ac_power',
-    description: 'AC power from RMS values: apparent = V·I (power), real = apparent·cosφ (power), reactive = apparent·sinφ (power), powerFactor = cosφ. phaseAngleDegree is the phase angle between voltage and current (positive = inductive load).',
+    description: 'AC power from RMS values: apparent = V·I (power), real = apparent·cosφ (power), reactive = apparent·sinφ (power), powerFactor = cosφ. phaseAngle is the phase angle between voltage and current in radians (positive = inductive load).',
     parameters: {
       rmsVoltage: { ...createValueParam(QuantityKind.Voltage, 'RMS voltage'), required: true },
       rmsCurrent: { ...createValueParam(QuantityKind.Current, 'RMS current'), required: true },
-      phaseAngleDegree: { ...createValueParam(QuantityKind.Angle, 'phase angle between V and I in degrees (default 0)') },
+      phaseAngle: { ...createValueParam(QuantityKind.Angle, 'phase angle between V and I in radians (default 0)') },
     },
     execute: (args) => {
       const rmsVoltage = toScalar(args.rmsVoltage, QuantityKind.Voltage)
       const rmsCurrent = toScalar(args.rmsCurrent, QuantityKind.Current)
-      const phaseAngleDegree = args.phaseAngleDegree === undefined ? 0 : toScalar(args.phaseAngleDegree, QuantityKind.Angle)
-      const { apparent, real, reactive, powerFactor } = calcAcPower(rmsVoltage, rmsCurrent, phaseAngleDegree)
+      const phaseAngle = args.phaseAngle === undefined ? 0 : toScalar(args.phaseAngle, QuantityKind.Angle)
+      const { apparent, real, reactive, powerFactor } = calcAcPower(rmsVoltage, rmsCurrent, phaseAngle)
       return {
         apparent: serializeReal(apparent, QuantityKind.Power),
         real: serializeReal(real, QuantityKind.Power),

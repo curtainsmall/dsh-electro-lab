@@ -36,6 +36,8 @@ describe('QuantityKind enum values', () => {
     expect(QuantityKind.Voltage).toBe('voltage')
     expect(QuantityKind.Power).toBe('power')
     expect(QuantityKind.Angle).toBe('angle')
+    expect(QuantityKind.Pressure).toBe('pressure')
+    expect(QuantityKind.Energy).toBe('energy')
     expect(QuantityKind.Log).toBe('log')
     expect(QuantityKind.None).toBe('none')
   })

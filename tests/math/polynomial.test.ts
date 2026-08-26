@@ -68,7 +68,7 @@ describe('dividePolynomials (descending order, the standard)', () => {
   })
 })
 
-describe('findPolyRoots (textbook checks)', () => {
+describe('findPolyRoots (known-value checks)', () => {
   it('solves a quadratic with two real roots', () => {
     const roots = sortedRoots([1, -3, 2]) // x² − 3x + 2 = (x−1)(x−2)
     expect(roots[0]!.re).toBeCloseTo(1, 6)
@@ -111,7 +111,7 @@ describe('findPolyRoots (textbook checks)', () => {
   })
 })
 
-describe('findPolesZeros (textbook checks)', () => {
+describe('findPolesZeros (known-value checks)', () => {
   it('1/((s+1)(s+2)): no zeros, poles −1 and −2', () => {
     const result = findPolesZeros([new Complex(1, 0)], [new Complex(1, 0), new Complex(3, 0), new Complex(2, 0)])
     expect(result.zeros).toEqual([])
@@ -127,7 +127,7 @@ describe('findPolesZeros (textbook checks)', () => {
   })
 })
 
-describe('expandPowerSeries (textbook checks)', () => {
+describe('expandPowerSeries (known-value checks)', () => {
   it('0.5z/(z−0.5): impulse response 0.5·0.5ⁿ', () => {
     // H(z) = 0.5/(1 − 0.5·z⁻¹) → numerator [0.5, 0], denominator [1, −0.5]
     const coefficients = expandPowerSeries([new Complex(0.5, 0), new Complex(0, 0)], [new Complex(1, 0), new Complex(-0.5, 0)], 5)

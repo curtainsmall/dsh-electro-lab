@@ -115,7 +115,7 @@ function isPowerOfTwo(size: number): boolean {
 /**
  * Fourier coefficients of standard odd-symmetric periodic waveforms with
  * peak amplitude `amplitude` (default 1): DC 0, cosine 0, sine per the
- * textbook series. Harmonics are 1..harmonics.
+ * standard series. Harmonics are 1..harmonics.
  */
 export function calcFourierSeriesCoeffs(
   waveform: WaveformKind,

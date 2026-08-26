@@ -12,7 +12,7 @@ import {
   calcWindowSamples,
 } from '../../src/math/dft.ts'
 
-describe('DFT/IDFT (textbook checks)', () => {
+describe('DFT/IDFT (known-value checks)', () => {
   it('maps a delta sequence to a flat spectrum', () => {
     const spectrum = calcDiscreteFourierTransform([new Complex(1, 0), new Complex(0, 0), new Complex(0, 0), new Complex(0, 0)])
     for (const bin of spectrum) {
@@ -81,7 +81,7 @@ describe('DFT/IDFT (textbook checks)', () => {
   })
 })
 
-describe('calcFourierSeriesCoeffs (textbook checks)', () => {
+describe('calcFourierSeriesCoeffs (known-value checks)', () => {
   it('square wave: bₙ = 4A/(nπ) for odd n, zeros elsewhere', () => {
     const result = calcFourierSeriesCoeffs(WaveformKind.Square, 6, 1)
     expect(result.dc).toBeCloseTo(0, 12)
@@ -113,7 +113,7 @@ describe('calcFourierSeriesCoeffs (textbook checks)', () => {
   })
 })
 
-describe('calcWindowSamples (textbook checks)', () => {
+describe('calcWindowSamples (known-value checks)', () => {
   it('Hann window: zero endpoints, unit center for odd N', () => {
     const samples = calcWindowSamples(WindowKind.Hann, 5)
     expect(samples[0]).toBeCloseTo(0, 12)
@@ -159,7 +159,7 @@ describe('applyWindow', () => {
   })
 })
 
-describe('calcSignalStatistics (textbook checks)', () => {
+describe('calcSignalStatistics (known-value checks)', () => {
   it('a unit sine: rms = 1/√2, peak 1, peak-to-peak 2, dc 0', () => {
     const samples: Complex[] = []
     for (let n = 0; n < 64; n++) samples.push(new Complex(Math.sin((2 * Math.PI * n) / 64), 0))

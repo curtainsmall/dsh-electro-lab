@@ -32,6 +32,8 @@ export enum QuantityKind {
   Voltage = 'voltage',
   Power = 'power',
   Angle = 'angle',
+  Pressure = 'pressure',
+  Energy = 'energy',
   // scale/category modifiers
   Log = 'log',
   None = 'none',
@@ -63,6 +65,8 @@ export function isNegligible(value: number, kind: QuantityKind): boolean {
     [QuantityKind.Voltage]: 1e-9,
     [QuantityKind.Power]: 1e-12,
     [QuantityKind.Angle]: 1e-9,
+    [QuantityKind.Pressure]: 1e-6,
+    [QuantityKind.Energy]: 1e-12,
     [QuantityKind.Log]: 0,
     [QuantityKind.None]: 1e-12,
   }
