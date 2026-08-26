@@ -5,93 +5,78 @@
  */
 import { Complex } from 'complex.js'
 
-// ── Enums ────────────────────────────────────────────────────────────────
-
-/** Op-amp configuration. */
-export enum OpampConfiguration {
-  Inverting = 'inverting',
-  NonInverting = 'non-inverting',
-  VoltageFollower = 'voltage-follower',
-  Summing = 'summing',
-  Difference = 'difference',
-  Integrator = 'integrator',
-  Differentiator = 'differentiator',
-}
-
 // ── Op-amp ───────────────────────────────────────────────────────────────
 
-/** Op-amp result: complex gain (when well-defined) and/or output voltage. */
-export function calcOpamp(
-  configuration: OpampConfiguration,
-  parameters: {
-    feedbackResistance?: number
-    inputResistance?: number
-    inputVoltage?: number
-    secondInputVoltage?: number
-    secondInputResistance?: number
-    capacitance?: number
-    frequency?: number
-  },
-): { gain?: Complex; outputVoltage?: Complex } {
-  const { feedbackResistance, inputResistance, inputVoltage, secondInputVoltage, secondInputResistance, capacitance, frequency } = parameters
-  switch (configuration) {
-    case OpampConfiguration.Inverting: {
-      if (feedbackResistance === undefined || inputResistance === undefined || inputVoltage === undefined) {
-        throw new Error('inverting configuration needs feedbackResistance, inputResistance and inputVoltage')
-      }
-      const gain = new Complex(-feedbackResistance / inputResistance, 0)
-      return { gain, outputVoltage: gain.mul(inputVoltage) }
-    }
-    case OpampConfiguration.NonInverting: {
-      if (feedbackResistance === undefined || inputResistance === undefined || inputVoltage === undefined) {
-        throw new Error('non-inverting configuration needs feedbackResistance, inputResistance and inputVoltage')
-      }
-      const gain = new Complex(1 + feedbackResistance / inputResistance, 0)
-      return { gain, outputVoltage: gain.mul(inputVoltage) }
-    }
-    case OpampConfiguration.VoltageFollower: {
-      if (inputVoltage === undefined) throw new Error('voltage-follower needs inputVoltage')
-      return { gain: new Complex(1, 0), outputVoltage: new Complex(inputVoltage, 0) }
-    }
-    case OpampConfiguration.Summing: {
-      if (
-        feedbackResistance === undefined ||
-        inputResistance === undefined ||
-        secondInputResistance === undefined ||
-        inputVoltage === undefined ||
-        secondInputVoltage === undefined
-      ) {
-        throw new Error('summing needs feedbackResistance, inputResistance, secondInputResistance, inputVoltage and secondInputVoltage')
-      }
-      const outputVoltage = -feedbackResistance * (inputVoltage / inputResistance + secondInputVoltage / secondInputResistance)
-      return { outputVoltage: new Complex(outputVoltage, 0) }
-    }
-    case OpampConfiguration.Difference: {
-      if (feedbackResistance === undefined || inputResistance === undefined || inputVoltage === undefined || secondInputVoltage === undefined) {
-        throw new Error('difference needs feedbackResistance, inputResistance, inputVoltage and secondInputVoltage')
-      }
-      const gain = new Complex(feedbackResistance / inputResistance, 0)
-      return { gain, outputVoltage: gain.mul(secondInputVoltage - inputVoltage) }
-    }
-    case OpampConfiguration.Integrator: {
-      if (inputResistance === undefined || capacitance === undefined || frequency === undefined || inputVoltage === undefined) {
-        throw new Error('integrator needs inputResistance, capacitance, frequency and inputVoltage')
-      }
-      const omega = 2 * Math.PI * frequency
-      // H(jω) = −1/(jωRC)
-      const gain = new Complex(0, 1 / (omega * inputResistance * capacitance))
-      return { gain, outputVoltage: gain.mul(inputVoltage) }
-    }
-    case OpampConfiguration.Differentiator: {
-      if (feedbackResistance === undefined || capacitance === undefined || frequency === undefined || inputVoltage === undefined) {
-        throw new Error('differentiator needs feedbackResistance, capacitance, frequency and inputVoltage')
-      }
-      const omega = 2 * Math.PI * frequency
-      // H(jω) = −jωRC
-      const gain = new Complex(0, -omega * feedbackResistance * capacitance)
-      return { gain, outputVoltage: gain.mul(inputVoltage) }
-    }
-  }
+/** Inverting amplifier: gain = −Rf/Rin; output = gain·Vin. */
+export function calcInvertingOpamp(
+  inputVoltage: number,
+  feedbackResistance: number,
+  inputResistance: number,
+): { gain: Complex; outputVoltage: Complex } {
+  const gain = new Complex(-feedbackResistance / inputResistance, 0)
+  return { gain, outputVoltage: gain.mul(inputVoltage) }
+}
+
+/** Non-inverting amplifier: gain = 1 + Rf/Rin; output = gain·Vin. */
+export function calcNonInvertingOpamp(
+  inputVoltage: number,
+  feedbackResistance: number,
+  inputResistance: number,
+): { gain: Complex; outputVoltage: Complex } {
+  const gain = new Complex(1 + feedbackResistance / inputResistance, 0)
+  return { gain, outputVoltage: gain.mul(inputVoltage) }
+}
+
+/** Voltage follower: gain = 1; output = input. */
+export function calcVoltageFollowerOpamp(inputVoltage: number): { gain: Complex; outputVoltage: Complex } {
+  return { gain: new Complex(1, 0), outputVoltage: new Complex(inputVoltage, 0) }
+}
+
+/** Summing amplifier: Vout = −Rf(V₁/R₁ + V₂/R₂). */
+export function calcSummingOpamp(
+  inputVoltage1: number,
+  inputVoltage2: number,
+  feedbackResistance: number,
+  inputResistance1: number,
+  inputResistance2: number,
+): { outputVoltage: Complex } {
+  const outputVoltage = -feedbackResistance * (inputVoltage1 / inputResistance1 + inputVoltage2 / inputResistance2)
+  return { outputVoltage: new Complex(outputVoltage, 0) }
+}
+
+/** Difference amplifier: Vout = (Rf/R1)(V₂−V₁). */
+export function calcDifferenceOpamp(
+  inputVoltage1: number,
+  inputVoltage2: number,
+  feedbackResistance: number,
+  inputResistance: number,
+): { gain: Complex; outputVoltage: Complex } {
+  const gain = new Complex(feedbackResistance / inputResistance, 0)
+  return { gain, outputVoltage: gain.mul(inputVoltage2 - inputVoltage1) }
+}
+
+/** Integrator: H(jω) = −1/(jωRC); output = gain·Vin. */
+export function calcIntegratorOpamp(
+  inputVoltage: number,
+  inputResistance: number,
+  capacitance: number,
+  frequency: number,
+): { gain: Complex; outputVoltage: Complex } {
+  const omega = 2 * Math.PI * frequency
+  const gain = new Complex(0, 1 / (omega * inputResistance * capacitance))
+  return { gain, outputVoltage: gain.mul(inputVoltage) }
+}
+
+/** Differentiator: H(jω) = −jωRC; output = gain·Vin. */
+export function calcDifferentiatorOpamp(
+  inputVoltage: number,
+  feedbackResistance: number,
+  capacitance: number,
+  frequency: number,
+): { gain: Complex; outputVoltage: Complex } {
+  const omega = 2 * Math.PI * frequency
+  const gain = new Complex(0, -omega * feedbackResistance * capacitance)
+  return { gain, outputVoltage: gain.mul(inputVoltage) }
 }
 
 // ── Time constant ────────────────────────────────────────────────────────

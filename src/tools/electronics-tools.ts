@@ -2,7 +2,18 @@
  * Electronics tools: op-amp configurations, time constants, voltage
  * dividers and LED series resistors. IO is JSON-and-complex-only.
  */
-import { OpampConfiguration, calcLedResistor, calcOpamp, calcTimeConstant, calcVoltageDivider } from '../math/electronics.ts'
+import {
+  calcDifferentiatorOpamp,
+  calcDifferenceOpamp,
+  calcIntegratorOpamp,
+  calcInvertingOpamp,
+  calcLedResistor,
+  calcNonInvertingOpamp,
+  calcSummingOpamp,
+  calcTimeConstant,
+  calcVoltageDivider,
+  calcVoltageFollowerOpamp,
+} from '../math/electronics.ts'
 import { toScalar, serializeReal, serializeComplex } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
@@ -15,15 +26,7 @@ export const electronicsTools = [
     parameters: {
       configuration: {
         type: 'string',
-        enum: [
-          OpampConfiguration.Inverting,
-          OpampConfiguration.NonInverting,
-          OpampConfiguration.VoltageFollower,
-          OpampConfiguration.Summing,
-          OpampConfiguration.Difference,
-          OpampConfiguration.Integrator,
-          OpampConfiguration.Differentiator,
-        ],
+        enum: ['inverting', 'non-inverting', 'voltage-follower', 'summing', 'difference', 'integrator', 'differentiator'],
         description: 'circuit configuration',
         required: true,
       },
@@ -35,21 +38,94 @@ export const electronicsTools = [
       capacitance: { ...createValueParam(QuantityKind.Capacitance, 'capacitance (integrator/differentiator)') },
       frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency (integrator/differentiator)') },
     },
-    execute: (args) => {
-      const inputVoltage = toScalar(args.inputVoltage, QuantityKind.Voltage)
-      const result = calcOpamp(args.configuration, {
-        feedbackResistance: args.feedbackResistance === undefined ? undefined : toScalar(args.feedbackResistance, QuantityKind.Resistance),
-        inputResistance: args.inputResistance === undefined ? undefined : toScalar(args.inputResistance, QuantityKind.Resistance),
-        inputVoltage,
-        secondInputVoltage: args.secondInputVoltage === undefined ? undefined : toScalar(args.secondInputVoltage, QuantityKind.Voltage),
-        secondInputResistance: args.secondInputResistance === undefined ? undefined : toScalar(args.secondInputResistance, QuantityKind.Resistance),
-        capacitance: args.capacitance === undefined ? undefined : toScalar(args.capacitance, QuantityKind.Capacitance),
-        frequency: args.frequency === undefined ? undefined : toScalar(args.frequency, QuantityKind.Frequency),
-      })
-      const out: Record<string, JsonValue> = { configuration: args.configuration }
-      if (result.gain !== undefined) out.gain = serializeComplex(result.gain, QuantityKind.None)
-      if (result.outputVoltage !== undefined) out.outputVoltage = serializeComplex(result.outputVoltage, QuantityKind.Voltage)
-      return out
+    execute: (args): Record<string, JsonValue> => {
+      switch (args.configuration) {
+        case 'inverting': {
+          if (args.inputVoltage === undefined || args.feedbackResistance === undefined || args.inputResistance === undefined) {
+            throw new Error('inverting requires inputVoltage, feedbackResistance and inputResistance')
+          }
+          const { gain, outputVoltage } = calcInvertingOpamp(
+            toScalar(args.inputVoltage, QuantityKind.Voltage),
+            toScalar(args.feedbackResistance, QuantityKind.Resistance),
+            toScalar(args.inputResistance, QuantityKind.Resistance),
+          )
+          return { configuration: args.configuration, gain: serializeComplex(gain, QuantityKind.None), outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
+        }
+        case 'non-inverting': {
+          if (args.inputVoltage === undefined || args.feedbackResistance === undefined || args.inputResistance === undefined) {
+            throw new Error('non-inverting requires inputVoltage, feedbackResistance and inputResistance')
+          }
+          const { gain, outputVoltage } = calcNonInvertingOpamp(
+            toScalar(args.inputVoltage, QuantityKind.Voltage),
+            toScalar(args.feedbackResistance, QuantityKind.Resistance),
+            toScalar(args.inputResistance, QuantityKind.Resistance),
+          )
+          return { configuration: args.configuration, gain: serializeComplex(gain, QuantityKind.None), outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
+        }
+        case 'voltage-follower': {
+          if (args.inputVoltage === undefined) throw new Error('voltage-follower requires inputVoltage')
+          const { gain, outputVoltage } = calcVoltageFollowerOpamp(toScalar(args.inputVoltage, QuantityKind.Voltage))
+          return { configuration: args.configuration, gain: serializeComplex(gain, QuantityKind.None), outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
+        }
+        case 'summing': {
+          if (
+            args.inputVoltage === undefined ||
+            args.secondInputVoltage === undefined ||
+            args.feedbackResistance === undefined ||
+            args.inputResistance === undefined ||
+            args.secondInputResistance === undefined
+          ) {
+            throw new Error('summing requires inputVoltage, secondInputVoltage, feedbackResistance, inputResistance and secondInputResistance')
+          }
+          const { outputVoltage } = calcSummingOpamp(
+            toScalar(args.inputVoltage, QuantityKind.Voltage),
+            toScalar(args.secondInputVoltage, QuantityKind.Voltage),
+            toScalar(args.feedbackResistance, QuantityKind.Resistance),
+            toScalar(args.inputResistance, QuantityKind.Resistance),
+            toScalar(args.secondInputResistance, QuantityKind.Resistance),
+          )
+          return { configuration: args.configuration, outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
+        }
+        case 'difference': {
+          if (args.inputVoltage === undefined || args.secondInputVoltage === undefined || args.feedbackResistance === undefined || args.inputResistance === undefined) {
+            throw new Error('difference requires inputVoltage, secondInputVoltage, feedbackResistance and inputResistance')
+          }
+          const { gain, outputVoltage } = calcDifferenceOpamp(
+            toScalar(args.inputVoltage, QuantityKind.Voltage),
+            toScalar(args.secondInputVoltage, QuantityKind.Voltage),
+            toScalar(args.feedbackResistance, QuantityKind.Resistance),
+            toScalar(args.inputResistance, QuantityKind.Resistance),
+          )
+          return { configuration: args.configuration, gain: serializeComplex(gain, QuantityKind.None), outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
+        }
+        case 'integrator': {
+          if (args.inputVoltage === undefined || args.inputResistance === undefined || args.capacitance === undefined || args.frequency === undefined) {
+            throw new Error('integrator requires inputVoltage, inputResistance, capacitance and frequency')
+          }
+          const { gain, outputVoltage } = calcIntegratorOpamp(
+            toScalar(args.inputVoltage, QuantityKind.Voltage),
+            toScalar(args.inputResistance, QuantityKind.Resistance),
+            toScalar(args.capacitance, QuantityKind.Capacitance),
+            toScalar(args.frequency, QuantityKind.Frequency),
+          )
+          return { configuration: args.configuration, gain: serializeComplex(gain, QuantityKind.None), outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
+        }
+        case 'differentiator': {
+          if (args.inputVoltage === undefined || args.feedbackResistance === undefined || args.capacitance === undefined || args.frequency === undefined) {
+            throw new Error('differentiator requires inputVoltage, feedbackResistance, capacitance and frequency')
+          }
+          const { gain, outputVoltage } = calcDifferentiatorOpamp(
+            toScalar(args.inputVoltage, QuantityKind.Voltage),
+            toScalar(args.feedbackResistance, QuantityKind.Resistance),
+            toScalar(args.capacitance, QuantityKind.Capacitance),
+            toScalar(args.frequency, QuantityKind.Frequency),
+          )
+          return { configuration: args.configuration, gain: serializeComplex(gain, QuantityKind.None), outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
+        }
+        default:
+          // unreachable: the framework schema restricts configuration to the seven values above
+          throw new Error(`unknown op-amp configuration "${args.configuration}"`)
+      }
     },
   }),
   defineJsonTool({

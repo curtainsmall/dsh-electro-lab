@@ -85,26 +85,6 @@ export const dftTools = [
     },
   }),
   defineJsonTool({
-    name: 'window_function',
-    description: 'Window coefficients for a length-N sequence: none (all 1), Hann 0.5(1−cos(2πn/(N−1))), Hamming 0.54−0.46·cos, Blackman 0.42−0.5·cos+0.08·cos(2θ). Apply before discrete_fourier_transform to reduce spectral leakage.',
-    parameters: {
-      window: {
-        type: 'string',
-        enum: [WindowKind.None, WindowKind.Hann, WindowKind.Hamming, WindowKind.Blackman],
-        description: 'window family',
-        required: true,
-      },
-      length: { type: 'number', description: 'sequence length N', required: true },
-    },
-    execute: (args) => {
-      return {
-        window: args.window,
-        length: args.length,
-        samples: calcWindowSamples(args.window, args.length).map((value) => serializeReal(value, QuantityKind.None)),
-      }
-    },
-  }),
-  defineJsonTool({
     name: 'signal_analysis',
     description: 'Signal statistics plus the windowed spectrum in one call: RMS, peak, peak-to-peak, DC component, and the DFT spectrum of the windowed samples (magnitude/phase per bin via the value snapshots).',
     parameters: {
