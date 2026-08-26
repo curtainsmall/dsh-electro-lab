@@ -2,6 +2,10 @@
   "name": "dsh-electro-lab",
   "version": "0.1.0",
   "description": "DSH plugin: electrical & electronics workbench",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/curtainsmall/dsh-electro-lab.git"
+  },
   "type": "module",
   "license": "MIT",
   "main": "lib/index.js",
