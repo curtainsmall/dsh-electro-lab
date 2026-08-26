@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Series-RLC transient: `transient_response` now accepts kind `rlc` (resistance + inductance + capacitance) and returns the full second-order charge/discharge curve — closed form by damping regime (underdamped / critical / overdamped, ζ = (R/2)·√(C/L)) with alpha, omega0, dampingRatio and damping metadata, honoring both initial conditions (capacitor voltage, inductor current).
 
+### Removed
+
+- Redundant single-point primitives, superseded by existing tools: `rc_transient` and `rl_transient` (use `transient_response` with `times: [t]`), `element_impedance` (use `circuit_impedance` with a leaf node), `window_function` (the window is applied by `discrete_fourier_transform` / `signal_analysis` directly).
+
 ## [0.1.1] - 2026-08-26
 
 ### Changed
