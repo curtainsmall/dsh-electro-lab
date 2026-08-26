@@ -1,5 +1,5 @@
 /**
- * Concept-level Smith-chart tools: one textbook concept per tool.
+ * Concept-level Smith-chart tools: one standard concept per tool.
  * IO is JSON-and-complex-only: every value is { re, im, kind }.
  */
 import { Complex } from 'complex.js'

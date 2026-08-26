@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DbUnit, RatioKind, calcMagnitudeToDb, convertDbLevels, convertDecibelRatio } from '../../src/math/db.ts'
 
-describe('convertDbLevels (textbook checks)', () => {
-  it('30 dBm = 1 W = 137 dBµV into 50 Ω (textbook approximation)', () => {
+describe('convertDbLevels (known-value checks)', () => {
+  it('30 dBm = 1 W = 137 dBµV into 50 Ω (known-value approximation)', () => {
     const levels = convertDbLevels(30, DbUnit.Dbm, 50)
     expect(levels.watts).toBeCloseTo(1, 10)
     expect(levels.dbw).toBeCloseTo(0, 10)
@@ -16,14 +16,14 @@ describe('convertDbLevels (textbook checks)', () => {
     expect(levels.dbm).toBeCloseTo(30, 10)
   })
 
-  it('0.775 V is 0 dBu; into 600 Ω it is ≈ 1 mW (0.775 is the rounded textbook value)', () => {
+  it('0.775 V is 0 dBu; into 600 Ω it is ≈ 1 mW (0.775 is the rounded reference value)', () => {
     const levels = convertDbLevels(0.775, DbUnit.Voltage, 600)
     expect(levels.dbu).toBeCloseTo(0, 8)
     expect(levels.watts).toBeCloseTo(0.775 * 0.775 / 600, 12) // 1.001 mW exactly
     expect(levels.dbm).toBeCloseTo(0.0045, 3) // ≈ 0 dBm
   })
 
-  it('0 dBm into 50 Ω = 107 dBµV (textbook approximation)', () => {
+  it('0 dBm into 50 Ω = 107 dBµV (known-value approximation)', () => {
     const levels = convertDbLevels(0, DbUnit.Dbm, 50)
     expect(levels.dbuV).toBeCloseTo(106.9897, 3)
   })
@@ -33,7 +33,7 @@ describe('convertDbLevels (textbook checks)', () => {
   })
 })
 
-describe('convertDecibelRatio (textbook checks)', () => {
+describe('convertDecibelRatio (known-value checks)', () => {
   it('10 dB power ratio is ×10; voltage ratio is √10', () => {
     const power = convertDecibelRatio(RatioKind.Power, undefined, 10)
     expect(power.ratio).toBeCloseTo(10, 10)
@@ -58,7 +58,7 @@ describe('convertDecibelRatio (textbook checks)', () => {
   })
 })
 
-describe('calcMagnitudeToDb (textbook checks)', () => {
+describe('calcMagnitudeToDb (known-value checks)', () => {
   it('maps 1 → 0 dB, 1/√2 → −3.01 dB, 0 → −Infinity', () => {
     expect(calcMagnitudeToDb(1)).toBeCloseTo(0, 12)
     expect(calcMagnitudeToDb(1 / Math.SQRT2)).toBeCloseTo(-3.0103, 3)

@@ -22,7 +22,7 @@ For multi-step chains, one call may use the `solve_steps` orchestrator whose ste
 
 ## Stop procedure
 
-Check conditions BEFORE any tool call: list the quantities the user actually gave. If any quantity the computation needs is missing, stop without calling any tool — state exactly what is missing and which tool would be needed. Never invent values, never assume textbook defaults (50 Ω, 1 GHz, …), and never continue with fabricated conditions.
+Check conditions BEFORE any tool call: list the quantities the user actually gave. If any quantity the computation needs is missing, stop without calling any tool — state exactly what is missing and which tool would be needed. Never invent values and never continue with fabricated conditions.
 
 ## Rules
 

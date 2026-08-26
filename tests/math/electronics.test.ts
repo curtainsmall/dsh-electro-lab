@@ -8,7 +8,7 @@ import {
   calcVoltageDivider,
 } from '../../src/math/electronics.ts'
 
-describe('op-amp configurations (textbook checks)', () => {
+describe('op-amp configurations (known-value checks)', () => {
   it('inverting: gain = −Rf/Rin', () => {
     const result = calcOpamp(OpampConfiguration.Inverting, { feedbackResistance: 10e3, inputResistance: 1e3, inputVoltage: 0.5 })
     expect(result.gain!.re).toBeCloseTo(-10, 10)
@@ -78,7 +78,7 @@ describe('op-amp configurations (textbook checks)', () => {
   })
 })
 
-describe('time constant (textbook checks)', () => {
+describe('time constant (known-value checks)', () => {
   it('RC: τ = R·C, fc = 1/(2πτ)', () => {
     const result = calcTimeConstant(1e3, 1e-6)
     expect(result.timeConstant).toBeCloseTo(1e-3, 12)
@@ -96,7 +96,7 @@ describe('time constant (textbook checks)', () => {
   })
 })
 
-describe('voltage divider (textbook checks)', () => {
+describe('voltage divider (known-value checks)', () => {
   it('unloaded: Vout = Vs·R2/(R1+R2)', () => {
     const result = calcVoltageDivider(10, 10e3, 10e3)
     expect(result.outputVoltage).toBeCloseTo(5, 10)
@@ -116,7 +116,7 @@ describe('voltage divider (textbook checks)', () => {
   })
 })
 
-describe('LED resistor (textbook checks)', () => {
+describe('LED resistor (known-value checks)', () => {
   it('5 V supply, 2 V forward, 20 mA → 150 Ω, 60 mW', () => {
     const result = calcLedResistor(5, 2, 20e-3)
     expect(result.resistance).toBeCloseTo(150, 10)

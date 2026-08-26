@@ -218,7 +218,7 @@ export function calcStepResponse(numerator: Polynomial, denominator: Polynomial,
 
 /**
  * Difference-equation recursion (Laurent a/b convention, the natural
- * textbook form of a digital filter):
+ * form of a digital filter):
  *   y[n] = (Σᵢ bᵢ·x[n−i] − Σⱼ aⱼ·y[n−j]) / a₀
  * Output length equals the input length; past samples are zero.
  */

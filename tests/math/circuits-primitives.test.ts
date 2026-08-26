@@ -25,7 +25,7 @@ describe('element leaves (through calcNetworkImpedance)', () => {
 })
 
 describe('combineSeriesImpedances / combineParallelImpedances — primitive combinations', () => {
-  it('series RLC equals the textbook formula (10 − j1585 at 1 kHz)', () => {
+  it('series RLC equals the known formula (10 − j1585 at 1 kHz)', () => {
     const f = 1000
     const parts = [
       calcNetworkImpedance({ kind: ElementKind.Resistance, value: 10 }, f),

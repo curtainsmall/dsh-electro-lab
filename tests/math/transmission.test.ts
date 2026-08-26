@@ -6,7 +6,7 @@ import {
   calcWavelength,
 } from '../../src/math/transmission.ts'
 
-describe('wavelength (textbook checks)', () => {
+describe('wavelength (known-value checks)', () => {
   it('300 MHz in vacuum → 1 m', () => {
     expect(calcWavelength(300e6)).toBeCloseTo(299792458 / 300e6, 8)
     expect(calcWavelength(300e6)).toBeCloseTo(0.9993, 3)
@@ -23,7 +23,7 @@ describe('wavelength (textbook checks)', () => {
   })
 })
 
-describe('coaxial parameters (textbook checks)', () => {
+describe('coaxial parameters (known-value checks)', () => {
   it('d = 1 mm, D = 3.58 mm, εr = 2.25 → ≈ 51 Ω (RG-58-like)', () => {
     const result = calcCoaxialParameters(1e-3, 3.58e-3, 2.25)
     expect(result.impedance).toBeCloseTo(50.9572, 3)
@@ -40,7 +40,7 @@ describe('coaxial parameters (textbook checks)', () => {
   })
 })
 
-describe('rise time / bandwidth (textbook checks)', () => {
+describe('rise time / bandwidth (known-value checks)', () => {
   it('1 MHz bandwidth → 350 ns rise time', () => {
     expect(calcRiseTimeFromBandwidth(1e6)).toBeCloseTo(350e-9, 10)
   })

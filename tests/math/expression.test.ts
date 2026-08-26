@@ -61,7 +61,7 @@ describe('constants and functions', () => {
     expect(calcExpression('2*pi*1e6').re).toBeCloseTo(2 * Math.PI * 1e6, 6)
   })
 
-  it('evaluates functions (textbook checks)', () => {
+  it('evaluates functions (known-value checks)', () => {
     expect(calcExpression('sin(pi/2)').re).toBeCloseTo(1, 10)
     expect(calcExpression('cos(0)').re).toBeCloseTo(1, 10)
     expect(calcExpression('sqrt(2)').re).toBeCloseTo(Math.SQRT2, 10)
@@ -164,7 +164,7 @@ describe('errors', () => {
 })
 
 describe('reduceRational — pure polynomials', () => {
-  it('extracts descending coefficients (textbook checks)', () => {
+  it('extracts descending coefficients (known-value checks)', () => {
     expect(reduceRational('x^2-3*x+2').numerator.map((c) => c.re)).toEqual([1, -3, 2])
     expect(reduceRational('x^2-3*x+2').denominator.map((c) => c.re)).toEqual([1])
     expect(reduceRational('x^2+5').numerator.map((c) => c.re)).toEqual([1, 0, 5])
