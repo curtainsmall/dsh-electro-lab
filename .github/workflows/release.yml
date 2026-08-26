@@ -84,7 +84,9 @@ jobs:
   # step falls back to the NPM_TOKEN secret. An already-published version is
   # skipped (safe tag replay) and prerelease versions use the `beta` dist-tag.
   # A GitHub Release named after the tag (no artifacts) is created only when
-  # npm actually published a new version — tag replay skips both.
+  # npm actually published a new version — tag replay skips both. The release
+  # body is the matching CHANGELOG.md entry, read with the guard-verified
+  # version (no duplicate normalization, no duplicate validation).
   publish:
     needs: guard
     runs-on: ubuntu-latest
@@ -130,6 +132,12 @@ jobs:
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Read changelog entry
+        id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          version: ${{ needs.guard.outputs.version }}
+          path: ./CHANGELOG.md
       - name: Publish GitHub Release
         if: steps.publish_npm.outputs.published == 'true'
         uses: softprops/action-gh-release@v2
@@ -137,4 +145,4 @@ jobs:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-') }}
-          body: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.changes }}
