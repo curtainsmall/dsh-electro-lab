@@ -1,6 +1,6 @@
 {
   "name": "dsh-electro-lab",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH plugin: electrical & electronics workbench",
   "repository": {
     "type": "git",
