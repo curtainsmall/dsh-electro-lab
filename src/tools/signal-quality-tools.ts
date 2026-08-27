@@ -1,0 +1,77 @@
+/**
+ * Signal-quality tools: THD, jitter SNR and the ADC noise budget.
+ * IO is JSON-and-complex-only.
+ */
+import { calcAdcBudget, calcJitterSnr, calcThd } from '../math/signal-quality.ts'
+import { toScalar, serializeReal } from '../math/convert.ts'
+import { QuantityKind } from '../math/quantity-kind.ts'
+import { defineJsonTool, createValueParam } from './helpers.ts'
+import type { JsonValue } from '@deepseek-ai/dsh-tools'
+
+export const signalQualityTools = [
+  defineJsonTool({
+    name: 'thd',
+    description: 'Total harmonic distortion of a sampled signal: √(Σ harmonic²)/fundamental, with the fundamental taken as the dominant non-DC DFT bin and harmonics at 2f₀..harmonics·f₀ (harmonics alias back via spectral folding, so the result is independent of which mirror peak is picked). thd is a fraction (0.05 = 5 %); thdDb is 20·log10(thd), floored at −300 dB when no harmonics are present (JSON cannot carry −Infinity).',
+    parameters: {
+      samples: {
+        type: 'array',
+        description: 'time-domain samples, kind none',
+        required: true,
+        items: createValueParam(QuantityKind.None, 'value (kind none)'),
+      },
+      harmonics: { type: 'integer', description: 'harmonics to include, starting at 2nd (default 10)' },
+    },
+    execute: (args): Record<string, JsonValue> => {
+      const samples = args.samples.map((sample) => toScalar(sample, QuantityKind.None))
+      const harmonics = args.harmonics ?? 10
+      const result = calcThd(samples, harmonics)
+      return {
+        thd: serializeReal(result.thd, QuantityKind.None),
+        thdDb: serializeReal(result.thd === 0 ? -300 : result.thdDb, QuantityKind.Log),
+        fundamental: serializeReal(result.fundamental, QuantityKind.None),
+        harmonicAmplitudes: result.harmonicAmplitudes.map((amplitude) => serializeReal(amplitude, QuantityKind.None)),
+      }
+    },
+  }),
+  defineJsonTool({
+    name: 'jitter_snr',
+    description: 'SNR ceiling set by sampling-clock jitter: SNR = −20·log10(2π·f·tⱼ) dB, with signal frequency f and RMS jitter tⱼ. Higher frequency or jitter lowers the ceiling; independent of the quantizer.',
+    parameters: {
+      signalFrequency: { ...createValueParam(QuantityKind.Frequency, 'signal frequency'), required: true },
+      jitter: { ...createValueParam(QuantityKind.Time, 'RMS clock jitter'), required: true },
+    },
+    execute: (args): Record<string, JsonValue> => {
+      const snrDb = calcJitterSnr(
+        toScalar(args.signalFrequency, QuantityKind.Frequency),
+        toScalar(args.jitter, QuantityKind.Time),
+      )
+      return { snrDb: serializeReal(snrDb, QuantityKind.Log) }
+    },
+  }),
+  defineJsonTool({
+    name: 'adc_budget',
+    description: 'Complete ADC noise budget in one call: quantization SNR (6.02·N + 1.76 dB), jitter SNR (−20·log10(2π·f·tⱼ)) and an optional thermal SNR (signal-dependent, supply it from thermal_noise against your signal level). Noise powers add linearly and the total is reported as snrTotalDb with ENOB = (snrTotalDb − 1.76)/6.02.',
+    parameters: {
+      bits: { type: 'integer', description: 'quantizer resolution in bits', required: true },
+      signalFrequency: { ...createValueParam(QuantityKind.Frequency, 'signal frequency'), required: true },
+      jitter: { ...createValueParam(QuantityKind.Time, 'RMS clock jitter'), required: true },
+      thermalSnrDb: { ...createValueParam(QuantityKind.Log, 'thermal SNR contribution in dB (optional)') },
+    },
+    execute: (args): Record<string, JsonValue> => {
+      const result = calcAdcBudget(
+        args.bits,
+        toScalar(args.signalFrequency, QuantityKind.Frequency),
+        toScalar(args.jitter, QuantityKind.Time),
+        args.thermalSnrDb === undefined ? undefined : toScalar(args.thermalSnrDb, QuantityKind.Log),
+      )
+      const out: Record<string, JsonValue> = {
+        snrQuantizationDb: serializeReal(result.snrQuantizationDb, QuantityKind.Log),
+        snrJitterDb: serializeReal(result.snrJitterDb, QuantityKind.Log),
+        snrTotalDb: serializeReal(result.snrTotalDb, QuantityKind.Log),
+        enob: serializeReal(result.enob, QuantityKind.None),
+      }
+      if (result.snrThermalDb !== undefined) out.snrThermalDb = serializeReal(result.snrThermalDb, QuantityKind.Log)
+      return out
+    },
+  }),
+]
