@@ -85,16 +85,9 @@ DeepSeek Harness ElectroLab 插件的全部工具,按领域分组。所有工具
 
 | 工具 | 用途 |
 |---|---|
-| `thermal_noise` | 约翰逊噪声功率 k·T·B（W 与 dBm） |
+| `thermal_noise` | 约翰逊噪声功率 k·T·B（W） |
 | `cascade_noise_figure` | Friis 多级级联 |
 | `quantization_noise` | 理想量化器 SNR:6.02·N + 1.76 dB |
-
-## 分贝与对数
-
-| 工具 | 用途 |
-|---|---|
-| `db_convert` | 绝对电平多参考换算（W/dBm/dBW/V/dBu/dBµV） |
-| `decibel_ratio` | 比值 ↔ 分贝（线性量 10·log10,二次量 20·log10） |
 
 ## 滤波器
 

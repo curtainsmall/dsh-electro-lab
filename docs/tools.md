@@ -85,16 +85,9 @@ All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every to
 
 | Tool | Purpose |
 |---|---|
-| `thermal_noise` | Johnson noise power k·T·B (W and dBm) |
+| `thermal_noise` | Johnson noise power k·T·B (W) |
 | `cascade_noise_figure` | Friis cascade of stages |
 | `quantization_noise` | Ideal quantizer SNR: 6.02·N + 1.76 dB |
-
-## dB & logarithms
-
-| Tool | Purpose |
-|---|---|
-| `db_convert` | Absolute level across references (W/dBm/dBW/V/dBu/dBµV) |
-| `decibel_ratio` | Ratio ↔ dB (10·log₁₀ linear, 20·log₁₀ quadratic) |
 
 ## Filters
 
