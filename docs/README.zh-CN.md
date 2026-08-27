@@ -1,23 +1,22 @@
-# dsh-electro-lab
+# DeepSeek Harness ElectroLab
 
-**ElectroLab** —— 用于解决电工电子问题的 DeepSeek Harness 插件。
+面向 DeepSeek Harness 的电气电子计算插件:电路分析、瞬态、滤波器、信号质量、噪声与单位换算——所有数值均为 SI 基本单位的自描述复数值对象。
 
 [English](../README.md) | [简体中文](README.zh-CN.md)
 
 ## 功能
 
-- **计算引擎** —— 复数表达式求值（`calculate`、`rational_coefficients`）、反三角函数与双参数 `atan2`。
-- **数列求和** —— 等差与等比数列（有限项或收敛无穷项）、自然数幂和（Σk、Σk²、Σk³）。
-- **传递函数核心** —— 零极点、部分分式、Bode 与阶跃响应、z 域幂级数展开。
-- **数字信号处理** —— DFT/IDFT（基 2 FFT）、傅里叶级数、窗函数、差分方程、信号统计。
-- **电路工具** —— 嵌套网络阻抗、L/π/T 匹配网络、巴特沃斯滤波器设计、一阶/二阶瞬态曲线（RC/RL/串联 RLC，含阻尼状态）、谐振。
-- **电子学工具** —— 运放配置、分压器、LED 限流电阻、时间常数、传输线原语（同轴线、四分之一波长变换器、上升时间/带宽）、反射系数/VSWR/回波损耗。
-- **噪声与分贝** —— 热噪声、Friis 级联、量化信噪比、分贝电平与比值换算（dBm/dBu/dBµV/dBW）。
-- **信号质量** —— 采样信号的总谐波失真（THD）、时钟抖动 SNR 上限、以及完整 ADC 预算（量化 + 抖动 + 热噪声，含 ENOB）。
-- **单位换算** —— 常见非 SI 单位（°C/°F、bar/psi/atm、cal/kWh、hp、inch/mile、lb/oz）换算为对应 SI 基本量。
-- **`solve_steps`** —— 多步求解器,通过 `@stepN` 引用串联工具结果。
-- **客户端 UI** —— 工作台面板与交互式史密斯圆图。
-- **随包智能体预设与技能** —— `electro-lab` 预设在任何工具调用之前进行门控;技能 `electro-lab-template` 与 `electro-lab-interface` 随插件提供。
+- **计算** —— 复数表达式求值、有理系数代数与数列求和。
+- **电路** —— 阻抗网络、匹配、滤波器、瞬态与谐振。
+- **电子学** —— 运放配置、分压器与 LED 驱动。
+- **射频与传输线** —— 史密斯圆图、反射、匹配与传输线参数。
+- **信号质量** —— 失真、抖动与 ADC 预算。
+- **噪声与分贝** —— 噪声源与分贝换算。
+- **DSP** —— 变换、统计与传递函数。
+- **单位换算** —— 同一族任意单位互转。
+- **工作流** —— 多步编排、客户端面板与随包智能体预设。
+
+全部工具见[tools.zh-CN.md](tools.zh-CN.md)。
 
 ## 安装
 
@@ -37,8 +36,8 @@ dsh plugin --profile web add dsh-electro-lab
 
 ## 文档
 
-- [参与贡献](../.github/CONTRIBUTING.md)
-- [English](../README.md)
+- [tools.zh-CN.md](tools.zh-CN.md)
+- [参与贡献](CONTRIBUTING.zh-CN.md)
 
 ## 许可
 

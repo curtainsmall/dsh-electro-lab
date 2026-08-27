@@ -19,7 +19,7 @@ export function apply(ctx: Context): void {
     const synced = installPresets()
     if (synced.length > 0) ctx.logger?.info(`[dsh-electro-lab] synced packaged preset(s): ${synced.join(', ')}`)
   } catch (error) {
-    // A preset that fails to sync must never break the workbench.
+    // A preset that fails to sync must never break the plugin.
     ctx.logger?.warn(`[dsh-electro-lab] failed to sync packaged preset: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
