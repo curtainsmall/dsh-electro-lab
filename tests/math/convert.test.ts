@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { Form, expectQuantity, serializeReal, serializeComplex, toComplex, toScalar, CommonUnit, convertCommonUnit } from '../../src/math/convert.ts'
+import { Form, expectQuantity, serializeReal, serializeComplex, toComplex, toScalar, ConvertUnit, convertAngle, convertEnergy, convertLength, convertLogValue, convertMass, convertPower, convertPressure, convertTemperature } from '../../src/math/convert.ts'
 import { QuantityKind } from '../../src/math/quantity-kind.ts'
+import { RatioKind } from '../../src/math/db.ts'
 
 function createRectValue(re: number, im: number, kind: QuantityKind): { form: Form.Rect; re: number; im: number; kind: QuantityKind } {
   return { form: Form.Rect, re, im, kind }
@@ -118,61 +119,89 @@ describe('serializeReal — real result output', () => {
   })
 })
 
-describe('convertCommonUnit — temperature to kelvin', () => {
-  it('celsius is affine: 0 °C = 273.15 K, 100 °C = 373.15 K', () => {
-    expect(convertCommonUnit(0, CommonUnit.Celsius)).toEqual({ value: 273.15, kind: QuantityKind.Temperature })
-    expect(convertCommonUnit(100, CommonUnit.Celsius)).toEqual({ value: 373.15, kind: QuantityKind.Temperature })
+describe('convertTemperature — affine, real only', () => {
+  it('celsius/fahrenheit are affine: 0 °C = 32 °F = 273.15 K, 100 °C = 212 °F, −40 °F = −40 °C', () => {
+    expect(convertTemperature(0, ConvertUnit.Celsius, ConvertUnit.Kelvin).re).toBeCloseTo(273.15, 9)
+    expect(convertTemperature(100, ConvertUnit.Celsius, ConvertUnit.Fahrenheit).re).toBeCloseTo(212, 9)
+    expect(convertTemperature(32, ConvertUnit.Fahrenheit, ConvertUnit.Celsius).re).toBeCloseTo(0, 9)
+    expect(convertTemperature(-40, ConvertUnit.Fahrenheit, ConvertUnit.Celsius).re).toBeCloseTo(-40, 9)
+    expect(convertTemperature(300, ConvertUnit.Kelvin, ConvertUnit.Kelvin).re).toBe(300)
   })
-  it('fahrenheit is affine: 32 °F = 273.15 K, −40 °F = 233.15 K', () => {
-    expect(convertCommonUnit(32, CommonUnit.Fahrenheit).value).toBeCloseTo(273.15, 9)
-    expect(convertCommonUnit(-40, CommonUnit.Fahrenheit).value).toBeCloseTo(233.15, 9)
-    expect(convertCommonUnit(32, CommonUnit.Fahrenheit).kind).toBe(QuantityKind.Temperature)
-  })
-})
-
-describe('convertCommonUnit — pressure to pascal', () => {
-  it('1 bar = 1e5 Pa, 1 atm = 101325 Pa', () => {
-    expect(convertCommonUnit(1, CommonUnit.Bar)).toEqual({ value: 1e5, kind: QuantityKind.Pressure })
-    expect(convertCommonUnit(1, CommonUnit.Atm)).toEqual({ value: 101325, kind: QuantityKind.Pressure })
-  })
-  it('1 psi ≈ 6894.76 Pa', () => {
-    const { value } = convertCommonUnit(1, CommonUnit.Psi)
-    expect(value).toBeCloseTo(6894.757293168, 6)
-    expect(convertCommonUnit(1, CommonUnit.Psi).kind).toBe(QuantityKind.Pressure)
+  it('rejects a complex temperature', () => {
+    expect(() => convertTemperature(new Complex(20, 1), ConvertUnit.Celsius, ConvertUnit.Kelvin)).toThrow(/real/)
   })
 })
 
-describe('convertCommonUnit — energy to joule', () => {
-  it('1 cal = 4.184 J, 1 kcal = 4184 J', () => {
-    expect(convertCommonUnit(1, CommonUnit.Calorie)).toEqual({ value: 4.184, kind: QuantityKind.Energy })
-    expect(convertCommonUnit(1, CommonUnit.Kilocalorie)).toEqual({ value: 4184, kind: QuantityKind.Energy })
-  })
-  it('1 Wh = 3600 J, 1 kWh = 3.6e6 J', () => {
-    expect(convertCommonUnit(1, CommonUnit.WattHour)).toEqual({ value: 3600, kind: QuantityKind.Energy })
-    expect(convertCommonUnit(1, CommonUnit.KilowattHour)).toEqual({ value: 3.6e6, kind: QuantityKind.Energy })
+describe('convertPressure', () => {
+  it('1 bar = 1e5 Pa, 1 atm = 101325 Pa, 1 psi ≈ 6894.76 Pa', () => {
+    expect(convertPressure(1, ConvertUnit.Bar, ConvertUnit.Pascal).re).toBe(1e5)
+    expect(convertPressure(1, ConvertUnit.Atm, ConvertUnit.Pascal).re).toBe(101325)
+    expect(convertPressure(1, ConvertUnit.Psi, ConvertUnit.Pascal).re).toBeCloseTo(6894.757293168, 6)
   })
 })
 
-describe('convertCommonUnit — power to watt', () => {
-  it('1 hp ≈ 745.7 W', () => {
-    const { value } = convertCommonUnit(1, CommonUnit.Horsepower)
-    expect(value).toBeCloseTo(745.6998715822702, 6)
-    expect(convertCommonUnit(1, CommonUnit.Horsepower).kind).toBe(QuantityKind.Power)
+describe('convertEnergy', () => {
+  it('1 cal = 4.184 J, 1 kWh = 3.6e6 J, 1 Wh = 0.001 kWh', () => {
+    expect(convertEnergy(1, ConvertUnit.Calorie, ConvertUnit.Joule).re).toBe(4.184)
+    expect(convertEnergy(1, ConvertUnit.KilowattHour, ConvertUnit.Joule).re).toBe(3.6e6)
+    expect(convertEnergy(1, ConvertUnit.WattHour, ConvertUnit.KilowattHour).re).toBe(0.001)
   })
 })
 
-describe('convertCommonUnit — length to metre', () => {
-  it('1 in = 0.0254 m, 1 ft = 0.3048 m, 1 yd = 0.9144 m, 1 mi = 1609.344 m', () => {
-    expect(convertCommonUnit(1, CommonUnit.Inch)).toEqual({ value: 0.0254, kind: QuantityKind.Length })
-    expect(convertCommonUnit(1, CommonUnit.Foot)).toEqual({ value: 0.3048, kind: QuantityKind.Length })
-    expect(convertCommonUnit(1, CommonUnit.Yard)).toEqual({ value: 0.9144, kind: QuantityKind.Length })
-    expect(convertCommonUnit(1, CommonUnit.Mile)).toEqual({ value: 1609.344, kind: QuantityKind.Length })
+describe('convertPower', () => {
+  it('1 hp ≈ 745.7 W, 1000 W ≈ 1.341 hp', () => {
+    expect(convertPower(1, ConvertUnit.Horsepower, ConvertUnit.Watt).re).toBeCloseTo(745.6998715822702, 6)
+    expect(convertPower(1000, ConvertUnit.Watt, ConvertUnit.Horsepower).re).toBeCloseTo(1.3410220896, 6)
   })
 })
 
-describe('convertCommonUnit — mass to kilogram', () => {
-  it('1 lb = 0.45359237 kg, 1 oz ≈ 0.02835 kg', () => {
-    expect(convertCommonUnit(1, CommonUnit.Pound)).toEqual({ value: 0.45359237, kind: QuantityKind.Mass })
-    expect(convertCommonUnit(1, CommonUnit.Ounce)).toEqual({ value: 0.028349523125, kind: QuantityKind.Mass })
+describe('convertLength', () => {
+  it('1 in = 0.0254 m, 1 mi = 1609.344 m, 1 m ≈ 39.37 in', () => {
+    expect(convertLength(1, ConvertUnit.Inch, ConvertUnit.Metre).re).toBe(0.0254)
+    expect(convertLength(1, ConvertUnit.Mile, ConvertUnit.Metre).re).toBe(1609.344)
+    expect(convertLength(1, ConvertUnit.Metre, ConvertUnit.Inch).re).toBeCloseTo(39.3700787402, 6)
+  })
+})
+
+describe('convertMass', () => {
+  it('1 lb = 0.45359237 kg, 1 kg ≈ 35.274 oz', () => {
+    expect(convertMass(1, ConvertUnit.Pound, ConvertUnit.Kilogram).re).toBe(0.45359237)
+    expect(convertMass(1, ConvertUnit.Kilogram, ConvertUnit.Ounce).re).toBeCloseTo(35.2739619496, 6)
+  })
+})
+
+describe('convertAngle — degrees to radians (angles are always radians)', () => {
+  it('30° = π/6 rad, 180° = π rad, −90° = −π/2 rad', () => {
+    expect(convertAngle(30).re).toBeCloseTo(Math.PI / 6, 12)
+    expect(convertAngle(180).re).toBeCloseTo(Math.PI, 12)
+    expect(convertAngle(-90).re).toBeCloseTo(-Math.PI / 2, 12)
+  })
+  it('complex values scale both components', () => {
+    const result = convertAngle(new Complex(30, 60))
+    expect(result.re).toBeCloseTo(Math.PI / 6, 12)
+    expect(result.im).toBeCloseTo(Math.PI / 3, 12)
+  })
+})
+
+describe('convertLogValue — real only, kind required', () => {
+  it('ratio ↔ dB: power uses 10·log10, voltage uses 20·log10', () => {
+    expect(convertLogValue(10, ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Power).re).toBeCloseTo(10, 12)
+    expect(convertLogValue(20, ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Voltage).re).toBeCloseTo(10, 12)
+    expect(convertLogValue(100, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Power).re).toBeCloseTo(20, 12)
+    expect(convertLogValue(1000, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Voltage).re).toBeCloseTo(60, 12)
+    expect(convertLogValue(4, ConvertUnit.Ratio, ConvertUnit.Ratio, RatioKind.Power).re).toBe(4)
+    expect(convertLogValue(10, ConvertUnit.Db, ConvertUnit.Db, RatioKind.Power).re).toBe(10)
+  })
+  it('rejects non-positive ratios and complex values', () => {
+    expect(() => convertLogValue(0, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Power)).toThrow(/positive/)
+    expect(() => convertLogValue(new Complex(1, 1), ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Power)).toThrow(/real/)
+  })
+})
+
+describe('convert — complex values', () => {
+  it('linear families scale both components of a complex value', () => {
+    const result = convertPower(new Complex(3, 4), ConvertUnit.Horsepower, ConvertUnit.Watt)
+    expect(result.re).toBeCloseTo(3 * 745.6998715822702, 6)
+    expect(result.im).toBeCloseTo(4 * 745.6998715822702, 6)
   })
 })
