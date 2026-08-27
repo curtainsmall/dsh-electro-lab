@@ -37,12 +37,19 @@ export function calcTransferResponse(numerator: Polynomial, denominator: Polynom
 export function calcFreqPoints(variable: Variable, frequencies: number[], sampleTime?: number): Complex[] {
   return frequencies.map((frequency) => {
     const angularFrequency = 2 * Math.PI * frequency
-    if (variable === Variable.Z) {
-      if (sampleTime === undefined) throw new Error('variable "z" requires sampleTime')
-      const angle = angularFrequency * sampleTime
-      return new Complex(Math.cos(angle), Math.sin(angle))
+    let point: Complex
+    switch (variable) {
+      case Variable.Z: {
+        if (sampleTime === undefined) throw new Error('variable "z" requires sampleTime')
+        const angle = angularFrequency * sampleTime
+        point = new Complex(Math.cos(angle), Math.sin(angle))
+        break
+      }
+      case Variable.S:
+        point = new Complex(0, angularFrequency)
+        break
     }
-    return new Complex(0, angularFrequency)
+    return point
   })
 }
 

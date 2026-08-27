@@ -278,7 +278,15 @@ export function calcRlcTransientSeries(
   const alpha = resistance / (2 * inductance)
   const omega0 = 1 / Math.sqrt(inductance * capacitance)
   const dampingRatio = alpha / omega0
-  const finalVoltage = mode === SwitchingMode.Charge ? sourceVoltage : 0
+  let finalVoltage: number
+  switch (mode) {
+    case SwitchingMode.Charge:
+      finalVoltage = sourceVoltage
+      break
+    case SwitchingMode.Discharge:
+      finalVoltage = 0
+      break
+  }
   const critical = Math.abs(dampingRatio - 1) < 1e-9
   const points = times.map((time) => {
     let voltage: number
