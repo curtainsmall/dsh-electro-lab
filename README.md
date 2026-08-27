@@ -7,6 +7,7 @@
 ## Features
 
 - **Calculation engine** — expression evaluation with complex numbers (`calculate`, `rational_coefficients`), inverse trigonometric functions and two-argument `atan2`.
+- **Series sums** — arithmetic and geometric series (finite or convergent infinite) and natural-number power sums (Σk, Σk², Σk³).
 - **Transfer-function core** — poles/zeros, partial fractions, Bode and step responses, z-domain power-series expansion.
 - **Digital signal processing** — DFT/IDFT (radix-2 FFT), Fourier series, window functions, difference equations, signal statistics.
 - **Circuit tools** — nested-network impedance, L/π/T matching networks, Butterworth filter design, first-/second-order transient curves (RC/RL/series-RLC with damping regimes), resonance.
