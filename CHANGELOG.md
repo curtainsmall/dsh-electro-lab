@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-28
+
+### Added
+
+- `series_sum` — arithmetic, geometric (finite or convergent infinite) and power sums (Σk, Σk², Σk³) selected by a `kind` discriminator.
+- Signal-quality tools: `thd` (total harmonic distortion from sampled signals, spectral-folding aware), `jitter_snr` (clock-jitter SNR ceiling −20·log₁₀(2π·f·tⱼ)) and the `adc_budget` combo (quantization + jitter + thermal noise → total SNR and ENOB).
+
+### Changed
+
+- Unit conversion is now the `convert` primitive: per-family math functions (temperature affine, real only; pressure/energy/power/length/mass/angle linear, complex-capable; log ratio ↔ dB) dispatched by one tool through an O(1) family lookup. Angle conversion is degree → radian only — angles are always radians.
+- Ratio kinds renamed `power`/`voltage` → `linear`/`quadratic` (10·log₁₀ vs 20·log₁₀), keeping the log conversion general outside any electronics context.
+- npm publishing uses OIDC trusted publishing exclusively — the `NPM_TOKEN` fallback is removed.
+
+### Removed
+
+- `convert_unit` — superseded by `convert` (same families, plus ratio ↔ dB).
+- `db_convert` and `decibel_ratio`, along with the dB level-unit layer (W/dBm/dBW/V/dBu/dBµV references) — level conversion adds no algorithm beyond a series of `convert` calls; `thermal_noise` returns watts only.
+
 ## [0.3.0] - 2026-08-26
 
 ### Removed
@@ -56,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.4.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.4.0
 [0.3.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.3.0
 [0.2.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.2.0
 [0.1.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.1.1
