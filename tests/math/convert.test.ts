@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { Form, expectQuantity, serializeReal, serializeComplex, toComplex, toScalar, ConvertUnit, convertAngle, convertEnergy, convertLength, convertLogValue, convertMass, convertPower, convertPressure, convertTemperature } from '../../src/math/convert.ts'
+import { Form, expectQuantity, serializeReal, serializeComplex, toComplex, toScalar, ConvertUnit, RatioKind, convertAngle, convertEnergy, convertLength, convertLogValue, convertMass, convertPower, convertPressure, convertTemperature } from '../../src/math/convert.ts'
 import { QuantityKind } from '../../src/math/quantity-kind.ts'
-import { RatioKind } from '../../src/math/db.ts'
 
 function createRectValue(re: number, im: number, kind: QuantityKind): { form: Form.Rect; re: number; im: number; kind: QuantityKind } {
   return { form: Form.Rect, re, im, kind }
@@ -185,16 +184,20 @@ describe('convertAngle — degrees to radians (angles are always radians)', () =
 
 describe('convertLogValue — real only, kind required', () => {
   it('ratio ↔ dB: power uses 10·log10, voltage uses 20·log10', () => {
-    expect(convertLogValue(10, ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Power).re).toBeCloseTo(10, 12)
-    expect(convertLogValue(20, ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Voltage).re).toBeCloseTo(10, 12)
-    expect(convertLogValue(100, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Power).re).toBeCloseTo(20, 12)
-    expect(convertLogValue(1000, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Voltage).re).toBeCloseTo(60, 12)
-    expect(convertLogValue(4, ConvertUnit.Ratio, ConvertUnit.Ratio, RatioKind.Power).re).toBe(4)
-    expect(convertLogValue(10, ConvertUnit.Db, ConvertUnit.Db, RatioKind.Power).re).toBe(10)
+    expect(convertLogValue(10, ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Linear).re).toBeCloseTo(10, 12)
+    expect(convertLogValue(20, ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Quadratic).re).toBeCloseTo(10, 12)
+    expect(convertLogValue(100, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Linear).re).toBeCloseTo(20, 12)
+    expect(convertLogValue(1000, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Quadratic).re).toBeCloseTo(60, 12)
+    expect(convertLogValue(4, ConvertUnit.Ratio, ConvertUnit.Ratio, RatioKind.Linear).re).toBe(4)
+    expect(convertLogValue(10, ConvertUnit.Db, ConvertUnit.Db, RatioKind.Linear).re).toBe(10)
+    // the classic dB landmarks: ×2 power ≈ 3.01 dB, ×2 voltage ≈ 6.02 dB
+    expect(convertLogValue(2, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Linear).re).toBeCloseTo(3.0103, 3)
+    expect(convertLogValue(2, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Quadratic).re).toBeCloseTo(6.0206, 3)
+    expect(convertLogValue(-6.0206, ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Quadratic).re).toBeCloseTo(0.5, 3)
   })
   it('rejects non-positive ratios and complex values', () => {
-    expect(() => convertLogValue(0, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Power)).toThrow(/positive/)
-    expect(() => convertLogValue(new Complex(1, 1), ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Power)).toThrow(/real/)
+    expect(() => convertLogValue(0, ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Linear)).toThrow(/positive/)
+    expect(() => convertLogValue(new Complex(1, 1), ConvertUnit.Db, ConvertUnit.Ratio, RatioKind.Linear)).toThrow(/real/)
   })
 })
 

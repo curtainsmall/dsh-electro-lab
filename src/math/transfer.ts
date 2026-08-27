@@ -5,6 +5,7 @@
  * response, and difference-equation recursion.
  */
 import { Complex } from 'complex.js'
+import { ConvertUnit, RatioKind, convertLogValue } from './convert.ts'
 import {
   convolvePolynomials,
   dividePolynomials,
@@ -13,7 +14,6 @@ import {
   trimPolynomial,
   type Polynomial,
 } from './polynomial.ts'
-import { calcMagnitudeToDb } from './db.ts'
 
 // ── Enums ────────────────────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ export function calcBodeResponse(
   const responses = calcTransferResponse(numerator, denominator, calcFreqPoints(variable, frequencies, sampleTime))
   return {
     frequencies,
-    magnitudesDb: responses.map((response) => calcMagnitudeToDb(response.abs())),
+    magnitudesDb: responses.map((response) => convertLogValue(response.abs(), ConvertUnit.Ratio, ConvertUnit.Db, RatioKind.Quadratic).re),
     phasesDeg: responses.map((response) => (response.arg() * 180) / Math.PI),
   }
 }

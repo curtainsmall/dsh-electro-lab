@@ -94,7 +94,7 @@ DeepSeek Harness ElectroLab 插件的全部工具,按领域分组。所有工具
 | 工具 | 用途 |
 |---|---|
 | `db_convert` | 绝对电平多参考换算（W/dBm/dBW/V/dBu/dBµV） |
-| `decibel_ratio` | 比值 ↔ 分贝（功率 10·log10,电压 20·log10） |
+| `decibel_ratio` | 比值 ↔ 分贝（线性量 10·log10,二次量 20·log10） |
 
 ## 滤波器
 

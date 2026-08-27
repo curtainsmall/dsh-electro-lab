@@ -1,7 +1,8 @@
 /**
- * Log mathematics: absolute level conversion (power/voltage references)
- * and ratio conversion. Voltage↔power conversion assumes a reference
- * impedance (default 50 Ω).
+ * Log mathematics: absolute level conversion (power/voltage references).
+ * Voltage↔power conversion assumes a reference impedance (default 50 Ω).
+ * Ratio ↔ dB lives in convert.ts (convertLogValue) — the primitive convert
+ * covers the log scale without any electronics context.
  */
 
 /** Absolute level unit: the reference each value is measured against. */
@@ -12,12 +13,6 @@ export enum DbUnit {
   Voltage = 'volt',
   Dbu = 'dbu',
   DbuV = 'dbuv',
-}
-
-/** What a decibel ratio is taken over. */
-export enum RatioKind {
-  Power = 'power',
-  Voltage = 'voltage',
 }
 
 /**
@@ -68,49 +63,4 @@ export function convertDbLevels(
     dbu: 20 * Math.log10(volts / 0.775),
     dbuV: 20 * Math.log10(volts / 1e-6),
   }
-}
-
-/**
- * Convert between a ratio and decibels. Exactly one of `ratio`/`db` must be
- * given; the other is returned. Power ratios use 10·log10, voltage ratios
- * 20·log10.
- */
-export function convertDecibelRatio(
-  kind: RatioKind,
-  ratio?: number,
-  db?: number,
-): { db?: number; ratio?: number } {
-  if ((ratio === undefined) === (db === undefined)) {
-    throw new Error('provide exactly one of ratio or db')
-  }
-  if (db !== undefined) {
-    let ratio: number
-    switch (kind) {
-      case RatioKind.Power:
-        ratio = 10 ** (db / 10)
-        break
-      case RatioKind.Voltage:
-        ratio = 10 ** (db / 20)
-        break
-    }
-    return { db, ratio }
-  }
-  const value = ratio!
-  if (value <= 0) throw new Error('ratio must be positive')
-  let dbValue: number
-  switch (kind) {
-    case RatioKind.Power:
-      dbValue = 10 * Math.log10(value)
-      break
-    case RatioKind.Voltage:
-      dbValue = 20 * Math.log10(value)
-      break
-  }
-  return { ratio: value, db: dbValue }
-}
-
-/** Magnitude to decibels: 20·log₁₀(magnitude); zero maps to −Infinity. */
-export function calcMagnitudeToDb(magnitude: number): number {
-  if (magnitude < 0) throw new Error('magnitude must be non-negative')
-  return 20 * Math.log10(magnitude)
 }

@@ -26,7 +26,7 @@ import {
   type LogUnit,
 } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { RatioKind } from '../math/db.ts'
+import { RatioKind } from '../math/convert.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
@@ -77,12 +77,12 @@ const FAMILY_OF: Record<ConvertUnit, ConvertFamily> = {
 export const unitTools = [
   defineJsonTool({
     name: 'convert',
-    description: 'Convert a value from one unit to any other unit of the same family: temperature (celsius, fahrenheit, kelvin), pressure (bar, psi, atm, pascal), energy (calorie, kilocalorie, watthour, kilowatthour, joule), power (horsepower, watt), length (inch, foot, yard, mile, metre), mass (pound, ounce, kilogram), angle (degree → radian only; angles are always radians), log scale (ratio ↔ db, requires kind power|voltage). The result is returned in the target unit.',
+    description: 'Convert a value from one unit to any other unit of the same family: temperature (celsius, fahrenheit, kelvin), pressure (bar, psi, atm, pascal), energy (calorie, kilocalorie, watthour, kilowatthour, joule), power (horsepower, watt), length (inch, foot, yard, mile, metre), mass (pound, ounce, kilogram), angle (degree → radian only; angles are always radians), log scale (ratio ↔ db, requires kind linear|quadratic). The result is returned in the target unit.',
     parameters: {
       value: { ...createValueParam(QuantityKind.None, 'value in the source unit'), required: true },
       from: { type: 'string', enum: ALL_UNITS, description: 'source unit', required: true },
       to: { type: 'string', enum: ALL_UNITS, description: 'target unit', required: true },
-      kind: { type: 'string', enum: [RatioKind.Power, RatioKind.Voltage], description: 'power or voltage (required when converting between ratio and db)' },
+      kind: { type: 'string', enum: [RatioKind.Linear, RatioKind.Quadratic], description: 'linear (power-like, 10·log10) or quadratic (amplitude-like, 20·log10); required when converting between ratio and db' },
     },
     execute: (args): Record<string, JsonValue> => {
       const value = toComplex(args.value, QuantityKind.None)

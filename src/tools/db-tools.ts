@@ -2,8 +2,8 @@
  * Log tools: absolute level conversion and ratio conversion.
  * IO is JSON-and-complex-only.
  */
-import { DbUnit, RatioKind, convertDbLevels, convertDecibelRatio } from '../math/db.ts'
-import { toScalar, serializeReal } from '../math/convert.ts'
+import { DbUnit, convertDbLevels } from '../math/db.ts'
+import { ConvertUnit, RatioKind, convertLogValue, toScalar, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
@@ -41,24 +41,29 @@ export const dbTools = [
   }),
   defineJsonTool({
     name: 'decibel_ratio',
-    description: 'Convert between a ratio and decibels. Provide exactly one of ratio or db (the level in dB); the other is returned. Power ratios use 10·log₁₀ (10 dB = ×10 power), voltage ratios 20·log₁₀ (20 dB = ×10 voltage).',
+    description: 'Convert between a ratio and decibels. Provide exactly one of ratio or db (the level in dB); the other is returned. Linear ratios (power-like, e.g. power, energy) use 10·log₁₀ (10 dB = ×10), quadratic ratios (amplitude-like, e.g. voltage, current, pressure) use 20·log₁₀ (20 dB = ×10).',
     parameters: {
       kind: {
         type: 'string',
-        enum: [RatioKind.Power, RatioKind.Voltage],
-        description: 'what the ratio is taken over',
+        enum: [RatioKind.Linear, RatioKind.Quadratic],
+        description: 'linear (power-like, 10·log10) or quadratic (amplitude-like, 20·log10)',
         required: true,
       },
       ratio: { ...createValueParam(QuantityKind.None, 'linear ratio (positive)') },
       db: { ...createValueParam(QuantityKind.Log, 'decibel value') },
     },
-    execute: (args) => {
+    execute: (args): Record<string, JsonValue> => {
       const ratio = args.ratio === undefined ? undefined : toScalar(args.ratio, QuantityKind.None)
       const db = args.db === undefined ? undefined : toScalar(args.db, QuantityKind.Log)
-      const result = convertDecibelRatio(args.kind, ratio, db)
+      if ((ratio === undefined) === (db === undefined)) {
+        throw new Error('provide exactly one of ratio or db')
+      }
       const out: Record<string, JsonValue> = { kind: args.kind }
-      if (result.db !== undefined) out.db = serializeReal(result.db, QuantityKind.Log)
-      if (result.ratio !== undefined) out.ratio = serializeReal(result.ratio, QuantityKind.None)
+      if (db !== undefined) {
+        out.ratio = serializeReal(convertLogValue(db, ConvertUnit.Db, ConvertUnit.Ratio, args.kind).re, QuantityKind.None)
+      } else {
+        out.db = serializeReal(convertLogValue(ratio!, ConvertUnit.Ratio, ConvertUnit.Db, args.kind).re, QuantityKind.Log)
+      }
       return out
     },
   }),

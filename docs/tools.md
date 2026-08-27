@@ -94,7 +94,7 @@ All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every to
 | Tool | Purpose |
 |---|---|
 | `db_convert` | Absolute level across references (W/dBm/dBW/V/dBu/dBµV) |
-| `decibel_ratio` | Ratio ↔ dB (10·log₁₀ power, 20·log₁₀ voltage) |
+| `decibel_ratio` | Ratio ↔ dB (10·log₁₀ linear, 20·log₁₀ quadratic) |
 
 ## Filters
 

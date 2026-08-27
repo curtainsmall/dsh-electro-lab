@@ -22,7 +22,18 @@
  */
 import { Complex } from 'complex.js'
 import { QuantityKind, isNearlyEqual } from './quantity-kind.ts'
-import { RatioKind } from './db.ts'
+
+/**
+ * What a decibel ratio is taken over. The 10 vs 20 factor comes from the
+ * nature of the quantity: a linear quantity (power, energy, intensity) has
+ * its energy in the quantity itself → 10·log10; a quadratic quantity
+ * (voltage, current, pressure — any amplitude whose energy is the square)
+ * → 20·log10. Named generically so it applies outside electronics too.
+ */
+export enum RatioKind {
+  Linear = 'linear',
+  Quadratic = 'quadratic',
+}
 
 /** Complex form discriminator (wire value = lowercase string). */
 export enum Form {
@@ -315,10 +326,19 @@ export function convertAngle(value: number | Complex): Complex {
  */
 export function convertLogValue(value: number | Complex, from: LogUnit, to: LogUnit, kind: RatioKind): Complex {
   const valueRe = asReal(value, 'log')
+  let logFactor: number
+  switch (kind) {
+    case RatioKind.Linear:
+      logFactor = 10
+      break
+    case RatioKind.Quadratic:
+      logFactor = 20
+      break
+  }
   let ratio: number
   switch (from) {
     case ConvertUnit.Db:
-      ratio = kind === RatioKind.Power ? 10 ** (valueRe / 10) : 10 ** (valueRe / 20)
+      ratio = 10 ** (valueRe / logFactor)
       break
     case ConvertUnit.Ratio:
       ratio = valueRe
@@ -328,7 +348,7 @@ export function convertLogValue(value: number | Complex, from: LogUnit, to: LogU
   switch (to) {
     case ConvertUnit.Db:
       if (ratio <= 0) throw new Error('ratio must be positive')
-      converted = kind === RatioKind.Power ? 10 * Math.log10(ratio) : 20 * Math.log10(ratio)
+      converted = logFactor * Math.log10(ratio)
       break
     case ConvertUnit.Ratio:
       converted = ratio

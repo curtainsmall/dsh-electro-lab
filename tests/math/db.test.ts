@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DbUnit, RatioKind, calcMagnitudeToDb, convertDbLevels, convertDecibelRatio } from '../../src/math/db.ts'
+import { DbUnit, convertDbLevels } from '../../src/math/db.ts'
 
 describe('convertDbLevels (known-value checks)', () => {
   it('30 dBm = 1 W = 137 dBµV into 50 Ω (known-value approximation)', () => {
@@ -30,42 +30,5 @@ describe('convertDbLevels (known-value checks)', () => {
 
   it('rejects non-positive impedance', () => {
     expect(() => convertDbLevels(1, DbUnit.Power, 0)).toThrow(/impedance/)
-  })
-})
-
-describe('convertDecibelRatio (known-value checks)', () => {
-  it('10 dB power ratio is ×10; voltage ratio is √10', () => {
-    const power = convertDecibelRatio(RatioKind.Power, undefined, 10)
-    expect(power.ratio).toBeCloseTo(10, 10)
-    const voltage = convertDecibelRatio(RatioKind.Voltage, undefined, 20)
-    expect(voltage.ratio).toBeCloseTo(10, 10)
-    const half = convertDecibelRatio(RatioKind.Voltage, undefined, -6.0206)
-    expect(half.ratio).toBeCloseTo(0.5, 3)
-  })
-
-  it('ratio to dB: power ×2 ≈ 3.01 dB, voltage ×2 ≈ 6.02 dB', () => {
-    expect(convertDecibelRatio(RatioKind.Power, 2).db).toBeCloseTo(3.0103, 3)
-    expect(convertDecibelRatio(RatioKind.Voltage, 2).db).toBeCloseTo(6.0206, 3)
-  })
-
-  it('rejects both or neither input', () => {
-    expect(() => convertDecibelRatio(RatioKind.Power, 2, 3)).toThrow(/exactly one/)
-    expect(() => convertDecibelRatio(RatioKind.Power)).toThrow(/exactly one/)
-  })
-
-  it('rejects non-positive ratio', () => {
-    expect(() => convertDecibelRatio(RatioKind.Power, -1)).toThrow(/positive/)
-  })
-})
-
-describe('calcMagnitudeToDb (known-value checks)', () => {
-  it('maps 1 → 0 dB, 1/√2 → −3.01 dB, 0 → −Infinity', () => {
-    expect(calcMagnitudeToDb(1)).toBeCloseTo(0, 12)
-    expect(calcMagnitudeToDb(1 / Math.SQRT2)).toBeCloseTo(-3.0103, 3)
-    expect(calcMagnitudeToDb(0)).toBe(Number.NEGATIVE_INFINITY)
-  })
-
-  it('rejects negative magnitudes', () => {
-    expect(() => calcMagnitudeToDb(-1)).toThrow(/non-negative/)
   })
 })
