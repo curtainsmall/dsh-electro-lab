@@ -79,10 +79,10 @@ jobs:
   # ── Publish: npm release + GitHub Release. Runs only after the guard passes. ──
   # Consistency is enforced by the guard; here we only build, test and publish.
   # prepublishOnly runs the build (tsc declarations + tsdown bundles) before
-  # the package is packed. OIDC trusted publishing is the default; if the OIDC
-  # exchange fails (e.g. the npmjs.com publisher is not configured yet) the
-  # step falls back to the NPM_TOKEN secret. An already-published version is
-  # skipped (safe tag replay) and prerelease versions use the `beta` dist-tag.
+  # the package is packed. Publishing uses OIDC trusted publishing only (the
+  # npmjs.com publisher authorizes this repository and workflow; no token is
+  # stored anywhere). An already-published version is skipped (safe tag
+  # replay) and prerelease versions use the `beta` dist-tag.
   # A GitHub Release named after the tag (no artifacts) is created only when
   # npm actually published a new version — tag replay skips both. The release
   # body is the matching CHANGELOG.md entry, read with the guard-verified
@@ -103,7 +103,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
-      - name: Publish to npm (OIDC, token fallback)
+      - name: Publish to npm (OIDC trusted publishing)
         id: publish_npm
         run: |
           # Version comes from the guard, which already verified it against
@@ -114,24 +114,11 @@ jobs:
           if npm view "dsh-electro-lab@$VER" version >/dev/null 2>&1; then
             echo "published=false" >> "$GITHUB_OUTPUT"
             echo "dsh-electro-lab@$VER already published — skipping (tag replay)"
-          elif pnpm publish --no-git-checks --access public --provenance --tag "$TAG"; then
+          else
+            pnpm publish --no-git-checks --access public --provenance --tag "$TAG"
             echo "published=true" >> "$GITHUB_OUTPUT"
             echo "published dsh-electro-lab@$VER via OIDC trusted publishing"
-          else
-            echo "::warning::OIDC publish failed — falling back to NPM_TOKEN"
-            if npm view "dsh-electro-lab@$VER" version >/dev/null 2>&1; then
-              echo "published=false" >> "$GITHUB_OUTPUT"
-              echo "dsh-electro-lab@$VER was actually published — skipping fallback"
-            elif [ -z "${NODE_AUTH_TOKEN:-}" ]; then
-              echo "::error::OIDC publish failed and NODE_AUTH_TOKEN is not set — cannot fall back"
-              exit 1
-            else
-              pnpm publish --no-git-checks --access public --tag "$TAG"
-              echo "published=true" >> "$GITHUB_OUTPUT"
-            fi
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Read changelog entry
         id: changelog
         uses: mindsers/changelog-reader-action@v2

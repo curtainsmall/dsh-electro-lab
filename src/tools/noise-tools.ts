@@ -3,7 +3,6 @@
  * SNR. IO is JSON-and-complex-only.
  */
 import { calcCascadeNoiseFigure, calcQuantizationSnr, calcThermalNoisePower } from '../math/noise.ts'
-import { convertDbLevels, DbUnit } from '../math/db.ts'
 import { toScalar, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
@@ -18,7 +17,7 @@ const dbArrayParam = (description: string) => ({
 export const noiseTools = [
   defineJsonTool({
     name: 'thermal_noise',
-    description: 'Thermal (Johnson) noise power in a bandwidth: P = k·T·B (k = 1.380649e−23 J/K). Returns watts and dBm. At 290 K in 1 MHz: −114 dBm.',
+    description: 'Thermal (Johnson) noise power in a bandwidth: P = k·T·B (k = 1.380649e−23 J/K). Returns watts. At 290 K in 1 MHz ≈ 4.0e−15 W.',
     parameters: {
       temperature: { ...createValueParam(QuantityKind.None, 'temperature in kelvin'), required: true },
       bandwidth: { ...createValueParam(QuantityKind.Frequency, 'bandwidth in Hz'), required: true },
@@ -32,7 +31,6 @@ export const noiseTools = [
         bandwidth: serializeReal(bandwidth, QuantityKind.Frequency),
         noisePowerWatts: serializeReal(watts, QuantityKind.Power),
       }
-      out.noisePowerDbm = serializeReal(convertDbLevels(watts, DbUnit.Power, 50).dbm, QuantityKind.Log)
       return out
     },
   }),

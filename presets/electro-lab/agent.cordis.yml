@@ -1,7 +1,7 @@
 # The `electro-lab` agent preset: a calculation sandbox.
 #
 # The persona is the complete system prompt: the model may ONLY use the
-# tools this preset composes (the dsh-electro-lab workbench) — no shell,
+# tools this preset composes (the dsh-electro-lab plugin) — no shell,
 # no file system, no network, no subagents. Runtime context snapshots are
 # suppressed; every number must come from a tool call result.
 #
@@ -35,8 +35,8 @@
     complete: true
     includeRuntimeContext: false
 
-# The electro-lab workbench: 30 tools (expression engine, circuit analysis,
-# Smith chart, transforms, noise/dB, transmission line, electronics) plus
+# The electro-lab plugin's toolset: expression engine, circuit analysis,
+# Smith chart, transforms, noise/dB, transmission line, electronics — plus
 # the solve_steps orchestrator and the electro-lab-template skill.
 - id: electro-lab
   name: 'dsh-electro-lab'

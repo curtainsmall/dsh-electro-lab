@@ -1,21 +1,22 @@
-# dsh-electro-lab
+# DeepSeek Harness ElectroLab
 
-**ElectroLab** — a DeepSeek Harness plugin for electrical & electronics problem solving.
+An electrical & electronics calculation plugin for the DeepSeek Harness: circuit analysis, transients, filters, signal quality, noise and unit conversion — every value a self-describing complex object in SI base units.
 
 [English](README.md) | [简体中文](docs/README.zh-CN.md)
 
 ## Features
 
-- **Calculation engine** — expression evaluation with complex numbers (`calculate`, `rational_coefficients`), inverse trigonometric functions and two-argument `atan2`.
-- **Transfer-function core** — poles/zeros, partial fractions, Bode and step responses, z-domain power-series expansion.
-- **Digital signal processing** — DFT/IDFT (radix-2 FFT), Fourier series, window functions, difference equations, signal statistics.
-- **Circuit tools** — nested-network impedance, L/π/T matching networks, Butterworth filter design, first-/second-order transient curves (RC/RL/series-RLC with damping regimes), resonance.
-- **Electronics tools** — op-amp configurations, voltage dividers, LED resistors, time constants, transmission-line primitives (coaxial, quarter-wave transformer, rise time/bandwidth), reflection coefficient/VSWR/return loss.
-- **Noise & dB** — thermal noise, Friis cascade, quantization SNR, dB level and ratio conversions.
-- **Unit conversion** — common non-SI units (°C/°F, bar/psi/atm, cal/kWh, hp, inch/mile, lb/oz) to their SI base quantities.
-- **`solve_steps`** — multi-step solver chaining tool results with `@stepN` references.
-- **Client UI** — workbench panel and interactive Smith chart.
-- **Packaged agent preset & skills** — the `electro-lab` preset gates every request before any tool call; skills `electro-lab-template` and `electro-lab-interface` ship with the plugin.
+- **Calculation** — complex expression evaluation, rational-coefficient algebra and series sums.
+- **Circuits** — impedance networks, matching, filters, transients and resonance.
+- **Electronics** — op-amp configurations, dividers and LED drive.
+- **RF & transmission** — Smith chart, reflections, matching and line parameters.
+- **Signal quality** — distortion, jitter and ADC budgets.
+- **Noise & dB** — noise sources and dB conversions.
+- **DSP** — transforms, statistics and transfer functions.
+- **Unit conversion** — any unit to any unit of the same family.
+- **Workflow** — multi-step orchestration, a client panel and a packaged agent preset.
+
+All tools are listed in [tools.md](docs/tools.md).
 
 ## Install
 
@@ -27,7 +28,7 @@ Published on npm — stable releases on the `latest` dist-tag, prereleases on `b
 
 ## Usage
 
-The plugin registers its tools, skills, and the `electro-lab` agent preset on mount. Pick the preset when starting a session: all numeric values must come from tool calls, and the preset stops when conditions are insufficient.
+The plugin registers its tools, skills and the `electro-lab` agent preset on mount. Pick the preset when starting a session: all numeric values must come from tool calls, and the preset stops when conditions are insufficient.
 
 ## Development
 
@@ -35,8 +36,8 @@ See [Contributing](.github/CONTRIBUTING.md) for the development setup, commit co
 
 ## Docs
 
+- [tools.md](docs/tools.md)
 - [Contributing](.github/CONTRIBUTING.md)
-- [简体中文](docs/README.zh-CN.md)
 
 ## License
 

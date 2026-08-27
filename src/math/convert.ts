@@ -23,6 +23,18 @@
 import { Complex } from 'complex.js'
 import { QuantityKind, isNearlyEqual } from './quantity-kind.ts'
 
+/**
+ * What a decibel ratio is taken over. The 10 vs 20 factor comes from the
+ * nature of the quantity: a linear quantity (power, energy, intensity) has
+ * its energy in the quantity itself → 10·log10; a quadratic quantity
+ * (voltage, current, pressure — any amplitude whose energy is the square)
+ * → 20·log10. Named generically so it applies outside electronics too.
+ */
+export enum RatioKind {
+  Linear = 'linear',
+  Quadratic = 'quadratic',
+}
+
 /** Complex form discriminator (wire value = lowercase string). */
 export enum Form {
   Rect = 'rect',
@@ -148,99 +160,199 @@ export function serializeReal(value: number, kind: QuantityKind): ComplexOutput 
   return serializeComplex(new Complex(value, 0), kind)
 }
 
-// ── Common non-SI → SI conversion ────────────────────────────────────────
-// The tool surface speaks SI base quantities only (quantity and unit are
-// one-to-one), so a user who has a measurement in a legacy unit needs one
-// of these conversions first. Every conversion is affine or a fixed
-// multiplier — nothing here is a decimal prefix scaling, which plain SI
-// already covers.
+// ── Unit conversion, split by family ─────────────────────────────────────
+// One function per quantity family, each with its own unit types and its
+// own number/complex policy (linear families scale complex values;
+// temperature and log are real). The convert tool dispatches on the source
+// unit. Local helpers keep the shared mechanics in one place.
 
-/** A common non-SI unit that converts cleanly into one SI base quantity. */
-export enum CommonUnit {
+/** Every supported unit, grouped by family. */
+export enum ConvertUnit {
   // temperature → kelvin (affine)
   Celsius = 'celsius',
   Fahrenheit = 'fahrenheit',
+  Kelvin = 'kelvin',
   // pressure → pascal
   Bar = 'bar',
   Psi = 'psi',
   Atm = 'atm',
+  Pascal = 'pascal',
   // energy → joule
   Calorie = 'calorie',
   Kilocalorie = 'kilocalorie',
   WattHour = 'watthour',
   KilowattHour = 'kilowatthour',
+  Joule = 'joule',
   // power → watt
   Horsepower = 'horsepower',
+  Watt = 'watt',
   // length → metre
   Inch = 'inch',
   Foot = 'foot',
   Yard = 'yard',
   Mile = 'mile',
+  Metre = 'metre',
   // mass → kilogram
   Pound = 'pound',
   Ounce = 'ounce',
+  Kilogram = 'kilogram',
+  // angle → radian
+  Degree = 'degree',
+  Radian = 'radian',
+  // log scale (ratio ↔ dB)
+  Ratio = 'ratio',
+  Db = 'db',
 }
 
-const TO_KELVIN: Partial<Record<CommonUnit, (value: number) => number>> = {
-  [CommonUnit.Celsius]: (value) => value + 273.15,
-  [CommonUnit.Fahrenheit]: (value) => ((value + 459.67) * 5) / 9,
+export type TemperatureUnit = ConvertUnit.Celsius | ConvertUnit.Fahrenheit | ConvertUnit.Kelvin
+export type PressureUnit = ConvertUnit.Bar | ConvertUnit.Psi | ConvertUnit.Atm | ConvertUnit.Pascal
+export type EnergyUnit = ConvertUnit.Calorie | ConvertUnit.Kilocalorie | ConvertUnit.WattHour | ConvertUnit.KilowattHour | ConvertUnit.Joule
+export type PowerUnit = ConvertUnit.Horsepower | ConvertUnit.Watt
+export type LengthUnit = ConvertUnit.Inch | ConvertUnit.Foot | ConvertUnit.Yard | ConvertUnit.Mile | ConvertUnit.Metre
+export type MassUnit = ConvertUnit.Pound | ConvertUnit.Ounce | ConvertUnit.Kilogram
+export type LogUnit = ConvertUnit.Ratio | ConvertUnit.Db
+
+/** Linear scale factor to the family base unit (complete for every linear unit). */
+const TO_BASE: Partial<Record<ConvertUnit, number>> = {
+  // pressure → pascal
+  [ConvertUnit.Bar]: 1e5,
+  [ConvertUnit.Psi]: 6894.757293168,
+  [ConvertUnit.Atm]: 101325,
+  [ConvertUnit.Pascal]: 1,
+  // energy → joule
+  [ConvertUnit.Calorie]: 4.184, // thermochemical calorie
+  [ConvertUnit.Kilocalorie]: 4184,
+  [ConvertUnit.WattHour]: 3600,
+  [ConvertUnit.KilowattHour]: 3.6e6,
+  [ConvertUnit.Joule]: 1,
+  // power → watt
+  [ConvertUnit.Horsepower]: 745.6998715822702, // mechanical horsepower
+  [ConvertUnit.Watt]: 1,
+  // length → metre
+  [ConvertUnit.Inch]: 0.0254,
+  [ConvertUnit.Foot]: 0.3048,
+  [ConvertUnit.Yard]: 0.9144,
+  [ConvertUnit.Mile]: 1609.344,
+  [ConvertUnit.Metre]: 1,
+  // mass → kilogram
+  [ConvertUnit.Pound]: 0.45359237, // avoirdupois pound
+  [ConvertUnit.Ounce]: 0.028349523125,
+  [ConvertUnit.Kilogram]: 1,
+  // angle → radian
+  [ConvertUnit.Degree]: Math.PI / 180,
+  [ConvertUnit.Radian]: 1,
 }
 
-const TO_PASCAL: Partial<Record<CommonUnit, number>> = {
-  [CommonUnit.Bar]: 1e5,
-  [CommonUnit.Psi]: 6894.757293168,
-  [CommonUnit.Atm]: 101325,
-}
-
-const TO_JOULE: Partial<Record<CommonUnit, number>> = {
-  [CommonUnit.Calorie]: 4.184, // thermochemical calorie
-  [CommonUnit.Kilocalorie]: 4184,
-  [CommonUnit.WattHour]: 3600,
-  [CommonUnit.KilowattHour]: 3.6e6,
-}
-
-const TO_WATT: Partial<Record<CommonUnit, number>> = {
-  [CommonUnit.Horsepower]: 745.6998715822702, // mechanical horsepower
-}
-
-const TO_METRE: Partial<Record<CommonUnit, number>> = {
-  [CommonUnit.Inch]: 0.0254,
-  [CommonUnit.Foot]: 0.3048,
-  [CommonUnit.Yard]: 0.9144,
-  [CommonUnit.Mile]: 1609.344,
-}
-
-const TO_KILOGRAM: Partial<Record<CommonUnit, number>> = {
-  [CommonUnit.Pound]: 0.45359237, // avoirdupois pound
-  [CommonUnit.Ounce]: 0.028349523125,
-}
-
-/** Convert a magnitude from a common non-SI unit to its SI base quantity.
- *  Returns the magnitude in the SI base unit of the family (K, Pa, J, W, m,
- *  kg) together with its SI quantity kind. */
-export function convertCommonUnit(value: number, unit: CommonUnit): { value: number; kind: QuantityKind } {
-  switch (unit) {
-    case CommonUnit.Celsius:
-    case CommonUnit.Fahrenheit:
-      return { value: TO_KELVIN[unit]!(value), kind: QuantityKind.Temperature }
-    case CommonUnit.Bar:
-    case CommonUnit.Psi:
-    case CommonUnit.Atm:
-      return { value: value * TO_PASCAL[unit]!, kind: QuantityKind.Pressure }
-    case CommonUnit.Calorie:
-    case CommonUnit.Kilocalorie:
-    case CommonUnit.WattHour:
-    case CommonUnit.KilowattHour:
-      return { value: value * TO_JOULE[unit]!, kind: QuantityKind.Energy }
-    case CommonUnit.Horsepower:
-      return { value: value * TO_WATT[unit]!, kind: QuantityKind.Power }
-    case CommonUnit.Inch:
-    case CommonUnit.Foot:
-    case CommonUnit.Yard:
-    case CommonUnit.Mile:
-      return { value: value * TO_METRE[unit]!, kind: QuantityKind.Length }
-    case CommonUnit.Pound:
-    case CommonUnit.Ounce:
-      return { value: value * TO_KILOGRAM[unit]!, kind: QuantityKind.Mass }
+/** Unwrap a value to a real number; a complex value with an imaginary part is rejected. */
+function asReal(value: number | Complex, family: string): number {
+  if (value instanceof Complex) {
+    if (!isNearlyEqual(value.im, 0)) throw new Error(`${family} conversion requires a real value`)
+    return value.re
   }
+  return value
+}
+
+/** Scale by a factor: linear families scale both components of a complex value. */
+function scaleLinear(value: number | Complex, factor: number): Complex {
+  return value instanceof Complex ? value.mul(factor) : new Complex(value * factor, 0)
+}
+
+function toKelvin(unit: TemperatureUnit, value: number): number {
+  switch (unit) {
+    case ConvertUnit.Celsius:
+      return value + 273.15
+    case ConvertUnit.Fahrenheit:
+      return ((value + 459.67) * 5) / 9
+    case ConvertUnit.Kelvin:
+      return value
+  }
+}
+
+function fromKelvin(unit: TemperatureUnit, kelvin: number): number {
+  switch (unit) {
+    case ConvertUnit.Celsius:
+      return kelvin - 273.15
+    case ConvertUnit.Fahrenheit:
+      return (kelvin * 9) / 5 - 459.67
+    case ConvertUnit.Kelvin:
+      return kelvin
+  }
+}
+
+/** Temperature is affine: convert via kelvin; requires a real value. */
+export function convertTemperature(value: number | Complex, from: TemperatureUnit, to: TemperatureUnit): Complex {
+  const kelvin = toKelvin(from, asReal(value, 'temperature'))
+  return new Complex(fromKelvin(to, kelvin), 0)
+}
+
+/** Pressure: linear, complex values scale both components. */
+export function convertPressure(value: number | Complex, from: PressureUnit, to: PressureUnit): Complex {
+  return scaleLinear(value, TO_BASE[from]! / TO_BASE[to]!)
+}
+
+/** Energy: linear, complex values scale both components. */
+export function convertEnergy(value: number | Complex, from: EnergyUnit, to: EnergyUnit): Complex {
+  return scaleLinear(value, TO_BASE[from]! / TO_BASE[to]!)
+}
+
+/** Power: linear, complex values scale both components. */
+export function convertPower(value: number | Complex, from: PowerUnit, to: PowerUnit): Complex {
+  return scaleLinear(value, TO_BASE[from]! / TO_BASE[to]!)
+}
+
+/** Length: linear, complex values scale both components. */
+export function convertLength(value: number | Complex, from: LengthUnit, to: LengthUnit): Complex {
+  return scaleLinear(value, TO_BASE[from]! / TO_BASE[to]!)
+}
+
+/** Mass: linear, complex values scale both components. */
+export function convertMass(value: number | Complex, from: MassUnit, to: MassUnit): Complex {
+  return scaleLinear(value, TO_BASE[from]! / TO_BASE[to]!)
+}
+
+/**
+ * Angle: degrees → radians. Angles are radians everywhere on the tool
+ * boundary, so this is the only angle conversion that exists — a radian
+ * value needs no conversion (identity), and the target is always radians.
+ * Linear, so complex values scale both components.
+ */
+export function convertAngle(value: number | Complex): Complex {
+  return scaleLinear(value, Math.PI / 180)
+}
+
+/**
+ * Log scale: ratio ↔ dB. Power ratios use 10·log10, voltage ratios
+ * 20·log10; requires a real value and a kind.
+ */
+export function convertLogValue(value: number | Complex, from: LogUnit, to: LogUnit, kind: RatioKind): Complex {
+  const valueRe = asReal(value, 'log')
+  let logFactor: number
+  switch (kind) {
+    case RatioKind.Linear:
+      logFactor = 10
+      break
+    case RatioKind.Quadratic:
+      logFactor = 20
+      break
+  }
+  let ratio: number
+  switch (from) {
+    case ConvertUnit.Db:
+      ratio = 10 ** (valueRe / logFactor)
+      break
+    case ConvertUnit.Ratio:
+      ratio = valueRe
+      break
+  }
+  let converted: number
+  switch (to) {
+    case ConvertUnit.Db:
+      if (ratio <= 0) throw new Error('ratio must be positive')
+      converted = logFactor * Math.log10(ratio)
+      break
+    case ConvertUnit.Ratio:
+      converted = ratio
+      break
+  }
+  return new Complex(converted, 0)
 }
