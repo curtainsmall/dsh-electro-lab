@@ -5,7 +5,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write # npm trusted publishing (OIDC) — unused when falling back to token
+  id-token: write # npm trusted publishing (OIDC)
 
 jobs:
   # ── Guard: a release tag must be on main and self-consistent. ──
@@ -114,10 +114,23 @@ jobs:
           if npm view "dsh-electro-lab@$VER" version >/dev/null 2>&1; then
             echo "published=false" >> "$GITHUB_OUTPUT"
             echo "dsh-electro-lab@$VER already published — skipping (tag replay)"
-          else
-            pnpm publish --no-git-checks --access public --provenance --tag "$TAG"
+          elif OUT="$(pnpm publish --no-git-checks --access public --provenance --tag "$TAG" 2>&1)"; then
+            echo "$OUT"
             echo "published=true" >> "$GITHUB_OUTPUT"
             echo "published dsh-electro-lab@$VER via OIDC trusted publishing"
+          elif echo "$OUT" | grep -q "previously staged"; then
+            # npmjs keeps a version staged when an earlier publish run was
+            # interrupted after the manifest write but before finalize: it is
+            # invisible to npm view yet blocks republishing with a 409. Clear
+            # the staged version and try once more.
+            echo "unstaging $VER from an interrupted publish"
+            npm unpublish "dsh-electro-lab@$VER" --force
+            pnpm publish --no-git-checks --access public --provenance --tag "$TAG"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "published dsh-electro-lab@$VER via OIDC trusted publishing (after unstage)"
+          else
+            echo "$OUT" >&2
+            exit 1
           fi
       - name: Read changelog entry
         id: changelog
