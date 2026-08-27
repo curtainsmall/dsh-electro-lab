@@ -48,14 +48,14 @@ main      ← 仅发布（PR 合并、打 tag、GitHub Actions）
 
 1. 同步更新 `package.json`、`dsh.plugin.json`，并在 `CHANGELOG.md` 添加对应条目（最新条目必须等于新版本号）。
 2. 推送 `develop`，向 `main` 发起 PR，CI（`build`）通过后合并。
-3. 在 `main` 上打 `vX.Y.Z` 并推送 —— 发布工作流校验 tag 位于 `main` 且版本一致，然后发布到 npm（OIDC 可信发布，回退 `NPM_TOKEN`）并创建 GitHub Release。
+3. 在 `main` 上打 `vX.Y.Z` 并推送 —— 发布工作流校验 tag 位于 `main` 且版本一致，然后发布到 npm（OIDC 可信发布）并创建 GitHub Release。
 4. 预发布版本（`x.y.z-*`）发布到 `beta` dist-tag，并在 GitHub 上标记为预发布。
 
 ## 文档
 
 - README 只记录**已实现**的功能 —— 保持简单、与现状一致。
 - 文档**双语**：英文版放在规范位置，简体中文版放在 `docs/` 下同名文件（`xxx.zh-CN.md`）。changelog 仅英文。
-- 简体中文文档中，分贝术语写作**分贝**；单位符号（`dBm`、`dBu`、`dBµV`、`dBW`）保持原样。
+- 简体中文文档中，分贝术语写作**分贝**。
 - 规划/路线图内容在成为实际工作之前不提交进仓库，另行跟踪。
 
 ## 许可
