@@ -3,7 +3,6 @@ import {
   applyElectroLabProjection,
   ELECTRO_LAB_TOOL_NAMES,
   initElectroLabProjection,
-  MAX_INPUTS,
   MAX_RUNS,
   SETTLE_WINDOW_MS,
   viewElectroLabProjection,
@@ -25,8 +24,8 @@ function fold(events: ElectroLabSessionEvent[]): ElectroLabProjectionState {
   return state
 }
 
-const calculateCall = (seq: number, time: number, callId = `c${seq}`) =>
-  event('tool/call', seq, time, { name: 'calculate', callId })
+const calculateCall = (seq: number, time: number, callId = `c${seq}`, args = '{"expression":"1+1"}') =>
+  event('tool/call', seq, time, { name: 'calculate', callId, arguments: args })
 const calculateResult = (seq: number, time: number, callId: string, error?: { name: string; code: string }, content?: unknown) =>
   event('tool/result', seq, time, {
     callId,
@@ -47,37 +46,44 @@ describe('electro-lab run records projection', () => {
     expect(ELECTRO_LAB_TOOL_NAMES.has('some_foreign_tool')).toBe(false)
   })
 
-  it('settles one run on turn/end with call and error counts', () => {
+  it('captures question/analyse paragraphs, structured calls and results, and the answer', () => {
     const state = fold([
-      calculateCall(1, 1000),
-      calculateResult(2, 1100, 'c1'),
-      calculateCall(3, 1200, 'c3'),
-      calculateResult(4, 1300, 'c3', { name: 'Error', code: 'E_INVALID' }),
-      event('turn/end', 5, 1400, { turn: 0, reason: 'success' }),
+      userMessage(1, 1000, 'compute the resonance frequency of an LC tank'),
+      assistantMessage(2, 1100, '10 µF 与 50 mH 并联的谐振频率与带宽是多少?'),
+      assistantMessage(3, 1200, '分析:f₀ = 1/(2π√(LC)),Q = R√(C/L)'),
+      calculateCall(4, 1300, 'c4', '{"expression":"1/(2*pi*sqrt(50e-3*10e-6))"}'),
+      calculateResult(5, 1400, 'c4', undefined, textContent('{"re": 225.079, "im": 0}')),
+      assistantMessage(6, 1500, '答案:f₀ ≈ 225 Hz。'),
+      event('turn/end', 7, 1600),
     ])
     const value = viewElectroLabProjection(state)
-    expect(value.open).toBeNull()
     expect(value.runs).toHaveLength(1)
     const run = value.runs[0]!
-    expect(run.toolCalls).toBe(2)
-    expect(run.errors).toBe(1)
-    expect(run.startedAt).toBe(1000)
-    expect(run.settledAt).toBe(1400)
-    expect(run.tools).toEqual([{ name: 'calculate', calls: 2 }])
+    expect(run.id).toBe('run-1300-4')
+    expect(run.question).toBe('10 µF 与 50 mH 并联的谐振频率与带宽是多少?')
+    expect(run.analyse).toBe('分析:f₀ = 1/(2π√(LC)),Q = R√(C/L)')
+    expect(run.answer).toBe('答案:f₀ ≈ 225 Hz。')
+    expect(run.calls).toEqual([
+      { callId: 'c4', name: 'calculate', arguments: '{"expression":"1/(2*pi*sqrt(50e-3*10e-6))"}' },
+    ])
+    expect(run.results).toEqual([{ callId: 'c4', content: '{"re": 225.079, "im": 0}' }])
   })
 
   it('keeps a multi-step run together across assistant messages within one turn', () => {
     const state = fold([
-      calculateCall(1, 1000),
-      calculateResult(2, 1100, 'c1'),
-      event('assistant/message', 3, 1200, { turn: 0, step: 0 }),
-      calculateCall(4, 1300, 'c4'),
-      calculateResult(5, 1400, 'c4'),
-      event('turn/end', 6, 1500, { turn: 0, reason: 'success' }),
+      userMessage(1, 1000, 'compute the impedance'),
+      calculateCall(2, 1100, 'c2'),
+      calculateResult(3, 1200, 'c2', undefined, textContent('{"re": 50, "im": 0}')),
+      event('assistant/message', 4, 1300, { content: textContent('中间文本') }),
+      calculateCall(5, 1400, 'c5'),
+      calculateResult(6, 1500, 'c5'),
+      event('turn/end', 7, 1600),
     ])
     const value = viewElectroLabProjection(state)
     expect(value.runs).toHaveLength(1)
-    expect(value.runs[0]!.toolCalls).toBe(2)
+    expect(value.runs[0]!.calls).toHaveLength(2)
+    expect(value.runs[0]!.results).toHaveLength(2)
+    expect(value.runs[0]!.answer).toBe('中间文本')
   })
 
   it('settles the open run when a foreign tool is called in between', () => {
@@ -109,34 +115,18 @@ describe('electro-lab run records projection', () => {
     ])
     const value = viewElectroLabProjection(state)
     expect(value.runs).toHaveLength(1)
-    expect(value.runs[0]!.toolCalls).toBe(1)
+    expect(value.runs[0]!.calls.length).toBe(1)
     expect(value.runs[0]!.settledAt).toBe(1000 + SETTLE_WINDOW_MS + 1)
     expect(value.open).not.toBeNull()
     expect(value.open!.startedAt).toBe(1000 + SETTLE_WINDOW_MS + 1)
   })
 
   it('reports the open run through view before it settles', () => {
-    const state = fold([calculateCall(1, 1000), calculateResult(2, 1100, 'c1')])
+    const state = fold([userMessage(1, 1000, 'q'), calculateCall(2, 1100, 'c2'), calculateResult(3, 1200, 'c2')])
     const value = viewElectroLabProjection(state)
     expect(value.runs).toHaveLength(0)
     expect(value.open).not.toBeNull()
-    expect(value.open!.toolCalls).toBe(1)
-    expect(value.open!.tools).toEqual([{ name: 'calculate', calls: 1 }])
-  })
-
-  it('groups tool usage in first-use order with per-tool counts', () => {
-    const state = fold([
-      calculateCall(1, 1000),
-      event('tool/call', 2, 1100, { name: 'resonance', callId: 'r' }),
-      calculateCall(3, 1200),
-      event('turn/end', 4, 1300),
-    ])
-    const run = viewElectroLabProjection(state).runs[0]!
-    expect(run.toolCalls).toBe(3)
-    expect(run.tools).toEqual([
-      { name: 'calculate', calls: 2 },
-      { name: 'resonance', calls: 1 },
-    ])
+    expect(value.open!.calls).toHaveLength(1)
   })
 
   it('keeps only MAX_RUNS settled runs, newest first', () => {
@@ -159,56 +149,28 @@ describe('electro-lab run records projection', () => {
     expect(next).toBe(state)
   })
 
-  it('captures the question inputs and five-step texts of one run', () => {
-    const state = fold([
-      userMessage(1, 1000, 'compute the resonance frequency of an LC tank'),
-      assistantMessage(2, 1100, '分析:LC 谐振,计划:用 resonance 工具'),
-      calculateCall(3, 1200, 'c3'),
-      calculateResult(4, 1300, 'c3'),
-      assistantMessage(5, 1400, '结果:f₀ = 159 kHz。答案:谐振频率约 159 kHz。'),
-      event('turn/end', 6, 1500),
-    ])
-    const value = viewElectroLabProjection(state)
-    expect(value.runs).toHaveLength(1)
-    const run = value.runs[0]!
-    expect(run.questionInputs).toEqual(['compute the resonance frequency of an LC tank'])
-    expect(run.answerTexts).toEqual([
-      '分析:LC 谐振,计划:用 resonance 工具',
-      '结果:f₀ = 159 kHz。答案:谐振频率约 159 kHz。',
-    ])
-    expect(run.toolCalls).toBe(1)
-  })
-
-  it('accumulates follow-up question inputs into one window', () => {
+  it('keeps one window across follow-up user messages', () => {
     const state = fold([
       userMessage(1, 1000, 'what is the bandwidth?'),
       userMessage(2, 1100, 'actually with the series resistance of 10 ohm'),
-      calculateCall(3, 1200, 'c3'),
-      event('turn/end', 4, 1300),
+      assistantMessage(3, 1200, 'what is the bandwidth with a 10 ohm series resistance?'),
+      calculateCall(4, 1300, 'c4'),
+      event('turn/end', 5, 1400),
     ])
     const run = viewElectroLabProjection(state).runs[0]!
-    expect(run.questionInputs).toEqual(['what is the bandwidth?', 'actually with the series resistance of 10 ohm'])
+    expect(run.startedAt).toBe(1000)
+    expect(run.question).toBe('what is the bandwidth with a 10 ohm series resistance?')
+    expect(run.calls).toHaveLength(1)
   })
 
-  it('caps the collected question inputs', () => {
-    const events: ElectroLabSessionEvent[] = []
-    for (let i = 0; i < MAX_INPUTS + 2; i++) events.push(userMessage(i + 1, i * 1000, `input ${i}`))
-    events.push(calculateCall(MAX_INPUTS + 3, (MAX_INPUTS + 2) * 1000), event('turn/end', MAX_INPUTS + 4, (MAX_INPUTS + 3) * 1000))
-    const run = viewElectroLabProjection(fold(events)).runs[0]!
-    expect(run.questionInputs).toHaveLength(MAX_INPUTS)
-    expect(run.questionInputs[0]).toBe('input 2')
-    expect(run.questionInputs[MAX_INPUTS - 1]).toBe(`input ${MAX_INPUTS + 1}`)
-  })
-
-  it('captures the exact tool outputs into results', () => {
+  it('records result errors structurally', () => {
     const state = fold([
       calculateCall(1, 1000, 'c1'),
-      calculateResult(2, 1100, 'c1', undefined, textContent('{"re": 225.079, "im": 0}')),
+      calculateResult(2, 1100, 'c1', { name: 'Error', code: 'E_INVALID' }, textContent('bad input')),
       event('turn/end', 3, 1200),
     ])
     const run = viewElectroLabProjection(state).runs[0]!
-    expect(run.results).toEqual(['{"re": 225.079, "im": 0}'])
-    expect(run.answerTexts).toEqual([])
+    expect(run.results).toEqual([{ callId: 'c1', content: 'bad input', error: { name: 'Error', code: 'E_INVALID' } }])
   })
 
   it('ignores assistant texts outside a question window', () => {
@@ -223,6 +185,6 @@ describe('electro-lab run records projection', () => {
       event('turn/end', 3, 1000 + SETTLE_WINDOW_MS + 2000),
     ])
     const run = viewElectroLabProjection(state).runs[0]!
-    expect(run.questionInputs).toEqual([])
+    expect(run.question).toBe('')
   })
 })

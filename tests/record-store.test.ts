@@ -15,12 +15,11 @@ function tempStore(): { storePath: string; run: (runId: string) => ElectroLabRun
     id: runId,
     startedAt: 1000,
     settledAt: 2000,
-    toolCalls: 1,
-    errors: 0,
-    tools: [{ name: 'calculate', calls: 1 }],
-    questionInputs: ['what is the impedance?'],
-    answerTexts: ['what is the total impedance of the network?', '答案:50 Ω。'],
-    results: ['{"re": 50, "im": 0}'],
+    question: 'what is the total impedance of the network?',
+    analyse: 'Z = √(R² + X²)',
+    answer: '答案:50 Ω。',
+    calls: [{ callId: 'c1', name: 'calculate', arguments: '{"expression":"sqrt(50^2)"}' }],
+    results: [{ callId: 'c1', content: '{"re": 50, "im": 0}' }],
   })
   return { storePath, run }
 }
@@ -59,7 +58,7 @@ describe('record store (JSONL, one-shot append-only)', () => {
     const store = createRecordStore(storePath)
     store.append(run('run-1'))
     // Simulate a torn tail line.
-    appendFileSync(storePath, '{"run":{"id":"run-9"')
+    appendFileSync(storePath, '{"id":"run-9"')
     const reloaded = createRecordStore(storePath)
     expect(reloaded.list()).toHaveLength(1)
     expect(reloaded.list()[0]!.id).toBe('run-1')
@@ -70,15 +69,16 @@ describe('record store (JSONL, one-shot append-only)', () => {
     dirs.push(dir)
     expect(createRecordStore(join(dir, 'missing.jsonl')).list()).toEqual([])
     const corrupt = join(dir, 'corrupt.jsonl')
-    writeFileSync(corrupt, 'not json\n{"run":{}}')
+    writeFileSync(corrupt, 'not json\n{"id":1}')
     expect(createRecordStore(corrupt).list()).toEqual([])
   })
 
   it('writes one self-describing line per run', () => {
     const { storePath, run } = tempStore()
     createRecordStore(storePath).append(run('run-1'))
-    const line = JSON.parse(readFileSync(storePath, 'utf8').trim()) as { run: ElectroLabRun }
-    expect(line.run.id).toBe('run-1')
-    expect(line.run.answerTexts[0]).toBe('what is the total impedance of the network?')
+    const line = JSON.parse(readFileSync(storePath, 'utf8').trim()) as ElectroLabRun
+    expect(line.id).toBe('run-1')
+    expect(line.question).toBe('what is the total impedance of the network?')
+    expect(line.calls[0]!.name).toBe('calculate')
   })
 })

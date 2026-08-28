@@ -8,41 +8,41 @@ import { useEffect, useState } from 'react'
 
 /* ── Records data shapes (mirror of the host store + endpoint) ─────────────── */
 
-interface ToolUsage {
+interface Call {
+  callId: string
   name: string
-  calls: number
+  arguments: string
+}
+
+interface Result {
+  callId: string
+  content: string
+  error?: { name: string; code: string }
 }
 
 interface SettledRun {
   id: string
   startedAt: number
   settledAt: number
-  toolCalls: number
-  errors: number
-  tools: ToolUsage[]
-  questionInputs: string[]
-  answerTexts: string[]
-  results: string[]
+  question: string
+  analyse: string
+  answer: string
+  calls: Call[]
+  results: Result[]
 }
 
 interface OpenRun {
   id: string
   startedAt: number
   lastAt: number
-  toolCalls: number
-  errors: number
-  tools: ToolUsage[]
-  questionInputs: string[]
-  answerTexts: string[]
-  results: string[]
-}
-
-interface StoredRecord {
-  run: SettledRun
+  question: string
+  analyse: string
+  calls: Call[]
+  results: Result[]
 }
 
 interface RecordsResponse {
-  records: StoredRecord[]
+  records: SettledRun[]
   open: OpenRun[]
 }
 
@@ -68,12 +68,81 @@ function formatTime(time: number): string {
   })
 }
 
-function toolChips(tools: ToolUsage[]): React.JSX.Element {
+const paragraphStyle: React.CSSProperties = {
+  marginTop: 6,
+  maxHeight: 140,
+  overflow: 'auto',
+  padding: '6px 8px',
+  background: '#0d0f14',
+  borderRadius: 4,
+  border: '1px solid #232833',
+  color: '#aab2c0',
+  font: '12px/1.6 ui-sans-serif, system-ui, sans-serif',
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+}
+
+/** One paragraph section with a small label. */
+function paragraph(label: string, text: string): React.JSX.Element | null {
+  if (text.length === 0) return null
+  return (
+    <div style={paragraphStyle}>
+      <div style={{ color: '#8b93a5', fontSize: 11, marginBottom: 2 }}>{label}</div>
+      {text}
+    </div>
+  )
+}
+
+/** The structured tool calls, one row each with the raw arguments. */
+function callsBox(calls: Call[]): React.JSX.Element | null {
+  if (calls.length === 0) return null
+  return (
+    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {calls.map((call) => (
+        <div key={call.callId} style={{ background: '#0a0d12', borderRadius: 4, border: '1px solid #1e2530', padding: '4px 8px' }}>
+          <span style={{ color: '#7fbf9a', font: '11px ui-monospace, monospace' }}>{call.name}</span>
+          {call.arguments.length > 0 && (
+            <span style={{ color: '#8b93a5', font: '11px ui-monospace, monospace' }}> {call.arguments}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** The structured tool results, keeping the full output and error identity. */
+function resultsBox(results: Result[]): React.JSX.Element | null {
+  if (results.length === 0) return null
+  return (
+    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {results.map((result) => (
+        <div key={result.callId} style={{ background: '#0a0d12', borderRadius: 4, border: '1px solid #1e2530', padding: '4px 8px' }}>
+          {result.error !== undefined && (
+            <div style={{ color: '#e08a8a', font: '11px ui-monospace, monospace' }}>
+              ✗ {result.error.name} ({result.error.code})
+            </div>
+          )}
+          {result.content.length > 0 && (
+            <div style={{ color: '#9fc3ae', font: '11px/1.6 ui-monospace, monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 100, overflow: 'auto' }}>
+              {result.content}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Tool usage chips derived from the structured calls. */
+function toolChips(calls: Call[]): React.JSX.Element | null {
+  if (calls.length === 0) return null
+  const counts = new Map<string, number>()
+  for (const call of calls) counts.set(call.name, (counts.get(call.name) ?? 0) + 1)
   return (
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-      {tools.map((tool) => (
+      {[...counts.entries()].map(([name, count]) => (
         <span
-          key={tool.name}
+          key={name}
           style={{
             padding: '1px 6px',
             borderRadius: 4,
@@ -83,57 +152,9 @@ function toolChips(tools: ToolUsage[]): React.JSX.Element {
             font: '11px ui-monospace, monospace',
           }}
         >
-          {tool.name}×{tool.calls}
+          {name}×{count}
         </span>
       ))}
-    </div>
-  )
-}
-
-/** The five-step answer texts, in a scrollable box. */
-function answerBox(texts: string[]): React.JSX.Element | null {
-  if (texts.length === 0) return null
-  return (
-    <div
-      style={{
-        marginTop: 6,
-        maxHeight: 140,
-        overflow: 'auto',
-        padding: '6px 8px',
-        background: '#0d0f14',
-        borderRadius: 4,
-        border: '1px solid #232833',
-        color: '#aab2c0',
-        font: '12px/1.6 ui-sans-serif, system-ui, sans-serif',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-      }}
-    >
-      {texts.join('\n\n')}
-    </div>
-  )
-}
-
-/** The exact tool outputs, in a monospace box above the answer. */
-function resultBox(texts: string[]): React.JSX.Element | null {
-  if (texts.length === 0) return null
-  return (
-    <div
-      style={{
-        marginTop: 6,
-        maxHeight: 120,
-        overflow: 'auto',
-        padding: '6px 8px',
-        background: '#0a0d12',
-        borderRadius: 4,
-        border: '1px solid #1e2530',
-        color: '#9fc3ae',
-        font: '11px/1.6 ui-monospace, monospace',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-      }}
-    >
-      {texts.join('\n\n')}
     </div>
   )
 }
@@ -193,48 +214,40 @@ export function RecordsTab(): React.JSX.Element {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#e8b34b', fontWeight: 600 }}>● in progress</span>
               </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4' }}>
-                {run.questionInputs[0] ?? run.id}
+              <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4', fontWeight: 600 }}>
+                {run.question || run.id}
               </div>
               <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4' }}>
-                {run.toolCalls} tool call(s)
-                {run.errors > 0 ? `, ${run.errors} error(s)` : ''}
-                {' · started '}
-                {formatTime(run.startedAt)}
+                {run.calls.length} tool call(s) · started {formatTime(run.startedAt)}
               </div>
-              {toolChips(run.tools)}
-              {resultBox(run.results)}
+              {toolChips(run.calls)}
+              {callsBox(run.calls)}
+              {resultsBox(run.results)}
             </div>
           ))}
-          {records.map((record) => {
-            const run = record.run
-            return (
-              <div key={run.id} style={rowStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
-                    {run.questionInputs[0] ?? `run ${run.id}`}
-                  </span>
-                  <span style={{ color: '#8b93a5', fontSize: 11, flex: 'none' }}>
-                    {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span style={{ color: '#8b93a5', fontSize: 11 }}>
-                    {run.toolCalls} tool call(s)
-                    {run.errors > 0 ? `, ${run.errors} error(s)` : ''}
-                  </span>
-                  {run.questionInputs.length > 1 && (
-                    <span style={{ color: '#8b93a5', fontSize: 11, fontStyle: 'italic' }}>
-                      {run.questionInputs.length} inputs
-                    </span>
-                  )}
-                </div>
-                {toolChips(run.tools)}
-                {resultBox(run.results)}
-                {answerBox(run.answerTexts)}
+          {records.map((run) => (
+            <div key={run.id} style={rowStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
+                  {run.question || `run ${run.id}`}
+                </span>
+                <span style={{ color: '#8b93a5', fontSize: 11, flex: 'none' }}>
+                  {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
+                </span>
               </div>
-            )
-          })}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ color: '#8b93a5', fontSize: 11 }}>
+                  {run.calls.length} tool call(s)
+                  {run.results.some((result) => result.error !== undefined) ? `, ${run.results.filter((result) => result.error !== undefined).length} error(s)` : ''}
+                </span>
+              </div>
+              {toolChips(run.calls)}
+              {callsBox(run.calls)}
+              {resultsBox(run.results)}
+              {paragraph('分析', run.analyse)}
+              {paragraph('答案', run.answer)}
+            </div>
+          ))}
         </>
       )}
     </div>

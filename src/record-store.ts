@@ -16,11 +16,6 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { ElectroLabRun } from './records.ts'
 
-/** One immutable line of the JSONL archive. */
-export interface RecordStoreLine {
-  run: ElectroLabRun
-}
-
 /** The disk-backed store face. */
 export interface RecordStore {
   /** Whether a run line for `runId` is already known (run ids are globally unique). */
@@ -42,10 +37,10 @@ export function createRecordStore(filePath: string): RecordStore {
         const trimmed = raw.trim()
         if (trimmed.length === 0) continue
         try {
-          const line = JSON.parse(trimmed) as Partial<RecordStoreLine>
-          if (line?.run?.id !== undefined) {
-            runs.push(line.run)
-            knownRunIds.add(line.run.id)
+          const run = JSON.parse(trimmed) as Partial<ElectroLabRun>
+          if (typeof run.id === 'string') {
+            runs.push(run as ElectroLabRun)
+            knownRunIds.add(run.id)
           }
         } catch {
           // Torn or partial tail line: self-contained by design, skip it.
@@ -59,7 +54,7 @@ export function createRecordStore(filePath: string): RecordStore {
   const appendLine = (run: ElectroLabRun): void => {
     try {
       mkdirSync(dirname(filePath), { recursive: true })
-      appendFileSync(filePath, `${JSON.stringify({ run })}\n`)
+      appendFileSync(filePath, `${JSON.stringify(run)}\n`)
       runs.push(run)
     } catch {
       // Disk trouble must never break the session listener: the in-memory
