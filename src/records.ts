@@ -19,9 +19,9 @@
  *   keeping the full output text and error identity. Everything else
  *   (tool counts, error counts) is derivable from these two arrays.
  *
- * Run ids embed the first call's `time` and `seq` (`run-<time>-<seq>`), which
- * makes them unique across sessions so stored records can key by run id
- * alone even though the fold never sees the session id.
+ * Run ids are deterministic UUIDv5 values over the first call's `time:seq`
+ * (see {@link runUuid}): UUID-shaped, replay-stable, and globally unique
+ * across sessions even though the fold never sees the session id.
  *
  * A run opens with the first electro-lab tool call — promoting the pending
  * pre-analysis window (`context`) collected since the first user message —
@@ -32,6 +32,7 @@
  * - no electro-lab activity arrives within {@link SETTLE_WINDOW_MS}.
  * Assistant messages do NOT close a run.
  */
+import { createHash } from 'node:crypto'
 import { ALL_TOOLS } from './tools/index.ts'
 import { filterTool } from './tools/filter-tool.ts'
 
@@ -46,6 +47,20 @@ export const MAX_TEXTS = 8
 /** Structured calls/results kept per run. */
 export const MAX_CALLS = 32
 export const MAX_RESULTS = 32
+
+/**
+ * Deterministic UUIDv5 for a run id: hashing the first call's `time:seq`
+ * keeps the fold pure and replay-stable (a random UUIDv4 would mint a fresh
+ * id on every log replay, duplicating records after a restart) while giving
+ * the standard UUID shape. Globally unique because time+seq is.
+ */
+function runUuid(time: number, seq: number): string {
+  const digest = createHash('sha1').update(`dsh-electro-lab:${time}:${seq}`).digest()
+  digest[6] = (digest[6]! & 0x0f) | 0x50 // version 5
+  digest[8] = (digest[8]! & 0x3f) | 0x80 // RFC 4122 variant
+  const hex = digest.toString('hex')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
+}
 
 /** Every tool the electro-lab plugin registers (ALL_TOOLS + the separately-registered pair). */
 export const ELECTRO_LAB_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -210,7 +225,7 @@ function clearContext(state: ElectroLabProjectionState): ElectroLabProjectionSta
 function promoteContext(context: ContextState, event: ElectroLabSessionEvent, name: string): OpenRunState {
   const callId = event.data.callId
   return {
-    id: `run-${event.time}-${event.seq}`,
+    id: runUuid(event.time, event.seq),
     startedAt: context.startedAt,
     lastAt: event.time,
     question: context.texts[0] ?? '',
@@ -225,7 +240,7 @@ function promoteContext(context: ContextState, event: ElectroLabSessionEvent, na
 function openRun(event: ElectroLabSessionEvent, name: string): OpenRunState {
   const callId = event.data.callId
   return {
-    id: `run-${event.time}-${event.seq}`,
+    id: runUuid(event.time, event.seq),
     startedAt: event.time,
     lastAt: event.time,
     question: '',
