@@ -1,16 +1,23 @@
 /**
- * ElectroLab run records: a session-projection fold that traces committed
- * session events into settled runs of electro-lab tool calls — the
- * five-step process (question → analysis → tool calls → results → answer).
+ * RecordManager: builds one settled record per five-step calculation
+ * (question → analysis → tool calls → results → answer).
  *
- * Pure functions only (no subscriptions, no I/O): the host feeds every
- * committed session event through the fold and persists each settled run
- * one-shot to the plugin-owned record store (see src/index.ts). The fold
- * never touches the session — no appends, no custom event types.
+ * The manager is the fold: `feed()` accepts session events one at a time and
+ * advances its build state. Held state:
+ * - `records` — every settled record (an item is appended only when settled),
+ * - `open` — the in-progress record, being assembled from events that arrive
+ *   one at a time,
+ * - `context` — the pre-analysis window (user messages + assistant texts
+ *   before the first tool call) that becomes the record's opening paragraphs.
+ *
+ * Pure by construction: no subscriptions, no I/O. The host creates one
+ * manager per session, feeds events, and appends each returned settled
+ * record to the plugin-owned store (see src/index.ts). The manager never
+ * touches the session — no appends, no custom event types.
  *
  * Record shape:
  * - `question` — one paragraph: the template's part 1, the consolidated full
- *   question the run solves,
+ *   question the calculation solves,
  * - `analyse` — one paragraph: the template's part 2, the approach with
  *   formulas,
  * - `answer` — one paragraph: the template's part 5, the final answer,
@@ -19,45 +26,55 @@
  *   keeping the full output text and error identity. Everything else
  *   (tool counts, error counts) is derivable from these two arrays.
  *
- * Run ids are random UUIDv4 values minted when the run opens. The fold is
- * therefore not replay-deterministic, which is fine: the host never re-appends
- * historical runs after a restart (records are live-only; see src/index.ts),
- * so a rebuilt state's fresh ids can never duplicate the archive.
+ * Record ids are random UUIDv4 values minted when the record opens. The
+ * manager is therefore not replay-deterministic, which is fine: the host
+ * never re-appends historical records after a restart (records are
+ * live-only; see src/index.ts), so a rebuilt manager's fresh ids can never
+ * duplicate the archive.
  *
- * A run opens with the first electro-lab tool call — promoting the pending
- * pre-analysis window (`context`) collected since the first user message —
- * and closes when:
+ * A record opens with the first electro-lab tool call — promoting the
+ * pending pre-analysis window collected since the first user message — and
+ * settles when:
  * - the turn ends (`turn/end`),
  * - a new user message arrives (`user/message`),
  * - a non-electro-lab tool is called in between (the flow moved on),
  * - no electro-lab activity arrives within {@link SETTLE_WINDOW_MS}.
- * Assistant messages do NOT close a run.
+ * Assistant messages do NOT settle a record.
  */
 import { randomUUID } from 'node:crypto'
 import { ALL_TOOLS } from './tools/index.ts'
 import { filterTool } from './tools/filter-tool.ts'
 
-/** A run closes when no electro-lab activity arrives within this window. */
+/** A record settles when no electro-lab activity arrives within this window. */
 export const SETTLE_WINDOW_MS = 30 * 60_000
-/** Settled runs retained in state (newest kept). */
-export const MAX_RUNS = 50
+/** Settled records retained in the manager (newest kept). */
+export const MAX_RECORDS = 50
 /** Per-paragraph text cap for question/analyse/answer and per-message caps. */
 export const MAX_TEXT_CHARS = 2000
-/** Collected pre/post-tool assistant texts per run (joined into paragraphs). */
+/** Collected pre/post-tool assistant texts per record (joined into paragraphs). */
 export const MAX_TEXTS = 8
-/** Structured calls/results kept per run. */
+/** Structured calls/results kept per record. */
 export const MAX_CALLS = 32
 export const MAX_RESULTS = 32
 
 /** Every tool the electro-lab plugin registers (ALL_TOOLS + the separately-registered pair). */
-export const ELECTRO_LAB_TOOL_NAMES: ReadonlySet<string> = new Set([
+export const RECORD_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...ALL_TOOLS.map((tool) => tool.name),
   filterTool.name,
   'solve_steps',
 ])
 
+/** The session-event types the manager folds. */
+export enum RecordEventType {
+  UserMessage = 'user/message',
+  AssistantMessage = 'assistant/message',
+  ToolCall = 'tool/call',
+  ToolResult = 'tool/result',
+  TurnEnd = 'turn/end',
+}
+
 /** One structured tool call, keeping the raw arguments. */
-export interface ElectroLabCall {
+export interface RecordCall {
   callId: string
   name: string
   /** Raw arguments JSON string exactly as the model produced it. */
@@ -65,15 +82,15 @@ export interface ElectroLabCall {
 }
 
 /** One structured tool result, keeping the full output and error identity. */
-export interface ElectroLabResult {
+export interface RecordResult {
   callId: string
   /** The tool-output text (may be empty when the tool returned no text). */
   content: string
   error?: { name: string; code: string }
 }
 
-/** A settled run: the closed record shown in the panel. */
-export interface ElectroLabRun {
+/** A settled record: the closed item shown in the panel. */
+export interface Record {
   id: string
   startedAt: number
   settledAt: number
@@ -84,80 +101,65 @@ export interface ElectroLabRun {
   /** One paragraph — the final answer (template part 5). */
   answer: string
   /** Structured tool calls, in execution order. */
-  calls: ElectroLabCall[]
+  calls: RecordCall[]
   /** Structured tool results, in call order. */
-  results: ElectroLabResult[]
+  results: RecordResult[]
 }
 
-/** The still-open run, when the session is mid-process. */
-export interface ElectroLabOpenRun {
+/** The still-open record, when the session is mid-process. */
+export interface OpenRecord {
   id: string
   startedAt: number
   lastAt: number
   question: string
   analyse: string
-  calls: ElectroLabCall[]
-  results: ElectroLabResult[]
+  calls: RecordCall[]
+  results: RecordResult[]
 }
 
-/** The wire payload for the records page. */
-export interface ElectroLabProjectionValue {
-  runs: ElectroLabRun[]
-  open: ElectroLabOpenRun | null
+/** The read view: settled records plus the in-progress one. */
+export interface RecordView {
+  records: Record[]
+  open: OpenRecord | null
 }
+
+interface RecordEventBase {
+  seq: number
+  time: number
+}
+
+/**
+ * One session event the manager understands, discriminated on `type`; the
+ * optional fields ride the union member they belong to (union types over
+ * enums with optional fields).
+ */
+export type RecordEvent =
+  | (RecordEventBase & { type: RecordEventType.UserMessage; data: { content?: unknown } })
+  | (RecordEventBase & { type: RecordEventType.AssistantMessage; data: { content?: unknown } })
+  | (RecordEventBase & { type: RecordEventType.ToolCall; data: { name: string; callId?: string; arguments?: string } })
+  | (RecordEventBase & { type: RecordEventType.ToolResult; data: { callId: string; error?: { name: string; code: string }; message?: unknown } })
+  | (RecordEventBase & { type: RecordEventType.TurnEnd; data: object })
 
 /** Pre-analysis window: assistant texts before the first tool call. */
-interface ContextState {
+interface ContextBuild {
   startedAt: number
   lastAt: number
   /** Pre-tool assistant texts: texts[0] is the question, the rest the analysis. */
   texts: string[]
 }
 
-/** Internal per-call bookkeeping of the open run. */
-interface OpenRunState {
+/** The in-progress record: built from events that do not arrive at once. */
+interface OpenBuild {
   id: string
   startedAt: number
   lastAt: number
   question: string
   analyse: string
-  calls: ElectroLabCall[]
-  results: ElectroLabResult[]
+  calls: RecordCall[]
+  results: RecordResult[]
   pending: string[]
   /** Post-tool assistant texts, joined into `answer` at settle time. */
   answerTexts: string[]
-}
-
-/** The fold state: plain JSON, ready for the persisted cache. */
-export interface ElectroLabProjectionState {
-  open: OpenRunState | null
-  context: ContextState | null
-  settled: ElectroLabRun[]
-}
-
-/**
- * The session-event shape this unit reads. Loose on purpose: only the leaf
- * fields the fold needs are read (the runtime provides the real dsh-session
- * event union, which structurally satisfies this view).
- */
-export interface ElectroLabSessionEvent {
-  type: string
-  seq: number
-  time: number
-  data: {
-    name?: string
-    callId?: string
-    arguments?: string
-    error?: { name: string; code: string }
-    content?: unknown
-    /** tool/result: `message.content[0]` is the ToolResultBlock carrying the output blocks. */
-    message?: unknown
-  }
-}
-
-/** State for the empty log. */
-export function initElectroLabProjection(): ElectroLabProjectionState {
-  return { open: null, context: null, settled: [] }
 }
 
 /** Join the text blocks of a message content array (TextBlock shape, loose). */
@@ -174,7 +176,7 @@ function textFromContent(content: unknown): string {
 }
 
 /** Extract the tool-output text from a `tool/result` payload (message.content[0] is the ToolResultBlock). */
-function textFromResultData(data: ElectroLabSessionEvent['data']): string {
+function textFromResultData(data: Extract<RecordEvent, { type: RecordEventType.ToolResult }>['data']): string {
   const message = data.message as { content?: unknown[] } | undefined
   const block = message?.content?.[0] as { type?: unknown; content?: unknown } | undefined
   return block?.type === 'tool-result' ? textFromContent(block.content) : ''
@@ -189,151 +191,167 @@ function joinParagraph(texts: string[]): string {
   return texts.join('\n\n').slice(0, MAX_TEXT_CHARS)
 }
 
-function settleOpen(state: ElectroLabProjectionState, settledAt: number): ElectroLabProjectionState {
-  const open = state.open
-  if (open === null) return state
-  const run: ElectroLabRun = {
-    id: open.id,
-    startedAt: open.startedAt,
-    settledAt,
-    question: open.question,
-    analyse: open.analyse,
-    answer: joinParagraph(open.answerTexts),
-    calls: open.calls,
-    results: open.results,
-  }
-  return { open: null, context: state.context, settled: [run, ...state.settled].slice(0, MAX_RUNS) }
-}
-
-function clearContext(state: ElectroLabProjectionState): ElectroLabProjectionState {
-  return state.context === null ? state : { ...state, context: null }
-}
-
-function promoteContext(context: ContextState, event: ElectroLabSessionEvent, name: string): OpenRunState {
-  const callId = event.data.callId
-  return {
-    id: randomUUID(),
-    startedAt: context.startedAt,
-    lastAt: event.time,
-    question: context.texts[0] ?? '',
-    analyse: joinParagraph(context.texts.slice(1)),
-    calls: [{ callId: callId ?? '', name, arguments: event.data.arguments ?? '' }],
-    results: [],
-    pending: callId === undefined ? [] : [callId],
-    answerTexts: [],
-  }
-}
-
-function openRun(event: ElectroLabSessionEvent, name: string): OpenRunState {
-  const callId = event.data.callId
-  return {
-    id: randomUUID(),
-    startedAt: event.time,
-    lastAt: event.time,
-    question: '',
-    analyse: '',
-    calls: [{ callId: callId ?? '', name, arguments: event.data.arguments ?? '' }],
-    results: [],
-    pending: callId === undefined ? [] : [callId],
-    answerTexts: [],
-  }
-}
-
-function extendRun(open: OpenRunState, event: ElectroLabSessionEvent, name: string): OpenRunState {
-  const callId = event.data.callId
-  return {
-    ...open,
-    lastAt: event.time,
-    calls: pushCapped(open.calls, { callId: callId ?? '', name, arguments: event.data.arguments ?? '' }, MAX_CALLS),
-    pending: callId === undefined ? open.pending : [...open.pending, callId],
-  }
-}
-
 /**
- * Pure transition: previous state + one committed event → next state.
- * Returns the same reference for events that do not change the unit.
+ * One session's record builder. Feed every committed event; each call returns
+ * the record it settled (if any) — once appended, a record is settled and
+ * never changes. Reads go through {@link items} and {@link view}.
  */
-export function applyElectroLabProjection(
-  state: ElectroLabProjectionState,
-  event: ElectroLabSessionEvent,
-): ElectroLabProjectionState {
-  let next = state
-  // An idle gap closes the open run and the stale question window before the
-  // event is processed.
-  if (next.open !== null && event.time - next.open.lastAt > SETTLE_WINDOW_MS) {
-    next = settleOpen(next, event.time)
-  }
-  if (next.context !== null && event.time - next.context.lastAt > SETTLE_WINDOW_MS) {
-    next = clearContext(next)
-  }
-  switch (event.type) {
-    case 'user/message': {
-      const text = textFromContent(event.data.content)
-      if (next.open !== null) next = settleOpen(next, event.time)
-      if (text.length === 0) return next
-      if (next.context !== null) {
-        // Follow-up question: the window continues, keep the collected texts.
-        return { ...next, context: { ...next.context, lastAt: event.time } }
-      }
-      return { ...next, context: { startedAt: event.time, lastAt: event.time, texts: [] } }
-    }
-    case 'assistant/message': {
-      const text = textFromContent(event.data.content)
-      if (text.length === 0) return next
-      if (next.open !== null) {
-        return { ...next, open: { ...next.open, answerTexts: pushCapped(next.open.answerTexts, text, MAX_TEXTS) } }
-      }
-      if (next.context !== null) {
-        return { ...next, context: { ...next.context, lastAt: event.time, texts: pushCapped(next.context.texts, text, MAX_TEXTS) } }
-      }
-      return next
-    }
-    case 'tool/call': {
-      const name = event.data.name
-      if (name === undefined || !ELECTRO_LAB_TOOL_NAMES.has(name)) {
-        // A foreign tool between electro-lab calls closes the run.
-        return next.open === null ? next : settleOpen(next, event.time)
-      }
-      if (next.open !== null) return { ...next, open: extendRun(next.open, event, name) }
-      if (next.context !== null) {
-        // First electro-lab call: promote the pre-analysis window into the run.
-        return { ...next, open: promoteContext(next.context, event, name), context: null }
-      }
-      return { ...next, open: openRun(event, name) }
-    }
-    case 'tool/result': {
-      const open = next.open
-      const callId = event.data.callId
-      if (open === null || callId === undefined || !open.pending.includes(callId)) return next
-      const result: ElectroLabResult = {
-        callId,
-        content: textFromResultData(event.data),
-        ...(event.data.error === undefined ? {} : { error: event.data.error }),
-      }
-      return { ...next, open: { ...open, results: pushCapped(open.results, result, MAX_RESULTS), pending: open.pending.filter((id) => id !== callId) } }
-    }
-    case 'turn/end': {
-      if (next.open !== null) next = settleOpen(next, event.time)
-      return clearContext(next)
-    }
-    default:
-      return next
-  }
-}
+export class RecordManager {
+  private readonly records: Record[] = []
+  private open: OpenBuild | null = null
+  private context: ContextBuild | null = null
 
-/** State → wire payload (newest runs first); open-run serialization for the records page. */
-export function viewElectroLabProjection(state: ElectroLabProjectionState): ElectroLabProjectionValue {
-  const openState = state.open
-  const open = openState === null
-    ? null
-    : {
-        id: openState.id,
-        startedAt: openState.startedAt,
-        lastAt: openState.lastAt,
-        question: openState.question,
-        analyse: openState.analyse,
-        calls: openState.calls,
-        results: openState.results,
+  /** Settled records, newest first. */
+  items(): readonly Record[] {
+    return this.records
+  }
+
+  /** Feed one event; returns the record it settled, or null. */
+  feed(event: RecordEvent): Record | null {
+    let settled: Record | null = null
+    // An idle gap settles the open record and drops the stale window first.
+    if (this.open !== null && event.time - this.open.lastAt > SETTLE_WINDOW_MS) settled = this.settle(event.time)
+    if (this.context !== null && event.time - this.context.lastAt > SETTLE_WINDOW_MS) this.context = null
+    switch (event.type) {
+      case RecordEventType.UserMessage: {
+        const text = textFromContent(event.data.content)
+        if (this.open !== null) settled = this.settle(event.time)
+        if (text.length === 0) break
+        if (this.context !== null) {
+          // Follow-up question: the window continues, keep the collected texts.
+          this.context = { ...this.context, lastAt: event.time }
+        } else {
+          this.context = { startedAt: event.time, lastAt: event.time, texts: [] }
+        }
+        break
       }
-  return { runs: state.settled, open }
+      case RecordEventType.AssistantMessage: {
+        const text = textFromContent(event.data.content)
+        if (text.length === 0) break
+        if (this.open !== null) {
+          this.open = { ...this.open, answerTexts: pushCapped(this.open.answerTexts, text, MAX_TEXTS) }
+        } else if (this.context !== null) {
+          this.context = { ...this.context, lastAt: event.time, texts: pushCapped(this.context.texts, text, MAX_TEXTS) }
+        }
+        break
+      }
+      case RecordEventType.ToolCall: {
+        const name = event.data.name
+        if (name === undefined || !RECORD_TOOL_NAMES.has(name)) {
+          // A foreign tool between electro-lab calls settles the record.
+          if (this.open !== null) settled = this.settle(event.time)
+          break
+        }
+        if (this.open !== null) {
+          this.extendRecord(event.time, event.data.callId, name, event.data.arguments)
+        } else if (this.context !== null) {
+          // First electro-lab call: promote the pre-analysis window into the record.
+          this.promoteContext(event.time, event.data.callId, name, event.data.arguments)
+        } else {
+          this.openRecord(event.time, event.data.callId, name, event.data.arguments)
+        }
+        break
+      }
+      case RecordEventType.ToolResult: {
+        const open = this.open
+        const callId = event.data.callId
+        if (open === null || !open.pending.includes(callId)) break
+        const result: RecordResult = {
+          callId,
+          content: textFromResultData(event.data),
+          ...(event.data.error === undefined ? {} : { error: event.data.error }),
+        }
+        this.open = {
+          ...open,
+          results: pushCapped(open.results, result, MAX_RESULTS),
+          pending: open.pending.filter((id) => id !== callId),
+        }
+        break
+      }
+      case RecordEventType.TurnEnd: {
+        if (this.open !== null) settled = this.settle(event.time)
+        this.context = null
+        break
+      }
+    }
+    return settled
+  }
+
+  /** The read view: settled records plus the in-progress one. */
+  view(): RecordView {
+    const open = this.open === null
+      ? null
+      : {
+          id: this.open.id,
+          startedAt: this.open.startedAt,
+          lastAt: this.open.lastAt,
+          question: this.open.question,
+          analyse: this.open.analyse,
+          calls: this.open.calls,
+          results: this.open.results,
+        }
+    return { records: this.records, open }
+  }
+
+  /** Settle the open record: freeze it, prepend it to the items, return it. */
+  private settle(at: number): Record {
+    const open = this.open
+    if (open === null) throw new Error('record manager: settle called with no open record')
+    const record: Record = {
+      id: open.id,
+      startedAt: open.startedAt,
+      settledAt: at,
+      question: open.question,
+      analyse: open.analyse,
+      answer: joinParagraph(open.answerTexts),
+      calls: open.calls,
+      results: open.results,
+    }
+    this.open = null
+    this.records.unshift(record)
+    if (this.records.length > MAX_RECORDS) this.records.length = MAX_RECORDS
+    return record
+  }
+
+  private promoteContext(time: number, callId: string | undefined, name: string, argumentsRaw: string | undefined): void {
+    const context = this.context
+    if (context === null) return
+    this.open = {
+      id: randomUUID(),
+      startedAt: context.startedAt,
+      lastAt: time,
+      question: context.texts[0] ?? '',
+      analyse: joinParagraph(context.texts.slice(1)),
+      calls: [{ callId: callId ?? '', name, arguments: argumentsRaw ?? '' }],
+      results: [],
+      pending: callId === undefined ? [] : [callId],
+      answerTexts: [],
+    }
+    this.context = null
+  }
+
+  private openRecord(time: number, callId: string | undefined, name: string, argumentsRaw: string | undefined): void {
+    this.open = {
+      id: randomUUID(),
+      startedAt: time,
+      lastAt: time,
+      question: '',
+      analyse: '',
+      calls: [{ callId: callId ?? '', name, arguments: argumentsRaw ?? '' }],
+      results: [],
+      pending: callId === undefined ? [] : [callId],
+      answerTexts: [],
+    }
+  }
+
+  private extendRecord(time: number, callId: string | undefined, name: string, argumentsRaw: string | undefined): void {
+    const open = this.open
+    if (open === null) return
+    this.open = {
+      ...open,
+      lastAt: time,
+      calls: pushCapped(open.calls, { callId: callId ?? '', name, arguments: argumentsRaw ?? '' }, MAX_CALLS),
+      pending: callId === undefined ? open.pending : [...open.pending, callId],
+    }
+  }
 }

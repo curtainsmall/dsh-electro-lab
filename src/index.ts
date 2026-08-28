@@ -7,13 +7,7 @@ import type { Context } from 'cordis'
 import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
-import {
-  applyElectroLabProjection,
-  initElectroLabProjection,
-  viewElectroLabProjection,
-  type ElectroLabProjectionState,
-  type ElectroLabSessionEvent,
-} from './records.ts'
+import { RecordManager, type RecordEvent } from './records.ts'
 import { createRecordStore, type RecordStore } from './record-store.ts'
 
 /** Plugin identity for cordis.yml rows. */
@@ -54,44 +48,41 @@ export function apply(ctx: Context): void {
   ctx.effect(() => registerTools(ctx), 'dsh-electro-lab: tools')
   ctx.effect(() => registerSkills(ctx), 'dsh-electro-lab: skills')
 
-  // Run records, plugin-owned: the fold observes session events WITHOUT
-  // touching the session (no appends, no custom event types), settled runs
+  // Run records, plugin-owned: the manager observes session events WITHOUT
+  // touching the session (no appends, no custom event types), settled records
   // are appended one-shot to disk under the user's home — `~/.dsh-electro-lab/`,
   // deliberately OUTSIDE $DSH_HOME so the records survive session deletion,
   // restarts and even a full DSH uninstall — and the client panel reads the
   // whole store through one HTTP endpoint: one page, all sessions.
   const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-electro-lab')
   const store: RecordStore = createRecordStore(join(recordsHome, 'records.jsonl'))
-  const states = new Map<string, ElectroLabProjectionState>()
+  const managers = new Map<string, RecordManager>()
 
   ctx.effect(() => {
     const disposers: Array<() => void> = []
 
-    // Session trace: fold every committed event per session. The first event
-    // of a session folds the FULL log first (lazy state rebuild) — that only
-    // RESTORES the fold state (an in-progress run keeps tracking); historical
-    // runs are never re-appended: they were appended live when they settled,
-    // and records are live-only (the archive is authoritative). Only a run
-    // settled by the incoming event itself is appended — detected by the
-    // settled head changing across this one apply.
+    // Session trace: feed every committed event into the session's record
+    // manager. The first event of a session rebuilds the manager by feeding
+    // the FULL log first — that only restores build state (an in-progress
+    // record keeps tracking); the settled records it returns are ignored,
+    // because records are live-only: they were appended when they settled,
+    // and the archive is authoritative. Only the record settled by the
+    // incoming event itself is appended.
     disposers.push(ctx.on('session/event', (session, event) => {
       const s = session as SessionLike
       const sessionId = s.id
       if (sessionId === undefined) return
-      let state = states.get(sessionId)
-      if (state === undefined) {
-        state = initElectroLabProjection()
-        for (const stored of s.events ?? []) state = applyElectroLabProjection(state, stored as ElectroLabSessionEvent)
-        states.set(sessionId, state)
+      let manager = managers.get(sessionId)
+      if (manager === undefined) {
+        manager = new RecordManager()
+        for (const stored of s.events ?? []) manager.feed(stored as RecordEvent)
+        managers.set(sessionId, manager)
       }
-      const headBefore = state.settled[0]?.id
-      const next = applyElectroLabProjection(state, event as ElectroLabSessionEvent)
-      states.set(sessionId, next)
-      const head = next.settled[0]
-      if (head !== undefined && head.id !== headBefore) store.append(head)
+      const settled = manager.feed(event as RecordEvent)
+      if (settled !== null) store.append(settled)
     }))
 
-    // The records page: all stored runs plus any live open runs, newest first.
+    // The records page: all stored records plus any live open records, newest first.
     const webServer = ctx.get('webServer') as WebServerLike | undefined
     if (webServer !== undefined) {
       disposers.push(webServer.register({
@@ -99,9 +90,9 @@ export function apply(ctx: Context): void {
         path: RECORDS_PATH,
         handler: (_req, res) => {
           const open: Array<unknown> = []
-          for (const state of states.values()) {
-            const run = viewElectroLabProjection(state).open
-            if (run !== null) open.push(run)
+          for (const manager of managers.values()) {
+            const record = manager.view().open
+            if (record !== null) open.push(record)
           }
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ records: [...store.list()].reverse(), open }))
@@ -112,7 +103,7 @@ export function apply(ctx: Context): void {
     return () => {
       for (const off of disposers) off()
     }
-  }, 'dsh-electro-lab: run records')
+  }, 'dsh-electro-lab: records')
 
   try {
     const synced = installPresets()
