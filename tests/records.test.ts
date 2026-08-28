@@ -59,7 +59,7 @@ describe('electro-lab run records projection', () => {
     const value = viewElectroLabProjection(state)
     expect(value.runs).toHaveLength(1)
     const run = value.runs[0]!
-    expect(run.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(run.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(run.question).toBe('10 µF 与 50 mH 并联的谐振频率与带宽是多少?')
     expect(run.analyse).toBe('分析:f₀ = 1/(2π√(LC)),Q = R√(C/L)')
     expect(run.answer).toBe('答案:f₀ ≈ 225 Hz。')
@@ -149,14 +149,15 @@ describe('electro-lab run records projection', () => {
     expect(next).toBe(state)
   })
 
-  it('mints deterministic UUIDv5 ids: same events, same id; different events, different id', () => {
-    const foldOnce = (time: number, seq: number) => viewElectroLabProjection(fold([
-      calculateCall(seq, time, `c${seq}`),
-      event('turn/end', seq + 1, time + 1000),
+  it('mints random UUIDv4 ids: every run gets a fresh one', () => {
+    const mint = () => viewElectroLabProjection(fold([
+      calculateCall(1, 1000, 'c1'),
+      event('turn/end', 2, 2000),
     ])).runs[0]!.id
-    expect(foldOnce(1000, 4)).toBe(foldOnce(1000, 4))
-    expect(foldOnce(1000, 4)).not.toBe(foldOnce(2000, 4))
-    expect(foldOnce(1000, 4)).not.toBe(foldOnce(1000, 5))
+    const a = mint()
+    const b = mint()
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(a).not.toBe(b)
   })
 
   it('keeps one window across follow-up user messages', () => {

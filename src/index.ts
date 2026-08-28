@@ -68,8 +68,12 @@ export function apply(ctx: Context): void {
     const disposers: Array<() => void> = []
 
     // Session trace: fold every committed event per session. The first event
-    // of a session folds the FULL log first (lazy cell build), so resumed
-    // sessions backfill their history into the store on first touch.
+    // of a session folds the FULL log first (lazy state rebuild) — that only
+    // RESTORES the fold state (an in-progress run keeps tracking); historical
+    // runs are never re-appended: they were appended live when they settled,
+    // and records are live-only (the archive is authoritative). Only a run
+    // settled by the incoming event itself is appended — detected by the
+    // settled head changing across this one apply.
     disposers.push(ctx.on('session/event', (session, event) => {
       const s = session as SessionLike
       const sessionId = s.id
@@ -80,15 +84,11 @@ export function apply(ctx: Context): void {
         for (const stored of s.events ?? []) state = applyElectroLabProjection(state, stored as ElectroLabSessionEvent)
         states.set(sessionId, state)
       }
+      const headBefore = state.settled[0]?.id
       const next = applyElectroLabProjection(state, event as ElectroLabSessionEvent)
       states.set(sessionId, next)
-
-      // Append every newly settled run (history backfill included). The run
-      // carries everything — the template's question step is the first
-      // analyse text — so one append completes the record.
-      for (const run of next.settled) {
-        if (!store.has(run.id)) store.append(run)
-      }
+      const head = next.settled[0]
+      if (head !== undefined && head.id !== headBefore) store.append(head)
     }))
 
     // The records page: all stored runs plus any live open runs, newest first.
