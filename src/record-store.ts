@@ -1,96 +1,83 @@
 /**
- * Plugin-owned record store: settled electro-lab runs persisted on disk,
- * independent of the session log and of session lifecycle — records survive
- * session deletion and process restarts, and every session's records live in
- * one flat file served as a single page.
+ * Plugin-owned record store: settled electro-lab runs appended as immutable
+ * JSONL lines on disk, independent of the session log and of session
+ * lifecycle. Records are built FROM sessions but never feed back into them —
+ * they are not used to rebuild sessions, and every downstream read (the
+ * records page) works from this file alone.
  *
- * The file (`records.json` under `~/.dsh-electro-lab/`, outside $DSH_HOME)
- * holds one JSON document with a flat `records` array; mutations rewrite it
- * atomically (write-temp + rename). The store is deliberately synchronous and
- * small — writes happen on run settlement only, and the file stays tiny.
+ * One-shot and append-only: a run line is written once at settle time and
+ * never touched again — the template's question step is part of the run's
+ * analyse texts, so nothing is added later. The file (`records.jsonl` under
+ * `~/.dsh-electro-lab/`) holds one self-contained JSON object per line, so a
+ * torn tail line is simply skipped on read — the archive never corrupts as
+ * a whole.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { ElectroLabRun } from './records.ts'
 
-/** One persisted record: the settled run plus the context it needs to live on its own. */
-export interface StoredElectroLabRecord {
-  sessionId: string
-  /** Model route captured at settle time — lets a later summary run without the live session. */
-  route?: { provider: string; model: string } | null
+/** One immutable line of the JSONL archive. */
+export interface RecordStoreLine {
   run: ElectroLabRun
-}
-
-/** The whole file shape (versioned for future migrations). */
-export interface RecordStoreFile {
-  version: 1
-  records: StoredElectroLabRecord[]
 }
 
 /** The disk-backed store face. */
 export interface RecordStore {
-  /** Whether a record for (sessionId, runId) is already known. */
-  has(sessionId: string, runId: string): boolean
-  /** Every stored record, newest first. */
-  list(): StoredElectroLabRecord[]
-  /** Persist one settled run (no-op when already known). */
-  append(record: StoredElectroLabRecord): void
-  /** Attach a summarized question to the stored run; false when unknown or already set. */
-  updateQuestion(runId: string, question: string): boolean
+  /** Whether a run line for `runId` is already known (run ids are globally unique). */
+  has(runId: string): boolean
+  /** Every stored run, in file order. */
+  list(): ElectroLabRun[]
+  /** Append one immutable run line (no-op when already known). */
+  append(run: ElectroLabRun): void
 }
 
-const key = (sessionId: string, runId: string): string => `${sessionId}:${runId}`
-
-/** Create the store over one JSON file (created lazily on first write). */
+/** Create the store over one JSONL file (created lazily on first write). */
 export function createRecordStore(filePath: string): RecordStore {
-  const records: StoredElectroLabRecord[] = []
-  const known = new Set<string>()
+  const runs: ElectroLabRun[] = []
+  const knownRunIds = new Set<string>()
 
-  const persist = (): void => {
+  try {
+    if (existsSync(filePath)) {
+      for (const raw of readFileSync(filePath, 'utf8').split('\n')) {
+        const trimmed = raw.trim()
+        if (trimmed.length === 0) continue
+        try {
+          const line = JSON.parse(trimmed) as Partial<RecordStoreLine>
+          if (line?.run?.id !== undefined) {
+            runs.push(line.run)
+            knownRunIds.add(line.run.id)
+          }
+        } catch {
+          // Torn or partial tail line: self-contained by design, skip it.
+        }
+      }
+    }
+  } catch {
+    // Unreadable file: start empty; the next append recreates it.
+  }
+
+  const appendLine = (run: ElectroLabRun): void => {
     try {
       mkdirSync(dirname(filePath), { recursive: true })
-      const tmp = `${filePath}.tmp`
-      const body: RecordStoreFile = { version: 1, records }
-      writeFileSync(tmp, JSON.stringify(body))
-      renameSync(tmp, filePath)
+      appendFileSync(filePath, `${JSON.stringify({ run })}\n`)
+      runs.push(run)
     } catch {
       // Disk trouble must never break the session listener: the in-memory
       // copy stays authoritative and the next mutation retries the write.
     }
   }
 
-  try {
-    if (existsSync(filePath)) {
-      const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Partial<RecordStoreFile>
-      for (const record of parsed.records ?? []) {
-        if (record === null || typeof record !== 'object' || typeof record.sessionId !== 'string' || record.run?.id === undefined) continue
-        records.push(record)
-        known.add(key(record.sessionId, record.run.id))
-      }
-    }
-  } catch {
-    // Unreadable or corrupt store: start empty; the next append rewrites it.
-  }
-
   return {
-    has(sessionId, runId) {
-      return known.has(key(sessionId, runId))
+    has(runId) {
+      return knownRunIds.has(runId)
     },
     list() {
-      return records
+      return runs
     },
-    append(record) {
-      if (known.has(key(record.sessionId, record.run.id))) return
-      records.unshift(record)
-      known.add(key(record.sessionId, record.run.id))
-      persist()
-    },
-    updateQuestion(runId, question) {
-      const record = records.find((item) => item.run.id === runId)
-      if (record === undefined || record.run.question !== undefined) return false
-      record.run = { ...record.run, question }
-      persist()
-      return true
+    append(run) {
+      if (knownRunIds.has(run.id)) return
+      knownRunIds.add(run.id)
+      appendLine(run)
     },
   }
 }

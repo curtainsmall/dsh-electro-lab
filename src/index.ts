@@ -35,11 +35,6 @@ interface SessionLike {
   events?: readonly unknown[]
 }
 
-/** Minimal structural shape of the llm service (stream + text deltas). */
-interface LlmLike {
-  stream(options: Record<string, unknown>): AsyncIterable<{ type?: string; text?: string }>
-}
-
 /** Minimal structural shape of the web-server route registry. */
 interface WebServerLike {
   register(route: {
@@ -54,69 +49,6 @@ interface WebServerLike {
 
 /** The records page endpoint (same origin as the web app; the client polls it). */
 const RECORDS_PATH = '/api/dsh-electro-lab/records'
-/** How many runs get summarized per settle/backfill batch. */
-const SUMMARY_BATCH = 3
-
-/** How the summarizer consolidates the raw question inputs (host-side prompt). */
-const QUESTION_SUMMARY_PROMPT =
-  'The following are one or more user inputs to an electrical/electronics calculation assistant ' +
-  '(later inputs may be follow-ups or refinements). Combine them into ONE complete, self-contained ' +
-  'question that needs no further context, in the same language as the inputs. ' +
-  'Return only the question text.'
-
-/** The last logged model route (`request/context`), when the session has one. */
-function lastRequestRoute(session: SessionLike): { provider: string; model: string } | undefined {
-  const events = session.events ?? []
-  for (let index = events.length - 1; index >= 0; index--) {
-    const event = events[index] as { type?: string; data?: { provider?: unknown; model?: unknown } } | undefined
-    if (event?.type === 'request/context' && typeof event.data?.provider === 'string' && typeof event.data?.model === 'string') {
-      return { provider: event.data.provider, model: event.data.model }
-    }
-  }
-  return undefined
-}
-
-/**
- * Summarize the raw question inputs of one settled run with its recorded
- * model route and attach the result to the stored record. The summary never
- * enters the session log (the session persistence read path refuses unknown
- * out-of-repo event types) — it lives in the plugin-owned record store only.
- * Failures are logged and contained; the record keeps the raw inputs.
- */
-async function summarizeQuestion(
-  ctx: Context,
-  llm: LlmLike,
-  store: RecordStore,
-  runId: string,
-  questionInputs: readonly string[],
-  route: { provider: string; model: string } | null | undefined,
-): Promise<void> {
-  if (route === undefined || route === null) {
-    ctx.logger?.warn(`[dsh-electro-lab] no request route for run ${runId} — question summarization skipped`)
-    return
-  }
-  try {
-    const stream = llm.stream({
-      provider: route.provider,
-      model: route.model,
-      messages: [
-        { role: 'user', content: [{ type: 'text', text: `${QUESTION_SUMMARY_PROMPT}\n\n${questionInputs.join('\n---\n')}` }] },
-      ],
-    })
-    const parts: string[] = []
-    for await (const chunk of stream) {
-      if (chunk.type === 'text-delta' && typeof chunk.text === 'string') parts.push(chunk.text)
-    }
-    const question = parts.join('').trim().slice(0, 500)
-    if (question.length === 0) {
-      ctx.logger?.warn(`[dsh-electro-lab] summarizer returned no text for run ${runId}`)
-      return
-    }
-    store.updateQuestion(runId, question)
-  } catch (error) {
-    ctx.logger?.warn(`[dsh-electro-lab] question summarization failed for run ${runId}: ${error instanceof Error ? error.message : String(error)}`)
-  }
-}
 
 export function apply(ctx: Context): void {
   ctx.effect(() => registerTools(ctx), 'dsh-electro-lab: tools')
@@ -124,14 +56,13 @@ export function apply(ctx: Context): void {
 
   // Run records, plugin-owned: the fold observes session events WITHOUT
   // touching the session (no appends, no custom event types), settled runs
-  // are persisted to disk under the user's home — `~/.dsh-electro-lab/`,
+  // are appended one-shot to disk under the user's home — `~/.dsh-electro-lab/`,
   // deliberately OUTSIDE $DSH_HOME so the records survive session deletion,
   // restarts and even a full DSH uninstall — and the client panel reads the
   // whole store through one HTTP endpoint: one page, all sessions.
   const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-electro-lab')
-  const store = createRecordStore(join(recordsHome, 'records.json'))
+  const store: RecordStore = createRecordStore(join(recordsHome, 'records.jsonl'))
   const states = new Map<string, ElectroLabProjectionState>()
-  const llm = ctx.get('llm') as LlmLike | undefined
 
   ctx.effect(() => {
     const disposers: Array<() => void> = []
@@ -152,44 +83,28 @@ export function apply(ctx: Context): void {
       const next = applyElectroLabProjection(state, event as ElectroLabSessionEvent)
       states.set(sessionId, next)
 
-      // Persist every newly settled run (history backfill included) and
-      // summarize a bounded batch of them.
-      const route = lastRequestRoute(s)
-      let budget = SUMMARY_BATCH
+      // Append every newly settled run (history backfill included). The run
+      // carries everything — the template's question step is the first
+      // analyse text — so one append completes the record.
       for (const run of next.settled) {
-        if (store.has(sessionId, run.id)) continue
-        store.append({ sessionId, route, run })
-        if (budget === 0 || llm === undefined || run.questionInputs.length === 0) continue
-        budget -= 1
-        void summarizeQuestion(ctx, llm, store, run.id, run.questionInputs, route)
+        if (!store.has(run.id)) store.append(run)
       }
     }))
 
-    // The records page: all stored records plus any live open runs, newest
-    // first. Also lazily refills missing question summaries on each read so a
-    // restarted process gradually catches up as the panel polls.
+    // The records page: all stored runs plus any live open runs, newest first.
     const webServer = ctx.get('webServer') as WebServerLike | undefined
     if (webServer !== undefined) {
       disposers.push(webServer.register({
         kind: 'exact',
         path: RECORDS_PATH,
         handler: (_req, res) => {
-          const open: Array<{ sessionId: string; run: unknown }> = []
-          for (const [sessionId, state] of states) {
+          const open: Array<unknown> = []
+          for (const state of states.values()) {
             const run = viewElectroLabProjection(state).open
-            if (run !== null) open.push({ sessionId, run })
-          }
-          if (llm !== undefined) {
-            let budget = SUMMARY_BATCH
-            for (const record of store.list()) {
-              if (budget === 0) break
-              if (record.run.question !== undefined || record.run.questionInputs.length === 0) continue
-              budget -= 1
-              void summarizeQuestion(ctx, llm, store, record.run.id, record.run.questionInputs, record.route)
-            }
+            if (run !== null) open.push(run)
           }
           res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ records: store.list(), open }))
+          res.end(JSON.stringify({ records: [...store.list()].reverse(), open }))
         },
       }))
     }

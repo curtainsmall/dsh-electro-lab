@@ -8,21 +8,17 @@
  * replays them deterministically from the persisted log, so the fold is
  * identical on live sessions, resume and checkpoint restore.
  *
- * Each record carries the question/answer pair:
+ * Each record carries the question/answer pair, captured one-shot:
  * - `questionInputs` — the raw user messages that led to the run (follow-up
  *   questions accumulate; multiple inputs are allowed),
- * - `question` — the LLM-summarized full question, attached by the host
- *   summarizer once the summary lands (see src/index.ts). The summary never
- *   enters the session log — the session persistence read path refuses
- *   unknown out-of-repo event types — and never touches this fold: settled
- *   runs are persisted by the host into the plugin-owned record store, and
- *   the store update carries the question back.
- * - `answerTexts` — the assistant texts inside the run window, i.e. the
- *   five-step texts (analyse/plan interleave with tool calls in one turn).
- *
- * Run ids embed the first call's `time` and `seq` (`run-<time>-<seq>`), which
- * makes them unique across sessions so stored records can key by run id
- * alone even though the fold never sees the session id.
+ * - `answerTexts` — the LLM-generated texts of the run window: the template's
+ *   part 1 restates the complete question (so the first text IS the
+ *   consolidated question the run solves), followed by the analysis and the
+ *   answer texts (which interleave with tool calls in one turn),
+ * - `results` — the exact tool outputs (`tool/result` content).
+ * Nothing is added after settle: the fold captures everything from the
+ * session events, and the host persists the settled run to the plugin-owned
+ * record store as one immutable line.
  *
  * A run opens with the first electro-lab tool call — promoting the pending
  * pre-analysis window (`context`) collected since the first user message —
@@ -68,11 +64,9 @@ export interface ElectroLabRun {
   toolCalls: number
   errors: number
   tools: ElectroLabToolUsage[]
-  /** LLM-summarized full question; merged from the ledger when available. */
-  question?: string
   /** Raw user texts that led to the run (follow-ups accumulate). */
   questionInputs: string[]
-  /** Assistant texts inside the run window — the five-step texts. */
+  /** LLM-generated texts: the summarized question (once merged) + five-step texts. */
   answerTexts: string[]
   /** Exact tool outputs (`tool/result` content) — the five-step results. */
   results: string[]

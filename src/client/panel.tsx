@@ -111,33 +111,100 @@ export function mountElectroLabPanel(): () => void {
   }
 }
 
-/* ── Nav entry (sidebar foot, beside Settings) ─────────────────────────────── */
+/* ── Nav entry (sidebar rail, beside SSH / task board / skills) ─────────────── */
 
-/** The sidebar-foot nav button that toggles the panel. */
-export function SidebarNavButton(_props: Record<string, unknown>): React.JSX.Element {
-  const open = useSyncExternalStore(panelStore.subscribe, () => panelStore.open)
-  return (
-    <button
-      type="button"
-      onClick={() => panelStore.toggle()}
-      title="ElectroLab"
-      aria-label="ElectroLab"
-      aria-expanded={open}
-      style={{
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        padding: 6,
-        display: 'flex',
-        alignItems: 'center',
-        color: open ? '#e8b34b' : '#8b93a5',
-      }}
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2z" />
-      </svg>
-    </button>
-  )
+const SIDEBAR_COLUMN_SELECTOR = '[data-pane="sidebar"], [class*="sidebarCol"]'
+const ENTRY_ATTR = 'data-dsh-electrolab-entry'
+/** The rail family this entry joins, in shell order — placed after the last one. */
+const ENTRY_FAMILY = ['[data-dsh-taskboard-entry]', '[data-dsh-ssh-entry]', '[data-dsh-skill-explorer-entry]']
+/** Font Awesome-style bolt glyph, rendered like the shell's 16px line icons. */
+const ENTRY_ICON =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M9.1 1 3.4 9.1h3.5l-.8 5.9 5.9-8.4H8.2L9.1 1z"/></svg>'
+/** Entry styles: the exact rules the SSH/task-board/skills entries use, self-contained. */
+const ENTRY_CSS = `
+.dsh-elab-entry{box-sizing:border-box;width:100%;min-height:36px;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:8px;align-items:center;gap:10px;padding:0 10px;font-size:13px;display:flex}
+.dsh-elab-entry:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.dsh-elab-entry[data-active]{background:var(--dsw-alias-interactive-bg-active);color:var(--dsw-alias-label-primary);font-weight:600}
+.dsh-elab-entryIcon{flex:none;justify-content:center;align-items:center;width:24px;height:24px;display:inline-flex}
+.dsh-elab-entryIcon svg{width:18px;height:18px;display:block}
+.dsh-elab-entryLabel{text-overflow:ellipsis;overflow:hidden}
+[data-dsh-frame][data-sidebar-collapsed] .dsh-elab-entry{border-radius:50%;justify-content:center;width:36px;min-height:36px;margin:0 auto 12px;padding:0}
+[data-dsh-frame][data-sidebar-collapsed] .dsh-elab-entryLabel{display:none}
+`
+
+/**
+ * Mount the nav entry into the sidebar rail exactly like the SSH/task-board/
+ * skills panels: a button appended inside the sidebar column root, anchored
+ * after the existing entry family, with self-healing observers that re-place
+ * it when the shell re-renders. Returns one disposer that removes it.
+ */
+export function mountElectroLabEntry(): () => void {
+  const entry = document.createElement('button')
+  entry.type = 'button'
+  entry.setAttribute(ENTRY_ATTR, '')
+  entry.setAttribute('data-dsh-plugin', 'electro-lab')
+  entry.setAttribute('data-dsh-part', 'sidebar-entry')
+  entry.setAttribute('aria-label', 'ElectroLab')
+  entry.setAttribute('title', 'ElectroLab')
+  entry.className = 'dsh-elab-entry'
+  entry.innerHTML = `<span class="dsh-elab-entryIcon">${ENTRY_ICON}</span><span class="dsh-elab-entryLabel">ElectroLab</span>`
+  const style = document.createElement('style')
+  style.textContent = ENTRY_CSS
+  document.head.appendChild(style)
+
+  const syncActive = (): void => {
+    if (panelStore.open) entry.dataset.active = 'true'
+    else delete entry.dataset.active
+  }
+  entry.addEventListener('click', () => panelStore.toggle())
+  const unsubscribeActive = panelStore.subscribe(syncActive)
+  syncActive()
+
+  let root: HTMLElement | undefined
+  let placed = false
+  const sidebarRoot = (): HTMLElement | undefined => {
+    const column = document.querySelector(SIDEBAR_COLUMN_SELECTOR)
+    if (column === null) return undefined
+    return column.querySelector('[class*="logoRow"]')?.parentElement ?? (column.firstElementChild as HTMLElement | undefined)
+  }
+  const place = (): boolean => {
+    const baseEl = root
+    if (baseEl === undefined) return false
+    const newSession = baseEl.querySelector('button[class*="newSession"]')
+    const firstButton = newSession ?? Array.from(baseEl.children).find((el) => el.tagName === 'BUTTON')
+    if (firstButton === undefined) return false
+    const row = firstButton.closest('[class*="logoRow"]')
+    const base = row !== null && row.parentElement === baseEl ? row : firstButton
+    const family = Array.from(baseEl.children).filter((el): el is HTMLElement => el instanceof HTMLElement && el.matches(ENTRY_FAMILY.join(', ')))
+    const anchor = family.length > 0 ? family[family.length - 1]!.nextElementSibling : base.nextElementSibling
+    baseEl.insertBefore(entry, anchor)
+    return true
+  }
+  const rootObserver = new MutationObserver(() => {
+    if (placed && entry.isConnected) return
+    if (root !== undefined && !entry.isConnected) placed = false
+    tryPlace()
+  })
+  const tryPlace = (): void => {
+    if (placed && entry.isConnected) return
+    root ??= sidebarRoot()
+    if (root === undefined) return
+    if (!placed) placed = place()
+    if (placed) rootObserver.observe(root, { childList: true, subtree: true })
+  }
+  const waitObserver = new MutationObserver(tryPlace)
+  waitObserver.observe(document.body, { childList: true, subtree: true })
+  tryPlace()
+
+  return () => {
+    waitObserver.disconnect()
+    rootObserver.disconnect()
+    unsubscribeActive()
+    style.remove()
+    entry.remove()
+  }
 }
 
 /* ── Panel chrome (SSH-style: back-to-session title bar, tabs, content) ────── */

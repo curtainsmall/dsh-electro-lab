@@ -20,7 +20,6 @@ interface SettledRun {
   toolCalls: number
   errors: number
   tools: ToolUsage[]
-  question?: string
   questionInputs: string[]
   answerTexts: string[]
   results: string[]
@@ -39,13 +38,12 @@ interface OpenRun {
 }
 
 interface StoredRecord {
-  sessionId: string
   run: SettledRun
 }
 
 interface RecordsResponse {
   records: StoredRecord[]
-  open: Array<{ sessionId: string; run: OpenRun }>
+  open: OpenRun[]
 }
 
 const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
@@ -68,10 +66,6 @@ function formatTime(time: number): string {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function shortSessionId(sessionId: string): string {
-  return sessionId.length > 12 ? `${sessionId.slice(0, 8)}…` : sessionId
 }
 
 function toolChips(tools: ToolUsage[]): React.JSX.Element {
@@ -194,35 +188,34 @@ export function RecordsTab(): React.JSX.Element {
         </div>
       ) : (
         <>
-          {openRuns.map((entry) => (
-            <div key={`open:${entry.sessionId}`} style={rowStyle}>
+          {openRuns.map((run) => (
+            <div key={`open:${run.id}`} style={rowStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#e8b34b', fontWeight: 600 }}>● in progress</span>
-                <span style={{ color: '#8b93a5', fontSize: 11 }}>{shortSessionId(entry.sessionId)}</span>
               </div>
               <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4' }}>
-                {entry.run.questionInputs[0] ?? entry.run.id}
+                {run.questionInputs[0] ?? run.id}
               </div>
               <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4' }}>
-                {entry.run.toolCalls} tool call(s)
-                {entry.run.errors > 0 ? `, ${entry.run.errors} error(s)` : ''}
+                {run.toolCalls} tool call(s)
+                {run.errors > 0 ? `, ${run.errors} error(s)` : ''}
                 {' · started '}
-                {formatTime(entry.run.startedAt)}
+                {formatTime(run.startedAt)}
               </div>
-              {toolChips(entry.run.tools)}
-              {resultBox(entry.run.results)}
+              {toolChips(run.tools)}
+              {resultBox(run.results)}
             </div>
           ))}
           {records.map((record) => {
             const run = record.run
             return (
-              <div key={`${record.sessionId}:${run.id}`} style={rowStyle}>
+              <div key={run.id} style={rowStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
-                    {run.question ?? run.questionInputs[0] ?? `run ${run.id}`}
+                    {run.questionInputs[0] ?? `run ${run.id}`}
                   </span>
                   <span style={{ color: '#8b93a5', fontSize: 11, flex: 'none' }}>
-                    {shortSessionId(record.sessionId)} · {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
+                    {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>

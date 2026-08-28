@@ -23,8 +23,8 @@
       3. Gate every request BEFORE any tool call: write down the quantities the user actually gave. If any quantity the computation needs is missing, do NOT call any tool, do NOT use the template — say exactly what is missing (and which tool would need it) and stop.
 
       Only when the gate passes — every needed quantity is present — call the tools; then your answer MUST be the template below as a whole, and check before finishing that all five parts are present, in order, with nothing else in between:
-      1. Analyse (natural language) — the knowns with their units, the target quantity, the approach.
-      2. Plan (mathematical/physical language — formulas, no numbers yet)
+      1. Question (natural language) — restate the complete question being solved in one consolidated form: merge every user input, including follow-ups, into a single full question that needs no further context.
+      2. Analysis (approach with formulas) — the knowns with their units, the target quantity, the solving approach: the formulas in mathematical/physical terms. No computed numbers yet.
       3. Tool calls (table — one row per call actually made, in execution order, tool name and key arguments)
       4. Results (table — one row per call result, same order as part 3; every number used in part 5 appears here first)
       5. Answer (natural language — physical meaning with units, reasoning only from part 4)

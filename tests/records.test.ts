@@ -171,7 +171,6 @@ describe('electro-lab run records projection', () => {
     const value = viewElectroLabProjection(state)
     expect(value.runs).toHaveLength(1)
     const run = value.runs[0]!
-    expect(run.question).toBeUndefined()
     expect(run.questionInputs).toEqual(['compute the resonance frequency of an LC tank'])
     expect(run.answerTexts).toEqual([
       '分析:LC 谐振,计划:用 resonance 工具',
