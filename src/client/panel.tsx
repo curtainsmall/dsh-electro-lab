@@ -62,6 +62,7 @@ export function mountElectroLabPanel(ctx: { get(name: string): unknown }): () =>
 
   const container = document.createElement('div')
   container.dataset.dshElectrolabView = ''
+  container.style.display = 'none'
   const style = document.createElement('style')
   style.textContent = `
     [data-pane="conversation"], [class*="centerCol"] { position: relative; }
@@ -83,6 +84,10 @@ export function mountElectroLabPanel(ctx: { get(name: string): unknown }): () =>
   waitObserver.observe(document.body, { childList: true, subtree: true })
 
   const applyActive = (): void => {
+    // The container itself paints the opaque overlay, so it must be hidden
+    // while the panel is closed — otherwise it would cover the conversation
+    // and swallow every click even though the React tree renders nothing.
+    container.style.display = panelStore.open ? 'block' : 'none'
     if (panelStore.open) {
       document.documentElement.setAttribute(ACTIVE_ATTR, '')
       document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: PANEL_NAME }))
