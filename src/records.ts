@@ -11,11 +11,18 @@
  * Each record carries the question/answer pair:
  * - `questionInputs` — the raw user messages that led to the run (follow-up
  *   questions accumulate; multiple inputs are allowed),
- * - `question` — the LLM-summarized full question, appended as a log-only
- *   `electro-lab/question` event by a host listener OUTSIDE this unit (the
- *   fold stays pure and synchronous; the LLM output rides the event data),
+ * - `question` — the LLM-summarized full question, attached by the host
+ *   summarizer once the summary lands (see src/index.ts). The summary never
+ *   enters the session log — the session persistence read path refuses
+ *   unknown out-of-repo event types — and never touches this fold: settled
+ *   runs are persisted by the host into the plugin-owned record store, and
+ *   the store update carries the question back.
  * - `answerTexts` — the assistant texts inside the run window, i.e. the
  *   five-step texts (analyse/plan interleave with tool calls in one turn).
+ *
+ * Run ids embed the first call's `time` and `seq` (`run-<time>-<seq>`), which
+ * makes them unique across sessions so stored records can key by run id
+ * alone even though the fold never sees the session id.
  *
  * A run opens with the first electro-lab tool call — promoting the pending
  * pre-analysis window (`context`) collected since the first user message —
@@ -29,12 +36,6 @@
 import { ALL_TOOLS } from './tools/index.ts'
 import { filterTool } from './tools/filter-tool.ts'
 
-/** The projection key this unit owns (merged into the SessionProjectionMap). */
-export const ELECTRO_LAB_PROJECTION_KEY = 'electro-lab'
-/** The log-only event carrying the LLM-summarized question (plugin-merged type). */
-export const QUESTION_EVENT_TYPE = 'electro-lab/question'
-/** Bump whenever the serialized state or fold semantics change. */
-export const ELECTRO_LAB_PROJECTION_STATE_VERSION = 2
 /** A run closes when no electro-lab activity arrives within this window. */
 export const SETTLE_WINDOW_MS = 30 * 60_000
 /** Settled runs retained in state (newest kept). */
@@ -67,12 +68,14 @@ export interface ElectroLabRun {
   toolCalls: number
   errors: number
   tools: ElectroLabToolUsage[]
-  /** LLM-summarized full question; absent until the summarizer appends it. */
+  /** LLM-summarized full question; merged from the ledger when available. */
   question?: string
   /** Raw user texts that led to the run (follow-ups accumulate). */
   questionInputs: string[]
   /** Assistant texts inside the run window — the five-step texts. */
   answerTexts: string[]
+  /** Exact tool outputs (`tool/result` content) — the five-step results. */
+  results: string[]
 }
 
 /** The still-open run, when the session is mid-process. */
@@ -85,6 +88,7 @@ export interface ElectroLabOpenRun {
   tools: ElectroLabToolUsage[]
   questionInputs: string[]
   answerTexts: string[]
+  results: string[]
 }
 
 /** The wire payload for the `electro-lab` projection key. */
@@ -113,6 +117,7 @@ interface OpenRunState {
   pending: string[]
   questionInputs: string[]
   answerTexts: string[]
+  results: string[]
 }
 
 /** The unit's fold state: plain JSON, ready for the persisted cache. */
@@ -136,8 +141,8 @@ export interface ElectroLabSessionEvent {
     callId?: string
     error?: { name: string; code: string }
     content?: unknown
-    runId?: string
-    question?: string
+    /** tool/result: `message.content[0]` is the ToolResultBlock carrying the output blocks. */
+    message?: unknown
   }
 }
 
@@ -164,6 +169,13 @@ function pushCapped(list: string[], text: string, cap: number): string[] {
   return next.length > cap ? next.slice(next.length - cap) : next
 }
 
+/** Extract the tool-output text from a `tool/result` payload (message.content[0] is the ToolResultBlock). */
+function textFromResultData(data: ElectroLabSessionEvent['data']): string {
+  const message = data.message as { content?: unknown[] } | undefined
+  const block = message?.content?.[0] as { type?: unknown; content?: unknown } | undefined
+  return block?.type === 'tool-result' ? textFromContent(block.content) : ''
+}
+
 function settleOpen(state: ElectroLabProjectionState, settledAt: number): ElectroLabProjectionState {
   const open = state.open
   if (open === null) return state
@@ -176,6 +188,7 @@ function settleOpen(state: ElectroLabProjectionState, settledAt: number): Electr
     tools: open.toolOrder.map((name) => ({ name, calls: open.toolCalls[name] ?? 0 })),
     questionInputs: open.questionInputs,
     answerTexts: open.answerTexts,
+    results: open.results,
   }
   return { open: null, context: state.context, settled: [run, ...state.settled].slice(0, MAX_RUNS) }
 }
@@ -187,7 +200,7 @@ function clearContext(state: ElectroLabProjectionState): ElectroLabProjectionSta
 function openRun(event: ElectroLabSessionEvent, name: string): OpenRunState {
   const callId = event.data.callId
   return {
-    id: `run-${event.seq}`,
+    id: `run-${event.time}-${event.seq}`,
     startedAt: event.time,
     lastAt: event.time,
     calls: 1,
@@ -197,13 +210,14 @@ function openRun(event: ElectroLabSessionEvent, name: string): OpenRunState {
     pending: callId === undefined ? [] : [callId],
     questionInputs: [],
     answerTexts: [],
+    results: [],
   }
 }
 
 function promoteContext(context: ContextState, event: ElectroLabSessionEvent, name: string): OpenRunState {
   const callId = event.data.callId
   return {
-    id: `run-${event.seq}`,
+    id: `run-${event.time}-${event.seq}`,
     startedAt: context.startedAt,
     lastAt: event.time,
     calls: 1,
@@ -213,6 +227,7 @@ function promoteContext(context: ContextState, event: ElectroLabSessionEvent, na
     pending: callId === undefined ? [] : [callId],
     questionInputs: context.questionInputs,
     answerTexts: context.answerTexts,
+    results: [],
   }
 }
 
@@ -287,27 +302,20 @@ export function applyElectroLabProjection(
       const callId = event.data.callId
       if (open === null || callId === undefined || !open.pending.includes(callId)) return next
       const errors = open.errors + (event.data.error === undefined ? 0 : 1)
-      return { ...next, open: { ...open, errors, pending: open.pending.filter((id) => id !== callId) } }
+      const resultText = textFromResultData(event.data)
+      const results = resultText.length === 0 ? open.results : pushCapped(open.results, resultText, MAX_TEXTS)
+      return { ...next, open: { ...open, errors, results, pending: open.pending.filter((id) => id !== callId) } }
     }
     case 'turn/end': {
       if (next.open !== null) next = settleOpen(next, event.time)
       return clearContext(next)
-    }
-    case QUESTION_EVENT_TYPE: {
-      const runId = event.data.runId
-      const question = event.data.question
-      if (typeof runId !== 'string' || typeof question !== 'string' || question.length === 0) return next
-      const run = next.settled.find((item) => item.id === runId)
-      if (run === undefined || run.question !== undefined) return next
-      const updated = { ...run, question }
-      return { ...next, settled: next.settled.map((item) => (item.id === runId ? updated : item)) }
     }
     default:
       return next
   }
 }
 
-/** State → wire payload (newest runs first). */
+/** State → wire payload (newest runs first); open-run serialization for the records page. */
 export function viewElectroLabProjection(state: ElectroLabProjectionState): ElectroLabProjectionValue {
   const openState = state.open
   const open = openState === null
@@ -321,6 +329,7 @@ export function viewElectroLabProjection(state: ElectroLabProjectionState): Elec
         tools: openState.toolOrder.map((name) => ({ name, calls: openState.toolCalls[name] ?? 0 })),
         questionInputs: openState.questionInputs,
         answerTexts: openState.answerTexts,
+        results: openState.results,
       }
   return { runs: state.settled, open }
 }

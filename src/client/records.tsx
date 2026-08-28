@@ -1,14 +1,12 @@
 /**
- * ElectroLab panel tabs: settled run records and panel configs.
- *
- * Records come from the host `electro-lab` session projection: the client
- * session list carries per-session projection values (seeded by the history
- * tail and updated live by `session/projection` frames), so the panel reads
- * them through the sessions service snapshot — no extra RPC channel.
+ * ElectroLab Records tab: one page with every settled run across all
+ * sessions, read from the plugin's own disk-backed store through the
+ * `/api/dsh-electro-lab/records` endpoint and polled while the panel is open.
+ * Records are plugin-owned: they survive session deletion and restarts.
  */
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 
-/* ── Records data shapes (mirror of the host projection value) ─────────────── */
+/* ── Records data shapes (mirror of the host store + endpoint) ─────────────── */
 
 interface ToolUsage {
   name: string
@@ -25,6 +23,7 @@ interface SettledRun {
   question?: string
   questionInputs: string[]
   answerTexts: string[]
+  results: string[]
 }
 
 interface OpenRun {
@@ -36,35 +35,22 @@ interface OpenRun {
   tools: ToolUsage[]
   questionInputs: string[]
   answerTexts: string[]
+  results: string[]
 }
 
-interface ProjectionValue {
-  runs: SettledRun[]
-  open: OpenRun | null
+interface StoredRecord {
+  sessionId: string
+  run: SettledRun
 }
 
-/** Loose shape of the session-list state the sessions service provides. */
-export interface SessionListLike {
-  byId?: Record<string, {
-    displayTitle?: string
-    projectionValues?: Record<string, unknown>
-  }>
+interface RecordsResponse {
+  records: StoredRecord[]
+  open: Array<{ sessionId: string; run: OpenRun }>
 }
 
-/** Minimal observable snapshot face (the sessions service list satisfies it). */
-export interface SnapshotLike<T> {
-  getSnapshot(): T
-  subscribe(fn: () => void): () => void
-}
-
-const NOOP_SUBSCRIBE = (): (() => void) => () => {}
-const EMPTY_LIST: SessionListLike = {}
-const EMPTY_GET = (): SessionListLike => EMPTY_LIST
-
-/* ── Display defaults (a future config tab will make these editable) ───────── */
-
-const DISPLAY_MAX_RECORDS = 20
-const DISPLAY_SHOW_OPEN_RUN = true
+const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
+const POLL_MS = 5000
+const DISPLAY_MAX_RECORDS = 100
 
 /* ── Shared bits ───────────────────────────────────────────────────────────── */
 
@@ -82,6 +68,10 @@ function formatTime(time: number): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function shortSessionId(sessionId: string): string {
+  return sessionId.length > 12 ? `${sessionId.slice(0, 8)}…` : sessionId
 }
 
 function toolChips(tools: ToolUsage[]): React.JSX.Element {
@@ -130,34 +120,75 @@ function answerBox(texts: string[]): React.JSX.Element | null {
   )
 }
 
+/** The exact tool outputs, in a monospace box above the answer. */
+function resultBox(texts: string[]): React.JSX.Element | null {
+  if (texts.length === 0) return null
+  return (
+    <div
+      style={{
+        marginTop: 6,
+        maxHeight: 120,
+        overflow: 'auto',
+        padding: '6px 8px',
+        background: '#0a0d12',
+        borderRadius: 4,
+        border: '1px solid #1e2530',
+        color: '#9fc3ae',
+        font: '11px/1.6 ui-monospace, monospace',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+      }}
+    >
+      {texts.join('\n\n')}
+    </div>
+  )
+}
+
 /* ── Records tab ───────────────────────────────────────────────────────────── */
 
-export function RecordsTab(props: { store?: SnapshotLike<SessionListLike> }): React.JSX.Element {
-  const list = useSyncExternalStore(
-    props.store?.subscribe ?? NOOP_SUBSCRIBE,
-    props.store?.getSnapshot ?? EMPTY_GET,
-  )
+export function RecordsTab(): React.JSX.Element {
+  const [response, setResponse] = useState<RecordsResponse | null>(null)
+  const [failed, setFailed] = useState(false)
 
-  const entries: Array<{ sessionId: string; title: string; value: ProjectionValue }> = []
-  for (const [sessionId, summary] of Object.entries(list.byId ?? {})) {
-    const value = summary.projectionValues?.['electro-lab']
-    if (value !== undefined) entries.push({ sessionId, title: summary.displayTitle ?? sessionId, value: value as ProjectionValue })
+  useEffect(() => {
+    let alive = true
+    const load = async (): Promise<void> => {
+      try {
+        const res = await fetch(RECORDS_ENDPOINT)
+        if (!res.ok) throw new Error(`records endpoint returned ${res.status}`)
+        const body = (await res.json()) as RecordsResponse
+        if (!alive) return
+        setResponse(body)
+        setFailed(false)
+      } catch {
+        if (alive) setFailed(true)
+      }
+    }
+    void load()
+    const timer = setInterval(() => void load(), POLL_MS)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [])
+
+  if (failed && response === null) {
+    return (
+      <div style={rowStyle}>
+        <span style={{ color: '#e08a8a' }}>Records unavailable — the host endpoint is not reachable.</span>
+      </div>
+    )
   }
 
-  const runs = entries
-    .flatMap((entry) => entry.value.runs.map((run) => ({ ...run, sessionId: entry.sessionId, sessionTitle: entry.title })))
-    .sort((a, b) => b.startedAt - a.startedAt)
-    .slice(0, DISPLAY_MAX_RECORDS)
-  const openRuns = DISPLAY_SHOW_OPEN_RUN
-    ? entries.filter((entry) => entry.value.open !== null)
-    : []
+  const records = (response?.records ?? []).slice(0, DISPLAY_MAX_RECORDS)
+  const openRuns = response?.open ?? []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 12, color: '#8b93a5' }}>
-        Settled runs of the five-step process — electro-lab tool calls grouped per session.
+        Settled runs of the five-step process across all sessions — stored on disk, refreshed automatically.
       </div>
-      {runs.length === 0 && openRuns.length === 0 ? (
+      {records.length === 0 && openRuns.length === 0 ? (
         <div style={rowStyle}>
           <span style={{ color: '#8b93a5' }}>No electro-lab runs recorded yet — ask the agent for a calculation.</span>
         </div>
@@ -167,47 +198,50 @@ export function RecordsTab(props: { store?: SnapshotLike<SessionListLike> }): Re
             <div key={`open:${entry.sessionId}`} style={rowStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#e8b34b', fontWeight: 600 }}>● in progress</span>
-                <span style={{ color: '#8b93a5', fontSize: 11 }}>{entry.title}</span>
+                <span style={{ color: '#8b93a5', fontSize: 11 }}>{shortSessionId(entry.sessionId)}</span>
               </div>
-              {entry.value.open !== null && (
-                <>
-                  <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4' }}>
-                    {entry.value.open.toolCalls} tool call(s)
-                    {entry.value.open.errors > 0 ? `, ${entry.value.open.errors} error(s)` : ''}
-                    {' · started '}
-                    {formatTime(entry.value.open.startedAt)}
-                  </div>
-                  {toolChips(entry.value.open.tools)}
-                  {answerBox(entry.value.open.answerTexts)}
-                </>
-              )}
+              <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4' }}>
+                {entry.run.questionInputs[0] ?? entry.run.id}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4' }}>
+                {entry.run.toolCalls} tool call(s)
+                {entry.run.errors > 0 ? `, ${entry.run.errors} error(s)` : ''}
+                {' · started '}
+                {formatTime(entry.run.startedAt)}
+              </div>
+              {toolChips(entry.run.tools)}
+              {resultBox(entry.run.results)}
             </div>
           ))}
-          {runs.map((run) => (
-            <div key={run.id} style={rowStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
-                  {run.question ?? run.questionInputs[0] ?? `run ${run.id}`}
-                </span>
-                <span style={{ color: '#8b93a5', fontSize: 11, flex: 'none' }}>
-                  {run.sessionTitle} · {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: '#8b93a5', fontSize: 11 }}>
-                  {run.toolCalls} tool call(s)
-                  {run.errors > 0 ? `, ${run.errors} error(s)` : ''}
-                </span>
-                {run.questionInputs.length > 1 && (
-                  <span style={{ color: '#8b93a5', fontSize: 11, fontStyle: 'italic' }}>
-                    {run.questionInputs.length} inputs
+          {records.map((record) => {
+            const run = record.run
+            return (
+              <div key={`${record.sessionId}:${run.id}`} style={rowStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
+                    {run.question ?? run.questionInputs[0] ?? `run ${run.id}`}
                   </span>
-                )}
+                  <span style={{ color: '#8b93a5', fontSize: 11, flex: 'none' }}>
+                    {shortSessionId(record.sessionId)} · {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ color: '#8b93a5', fontSize: 11 }}>
+                    {run.toolCalls} tool call(s)
+                    {run.errors > 0 ? `, ${run.errors} error(s)` : ''}
+                  </span>
+                  {run.questionInputs.length > 1 && (
+                    <span style={{ color: '#8b93a5', fontSize: 11, fontStyle: 'italic' }}>
+                      {run.questionInputs.length} inputs
+                    </span>
+                  )}
+                </div>
+                {toolChips(run.tools)}
+                {resultBox(run.results)}
+                {answerBox(run.answerTexts)}
               </div>
-              {toolChips(run.tools)}
-              {answerBox(run.answerTexts)}
-            </div>
-          ))}
+            )
+          })}
         </>
       )}
     </div>

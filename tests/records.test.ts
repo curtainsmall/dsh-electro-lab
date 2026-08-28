@@ -5,7 +5,6 @@ import {
   initElectroLabProjection,
   MAX_INPUTS,
   MAX_RUNS,
-  QUESTION_EVENT_TYPE,
   SETTLE_WINDOW_MS,
   viewElectroLabProjection,
   type ElectroLabProjectionState,
@@ -19,8 +18,6 @@ function event(type: string, seq: number, time: number, data: Record<string, unk
 const textContent = (text: string) => [{ type: 'text', text }]
 const userMessage = (seq: number, time: number, text: string) => event('user/message', seq, time, { content: textContent(text) })
 const assistantMessage = (seq: number, time: number, text: string) => event('assistant/message', seq, time, { content: textContent(text) })
-const questionEvent = (seq: number, time: number, runId: string, question: string) =>
-  event(QUESTION_EVENT_TYPE, seq, time, { runId, question })
 
 function fold(events: ElectroLabSessionEvent[]): ElectroLabProjectionState {
   let state = initElectroLabProjection()
@@ -30,8 +27,12 @@ function fold(events: ElectroLabSessionEvent[]): ElectroLabProjectionState {
 
 const calculateCall = (seq: number, time: number, callId = `c${seq}`) =>
   event('tool/call', seq, time, { name: 'calculate', callId })
-const calculateResult = (seq: number, time: number, callId: string, error?: { name: string; code: string }) =>
-  event('tool/result', seq, time, { callId, error })
+const calculateResult = (seq: number, time: number, callId: string, error?: { name: string; code: string }, content?: unknown) =>
+  event('tool/result', seq, time, {
+    callId,
+    error,
+    message: content === undefined ? undefined : { content: [{ type: 'tool-result', toolCallId: callId, content }] },
+  })
 
 describe('electro-lab run records projection', () => {
   it('has an empty view for an empty log', () => {
@@ -200,29 +201,15 @@ describe('electro-lab run records projection', () => {
     expect(run.questionInputs[MAX_INPUTS - 1]).toBe(`input ${MAX_INPUTS + 1}`)
   })
 
-  it('attaches the summarized question event to the matching settled run', () => {
-    const state = fold([
-      userMessage(1, 1000, 'what is the impedance?'),
-      calculateCall(2, 1100, 'c2'),
-      event('turn/end', 3, 1200),
-      questionEvent(4, 1300, 'run-2', 'What is the total impedance of the network?'),
-    ])
-    const run = viewElectroLabProjection(state).runs[0]!
-    expect(run.id).toBe('run-2')
-    expect(run.question).toBe('What is the total impedance of the network?')
-    expect(run.questionInputs).toEqual(['what is the impedance?'])
-  })
-
-  it('ignores question events for unknown runs or repeated questions', () => {
+  it('captures the exact tool outputs into results', () => {
     const state = fold([
       calculateCall(1, 1000, 'c1'),
-      event('turn/end', 2, 1100),
-      questionEvent(3, 1200, 'run-99', 'no such run'),
-      questionEvent(4, 1300, 'run-1', 'first'),
-      questionEvent(5, 1400, 'run-1', 'second'),
+      calculateResult(2, 1100, 'c1', undefined, textContent('{"re": 225.079, "im": 0}')),
+      event('turn/end', 3, 1200),
     ])
     const run = viewElectroLabProjection(state).runs[0]!
-    expect(run.question).toBe('first')
+    expect(run.results).toEqual(['{"re": 225.079, "im": 0}'])
+    expect(run.answerTexts).toEqual([])
   })
 
   it('ignores assistant texts outside a question window', () => {

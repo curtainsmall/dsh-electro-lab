@@ -12,20 +12,23 @@
  */
 import { useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
-import { RecordsTab, type SessionListLike } from './records.tsx'
+import { RecordsTab } from './records.tsx'
 
-/** Tiny shared store: open state + subscription for the nav button and the panel. */
+/** Tiny shared store: open state + subscription for the nav button and the panel.
+ *  Methods never use `this`: they are passed around detached (React's
+ *  useSyncExternalStore hands `subscribe` to the store), and a `this`-bound
+ *  method would lose its receiver and crash on `this.listeners`. */
+const panelListeners = new Set<() => void>()
 const panelStore = {
   open: false,
-  listeners: new Set<() => void>(),
   toggle(): void {
-    this.open = !this.open
-    for (const listener of this.listeners) listener()
+    panelStore.open = !panelStore.open
+    for (const listener of panelListeners) listener()
   },
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener)
+    panelListeners.add(listener)
     return () => {
-      this.listeners.delete(listener)
+      panelListeners.delete(listener)
     }
   },
 }
@@ -40,26 +43,13 @@ const PANEL_NAME = 'electrolab'
 /** Sidebar rows whose click returns the user to the session. */
 const SIDEBAR_ROW_SELECTOR = '[class*="sessionRow"], [class*="projectRow"], [class*="searchResultRow"], [class*="searchResultWorkspace"], [class*="newSession"]'
 
-/** Minimal observable snapshot face (the sessions service list satisfies it). */
-export interface SnapshotLike<T> {
-  getSnapshot(): T
-  subscribe(fn: () => void): () => void
-}
-
-const NOOP_SUBSCRIBE = (): (() => void) => () => {}
-const EMPTY_LIST: SessionListLike = {}
-const EMPTY_GET = (): SessionListLike => EMPTY_LIST
-
 /**
  * Mount the panel inside the center column and wire open-state side effects:
  * the active attribute on <html>, cross-panel mutual exclusion, and closing
  * when the user picks another sidebar row. Returns one disposer that removes
  * the DOM, the React root and every listener.
  */
-export function mountElectroLabPanel(ctx: { get(name: string): unknown }): () => void {
-  const sessions = ctx.get('sessions') as { list?: SnapshotLike<SessionListLike> } | undefined
-  const store: SnapshotLike<SessionListLike> = sessions?.list ?? { getSnapshot: EMPTY_GET, subscribe: NOOP_SUBSCRIBE }
-
+export function mountElectroLabPanel(): () => void {
   const container = document.createElement('div')
   container.dataset.dshElectrolabView = ''
   container.style.display = 'none'
@@ -78,7 +68,7 @@ export function mountElectroLabPanel(ctx: { get(name: string): unknown }): () =>
     if (column === null) return
     column.appendChild(container)
     root ??= createRoot(container)
-    root.render(<ElectroLabPanel store={store} />)
+    root.render(<ElectroLabPanel />)
   }
   const waitObserver = new MutationObserver(tryPlace)
   waitObserver.observe(document.body, { childList: true, subtree: true })
@@ -183,7 +173,7 @@ const tabBarStyle: React.CSSProperties = {
 }
 
 /** The panel body: title bar with a back-to-session button, tabs, content. */
-export function ElectroLabPanel(props: { store: SnapshotLike<SessionListLike> }): React.JSX.Element | null {
+export function ElectroLabPanel(): React.JSX.Element | null {
   const open = useSyncExternalStore(panelStore.subscribe, () => panelStore.open)
   const [tab, setTab] = useState<'config' | 'records'>('records')
 
@@ -236,7 +226,7 @@ export function ElectroLabPanel(props: { store: SnapshotLike<SessionListLike> })
         {tabButton('records', 'Records')}
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
-        {tab === 'records' ? <RecordsTab store={props.store} /> : <div />}
+        {tab === 'records' ? <RecordsTab /> : <div />}
       </div>
     </div>
   )

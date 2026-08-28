@@ -41,7 +41,7 @@ export function apply(ctx: Context): void {
         ),
       )
     }
-    disposers.push(mountElectroLabPanel(ctx))
+    disposers.push(mountElectroLabPanel())
     return () => {
       for (const off of disposers) off()
     }
