@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Client **Records** panel in SSH style: a lightning nav entry in the sidebar foot (beside Settings) toggles a panel that takes over the center column — back-to-session title bar, Config/Records tabs, content below — listing settled electro-lab runs (the five-step process) per session. A host session-projection unit folds `tool/call` / `tool/result` events into runs that close on turn end, a user message, a foreign tool in between, or an idle gap; each record keeps the raw question inputs (follow-ups accumulate) and the five-step assistant texts, and a host listener summarizes the inputs into one self-contained question through the session's own model route, appended as a log-only `electro-lab/question` event — records only, never the chat. The Config tab is an empty placeholder for now.
+
+### Removed
+
+- The interactive Smith chart and the session-header button from the client (the impedance/reflection math remains available through the RF tools).
+
 ## [0.4.0] - 2026-08-28
 
 ### Added
