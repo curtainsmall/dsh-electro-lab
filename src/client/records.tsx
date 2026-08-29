@@ -59,7 +59,7 @@ const DISPLAY_MAX_RECORDS = 100
 /* ── Shared bits ───────────────────────────────────────────────────────────── */
 
 const rowStyle: React.CSSProperties = {
-  padding: '8px 10px',
+  padding: '10px 12px',
   background: 'var(--dsw-alias-bg-layer-2)',
   borderRadius: 6,
   border: '1px solid var(--dsw-alias-border-l2)',
@@ -321,11 +321,20 @@ export function RecordsTab(): React.JSX.Element {
               onMouseLeave={() => setHoveredId(null)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: 'var(--dsw-alias-label-primary)', fontSize: 12, fontWeight: 600 }}>
+                <span style={{
+                  color: 'var(--dsw-alias-label-primary)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flex: 1,
+                  minWidth: 0,
+                }}>
                   {run.question || `record ${run.id}`}
                 </span>
                 <span style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 'none' }}>
-                  <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11 }}>
+                  <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, whiteSpace: 'nowrap' }}>
                     {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
                   </span>
                   <span
@@ -337,7 +346,7 @@ export function RecordsTab(): React.JSX.Element {
                       fontWeight: confirmId === run.id ? 600 : 400,
                       cursor: 'pointer',
                       lineHeight: 1,
-                      minWidth: 30,
+                      minWidth: 64,
                       textAlign: 'center',
                       transition: 'color 0.12s',
                       whiteSpace: 'nowrap',
