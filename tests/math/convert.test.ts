@@ -64,7 +64,7 @@ describe('serializeComplex — tool output', () => {
     expect(output.im).toBe(50)
     expect(output.kind).toBe(QuantityKind.Resistance)
     expect(output.mag).toBeCloseTo(70.7107, 4)
-    expect(output.angRad).toBeCloseTo(Math.PI / 4, 6)
+    expect(output.ang).toBeCloseTo(Math.PI / 4, 6)
   })
 
   it('round-trips: the output feeds straight back into toComplex (createRectValue or polar)', () => {
@@ -72,7 +72,7 @@ describe('serializeComplex — tool output', () => {
     const backRect = toComplex(output, QuantityKind.Resistance)
     expect(backRect.re).toBe(50)
     expect(backRect.im).toBe(50)
-    const backPolar = toComplex(createPolarRadiansValue(output.mag, output.angRad, output.kind), QuantityKind.Resistance)
+    const backPolar = toComplex(createPolarRadiansValue(output.mag, output.ang, output.kind), QuantityKind.Resistance)
     expect(backPolar.re).toBeCloseTo(50, 10)
     expect(backPolar.im).toBeCloseTo(50, 10)
   })
@@ -88,7 +88,7 @@ describe('serializeComplex — tool output', () => {
     // complex.js arithmetic yields -0 routinely (e.g. +0 divided by a negative
     // real divisor); the harness lossless-JSON check rejects Object.is(x, -0).
     const output = serializeComplex(new Complex(0.2459667825807158, 0).div(new Complex(-0.34602076124567472, 0)), QuantityKind.None)
-    for (const value of [output.re, output.im, output.mag, output.angRad]) {
+    for (const value of [output.re, output.im, output.mag, output.ang]) {
       expect(Object.is(value, -0)).toBe(false)
       expect(Number.isFinite(value)).toBe(true)
     }
@@ -108,7 +108,7 @@ describe('serializeReal — real result output', () => {
     expect(output.im).toBe(0)
     expect(output.kind).toBe(QuantityKind.Frequency)
     expect(output.mag).toBe(2400)
-    expect(output.angRad).toBe(0)
+    expect(output.ang).toBe(0)
   })
 
   it('folds negative zero input to positive zero', () => {

@@ -11,7 +11,7 @@
  *   polar { form: Form.Polar, mag, angRad, kind }   (angles are radians — SI)
  *
  * OUTPUT — a complete snapshot, both projections always present:
- *   { re, im, kind, mag, angRad }
+ *   { re, im, kind, mag, ang }
  * The output feeds straight back into any input branch (re/im → rect,
  * mag + angRad → polar).
  *
@@ -72,7 +72,7 @@ export type ComplexOutput = {
   im: number
   kind: QuantityKind
   mag: number
-  angRad: number
+  ang: number
 }
 
 /** Raise unless the value carries the expected kind. */
@@ -151,7 +151,7 @@ export function serializeComplex(value: Complex, kind: QuantityKind): ComplexOut
     im: normalizeOutputNumber(value.im),
     kind,
     mag: normalizeOutputNumber(value.abs()),
-    angRad: normalizeOutputNumber(value.arg()),
+    ang: normalizeOutputNumber(value.arg()),
   }
 }
 

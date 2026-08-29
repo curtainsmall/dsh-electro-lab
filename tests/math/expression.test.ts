@@ -141,7 +141,7 @@ describe('regression — single-stub matching quadratic (lossless output)', () =
     expect(roots[1]!.re).toBeCloseTo(-0.7108440016582688, 12)
     for (const root of roots) {
       const output = serializeComplex(root, QuantityKind.None)
-      for (const value of [output.re, output.im, output.mag, output.angRad]) {
+      for (const value of [output.re, output.im, output.mag, output.ang]) {
         expect(Object.is(value, -0)).toBe(false)
         expect(Number.isFinite(value)).toBe(true)
       }
