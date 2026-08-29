@@ -74,6 +74,11 @@ function formatTime(time: number): string {
   })
 }
 
+/** Full timestamp for the detail view. */
+function formatFull(time: number): string {
+  return new Date(time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' })
+}
+
 const paragraphStyle: React.CSSProperties = {
   marginTop: 6,
   maxHeight: 140,
@@ -86,17 +91,6 @@ const paragraphStyle: React.CSSProperties = {
   font: '12px/1.6 ui-sans-serif, system-ui, sans-serif',
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
-}
-
-/** One paragraph section with a small label. */
-function paragraph(label: string, text: string): React.JSX.Element | null {
-  if (text.length === 0) return null
-  return (
-    <div style={paragraphStyle}>
-      <div style={{ color: '#8b93a5', fontSize: 11, marginBottom: 2 }}>{label}</div>
-      {text}
-    </div>
-  )
 }
 
 /** The structured tool calls, one row each with the raw arguments. */
@@ -165,11 +159,66 @@ function toolChips(calls: Call[]): React.JSX.Element | null {
   )
 }
 
+/* ── Detail view: id, timestamps, and the five steps in order ───────────────── */
+
+/** Everything the detail view shows; settled records and open records both fit. */
+interface DetailRecord {
+  id: string
+  startedAt: number
+  settledAt?: number
+  question: string
+  analyse: string
+  answer?: string
+  calls: Call[]
+  results: Result[]
+  error?: RecordError
+}
+
+/** One grid row: step title (left) + content (right); empty content shows a placeholder. */
+function stepCell(label: string, content: React.JSX.Element | string | null): React.JSX.Element {
+  const empty = content === null || (typeof content === 'string' && content.length === 0)
+  return (
+    <>
+      <div style={{ color: '#8b93a5', fontSize: 11, fontWeight: 600, paddingTop: 2 }}>{label}</div>
+      <div style={{ minWidth: 0 }}>
+        {empty
+          ? <span style={{ color: '#5b6270', fontSize: 11 }}>—</span>
+          : typeof content === 'string'
+            ? <div style={paragraphStyle}>{content}</div>
+            : content}
+      </div>
+    </>
+  )
+}
+
+/** The expanded detail: identity, timestamps, and the five steps in a grid. */
+function detailGrid(record: DetailRecord): React.JSX.Element {
+  return (
+    <div style={{ marginTop: 8, borderTop: '1px solid #232833', paddingTop: 8 }}>
+      <div style={{ color: '#8b93a5', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
+        id: {record.id}
+      </div>
+      <div style={{ color: '#8b93a5', fontSize: 11, marginTop: 2 }}>
+        started: {formatFull(record.startedAt)}
+        {record.settledAt !== undefined ? ` · settled: ${formatFull(record.settledAt)}` : ''}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '6px 10px', marginTop: 8 }}>
+        {stepCell('1 · 问题', record.question)}
+        {stepCell('2 · 分析', record.analyse)}
+        {stepCell('3 · 工具调用', record.calls.length === 0 ? '' : callsBox(record.calls))}
+        {stepCell('4 · 结果', record.results.length === 0 ? '' : resultsBox(record.results))}
+        {stepCell('5 · 答案', record.answer ?? '')}
+      </div>
+    </div>
+  )
+}
+
 /* ── Records tab ───────────────────────────────────────────────────────────── */
 
 export function RecordsTab(): React.JSX.Element {
   const [response, setResponse] = useState<RecordsResponse | null>(null)
   const [failed, setFailed] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -218,7 +267,11 @@ export function RecordsTab(): React.JSX.Element {
       ) : (
         <>
           {openRecords.map((run) => (
-            <div key={`open:${run.id}`} style={rowStyle}>
+            <div
+              key={`open:${run.id}`}
+              style={{ ...rowStyle, cursor: 'pointer' }}
+              onClick={() => setExpandedId(expandedId === `open:${run.id}` ? null : `open:${run.id}`)}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#e8b34b', fontWeight: 600 }}>● in progress</span>
               </div>
@@ -229,12 +282,15 @@ export function RecordsTab(): React.JSX.Element {
                 {run.calls.length} tool call(s) · started {formatTime(run.startedAt)}
               </div>
               {toolChips(run.calls)}
-              {callsBox(run.calls)}
-              {resultsBox(run.results)}
+              {expandedId === `open:${run.id}` && detailGrid({ ...run, answer: '' })}
             </div>
           ))}
           {records.map((run) => (
-            <div key={run.id} style={rowStyle}>
+            <div
+              key={run.id}
+              style={{ ...rowStyle, cursor: 'pointer' }}
+              onClick={() => setExpandedId(expandedId === run.id ? null : run.id)}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
                   {run.question || `record ${run.id}`}
@@ -256,10 +312,7 @@ export function RecordsTab(): React.JSX.Element {
                 </span>
               </div>
               {toolChips(run.calls)}
-              {callsBox(run.calls)}
-              {resultsBox(run.results)}
-              {paragraph('分析', run.analyse)}
-              {paragraph('答案', run.answer)}
+              {expandedId === run.id && detailGrid(run)}
             </div>
           ))}
         </>
