@@ -79,54 +79,37 @@ function formatFull(time: number): string {
   return new Date(time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' })
 }
 
-const paragraphStyle: React.CSSProperties = {
-  marginTop: 6,
-  maxHeight: 140,
-  overflow: 'auto',
-  padding: '6px 8px',
-  background: 'var(--dsw-alias-bg-base)',
-  borderRadius: 4,
-  border: '1px solid var(--dsw-alias-border-l1)',
-  color: 'var(--dsw-alias-label-secondary)',
-  font: '12px/1.6 ui-sans-serif, system-ui, sans-serif',
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-word',
+/** Plain text block: no box, no inner scroll — the dialog's single outer scrollbar owns scrolling. */
+function plainText(text: string): React.JSX.Element {
+  return (
+    <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      {text}
+    </div>
+  )
 }
 
-/** The structured tool calls, one row each with the raw arguments. */
-function callsBox(calls: Call[]): React.JSX.Element | null {
-  if (calls.length === 0) return null
+/** The tool calls as plain text rows (name + raw arguments). */
+function plainCalls(calls: Call[]): React.JSX.Element {
   return (
-    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div>
       {calls.map((call) => (
-        <div key={call.callId} style={{ background: 'var(--dsw-alias-bg-base)', borderRadius: 4, border: '1px solid var(--dsw-alias-border-l1)', padding: '4px 8px' }}>
-          <span style={{ color: 'var(--dsw-alias-state-success-primary)', font: '11px ui-monospace, monospace' }}>{call.name}</span>
-          {call.arguments.length > 0 && (
-            <span style={{ color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace' }}> {call.arguments}</span>
-          )}
+        <div key={call.callId} style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--dsw-alias-label-primary)' }}>
+          <span style={{ fontWeight: 600 }}>{call.name}</span>
+          {call.arguments.length > 0 ? ` ${call.arguments}` : ''}
         </div>
       ))}
     </div>
   )
 }
 
-/** The structured tool results, keeping the full output and error identity. */
-function resultsBox(results: Result[]): React.JSX.Element | null {
-  if (results.length === 0) return null
+/** The tool results as plain text rows (full output, error identity inline). */
+function plainResults(results: Result[]): React.JSX.Element {
   return (
-    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div>
       {results.map((result) => (
-        <div key={result.callId} style={{ background: 'var(--dsw-alias-bg-base)', borderRadius: 4, border: '1px solid var(--dsw-alias-border-l1)', padding: '4px 8px' }}>
-          {result.error !== undefined && (
-            <div style={{ color: 'var(--dsw-alias-state-error-primary)', font: '11px ui-monospace, monospace' }}>
-              ✗ {result.error.name} ({result.error.code})
-            </div>
-          )}
-          {result.content.length > 0 && (
-            <div style={{ color: 'var(--dsw-alias-state-success-primary)', font: '11px/1.6 ui-monospace, monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 100, overflow: 'auto' }}>
-              {result.content}
-            </div>
-          )}
+        <div key={result.callId} style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--dsw-alias-label-primary)' }}>
+          {result.error !== undefined ? `✗ ${result.error.name} (${result.error.code})` : ''}
+          {result.content.length > 0 ? `${result.error !== undefined ? '\n' : ''}${result.content}` : ''}
         </div>
       ))}
     </div>
@@ -159,9 +142,9 @@ function toolChips(calls: Call[]): React.JSX.Element | null {
   )
 }
 
-/* ── Detail view: id, timestamps, and the five steps in order ───────────────── */
+/* ── Detail dialog: id, timestamps, and the five steps with sticky headings ── */
 
-/** Everything the detail view shows; settled records and open records both fit. */
+/** Everything the detail dialog shows; settled records and open records both fit. */
 interface DetailRecord {
   id: string
   startedAt: number
@@ -174,40 +157,126 @@ interface DetailRecord {
   error?: RecordError
 }
 
-/** One grid row: step title (left) + content (right); empty content shows a placeholder. */
-function stepCell(label: string, content: React.JSX.Element | string | null): React.JSX.Element {
-  const empty = content === null || (typeof content === 'string' && content.length === 0)
+/** The five steps of the record, in order. */
+interface DetailSection {
+  key: string
+  label: string
+  content: React.JSX.Element | string | null
+}
+
+/** One section: a sticky heading (sticks to the top of the shared scroll area until the next section pushes it away) plus the content below it. */
+function sectionBlock(section: DetailSection): React.JSX.Element {
   return (
-    <>
-      <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, fontWeight: 600, paddingTop: 2 }}>{label}</div>
-      <div style={{ minWidth: 0 }}>
-        {empty
-          ? <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }}>—</span>
-          : typeof content === 'string'
-            ? <div style={paragraphStyle}>{content}</div>
-            : content}
+    <section id={`elab-sec-${section.key}`} style={{ scrollMarginTop: 0 }}>
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 1,
+          background: 'var(--dsw-alias-bg-layer-2)',
+          borderBottom: '1px solid var(--dsw-alias-border-l2)',
+          padding: '6px 12px',
+          fontSize: 13,
+          fontWeight: 600,
+          color: 'var(--dsw-alias-label-primary)',
+        }}
+      >
+        {section.label}
       </div>
-    </>
+      <div style={{ padding: '10px 12px' }}>
+        {section.content === null || (typeof section.content === 'string' && section.content.length === 0)
+          ? <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 12 }}>—</span>
+          : typeof section.content === 'string'
+            ? plainText(section.content)
+            : section.content}
+      </div>
+    </section>
   )
 }
 
-/** The expanded detail: identity, timestamps, and the five steps in a grid. */
-function detailGrid(record: DetailRecord): React.JSX.Element {
+/**
+ * The record detail as a PAGE covering the records tab: a back header, a
+ * left table of contents (click to jump to a section heading) and ONE
+ * shared scroll area on the right whose section headings stick to the top
+ * while scrolling — no nested scrollbars, no framework, no popup shell.
+ */
+function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
+  const sections: DetailSection[] = [
+    { key: 'question', label: '1 · 问题', content: record.question },
+    { key: 'analyse', label: '2 · 分析', content: record.analyse },
+    { key: 'calls', label: '3 · 工具调用', content: record.calls.length === 0 ? '' : plainCalls(record.calls) },
+    { key: 'results', label: '4 · 结果', content: record.results.length === 0 ? '' : plainResults(record.results) },
+    { key: 'answer', label: '5 · 答案', content: record.answer ?? '' },
+  ]
+
+  const jump = (key: string): void => {
+    const element = document.getElementById(`elab-sec-${key}`)
+    element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
-    <div style={{ marginTop: 8, borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: 8 }}>
-      <div style={{ color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
-        id: {record.id}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--dsw-alias-border-l2)' }}>
+        <button
+          type="button"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 8px',
+            borderRadius: 6,
+            border: '1px solid var(--dsw-alias-border-l2)',
+            background: 'none',
+            color: 'var(--dsw-alias-label-primary)',
+            cursor: 'pointer',
+            fontSize: 13,
+          }}
+          onClick={onBack}
+        >
+          <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
+          <span style={{ lineHeight: 1 }}>返回记录</span>
+        </button>
+        <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+          {record.question || `record ${record.id}`}
+        </div>
       </div>
-      <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, marginTop: 2 }}>
-        started: {formatFull(record.startedAt)}
-        {record.settledAt !== undefined ? ` · settled: ${formatFull(record.settledAt)}` : ''}
+      <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--dsw-alias-border-l1)', background: 'var(--dsw-alias-bg-base)' }}>
+        <div style={{ color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
+          id: {record.id}
+        </div>
+        <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, marginTop: 2 }}>
+          started: {formatFull(record.startedAt)}
+          {record.settledAt !== undefined ? ` · settled: ${formatFull(record.settledAt)}` : ''}
+        </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '6px 10px', marginTop: 8 }}>
-        {stepCell('1 · 问题', record.question)}
-        {stepCell('2 · 分析', record.analyse)}
-        {stepCell('3 · 工具调用', record.calls.length === 0 ? '' : callsBox(record.calls))}
-        {stepCell('4 · 结果', record.results.length === 0 ? '' : resultsBox(record.results))}
-        {stepCell('5 · 答案', record.answer ?? '')}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* Table of contents: fixed, jumps to the section headings. */}
+        <nav style={{ width: 150, flex: 'none', borderRight: '1px solid var(--dsw-alias-border-l2)', overflowY: 'auto', padding: '8px 0' }}>
+          {sections.map((section) => (
+            <div
+              key={section.key}
+              role="button"
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                color: 'var(--dsw-alias-label-secondary)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              onClick={() => jump(section.key)}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--dsw-alias-label-primary)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--dsw-alias-label-secondary)' }}
+            >
+              {section.label}
+            </div>
+          ))}
+        </nav>
+        {/* The ONE scroll area; its headings stick to the top. */}
+        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+          {sections.map((section) => sectionBlock(section))}
+        </div>
       </div>
     </div>
   )
@@ -218,7 +287,7 @@ function detailGrid(record: DetailRecord): React.JSX.Element {
 export function RecordsTab(): React.JSX.Element {
   const [response, setResponse] = useState<RecordsResponse | null>(null)
   const [failed, setFailed] = useState(false)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [dialogRecord, setDialogRecord] = useState<DetailRecord | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [delHoverId, setDelHoverId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
@@ -266,19 +335,21 @@ export function RecordsTab(): React.JSX.Element {
     )
   }
 
+  // The detail page covers the records tab.
+  if (dialogRecord !== null) {
+    return <RecordDetailPage record={dialogRecord} onBack={() => setDialogRecord(null)} />
+  }
+
   const records = (response?.records ?? []).slice(0, DISPLAY_MAX_RECORDS)
   const openRecords = response?.open ?? []
 
-  /** Row style: the border is visible only while the card is expanded (hover brightens it). */
-  const rowHoverStyle = (id: string): React.CSSProperties => {
-    const expanded = expandedId === id
-    return {
-      ...rowStyle,
-      cursor: 'pointer',
-      background: hoveredId === id ? 'var(--dsw-alias-interactive-bg-hover)' : rowStyle.background,
-      borderColor: expanded ? (hoveredId === id ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)') : 'transparent',
-    }
-  }
+  /** Row style: the border shows on hover (the detail now opens as a dialog). */
+  const rowHoverStyle = (id: string): React.CSSProperties => ({
+    ...rowStyle,
+    cursor: 'pointer',
+    background: hoveredId === id ? 'var(--dsw-alias-interactive-bg-hover)' : rowStyle.background,
+    borderColor: hoveredId === id ? 'var(--dsw-alias-border-l1)' : 'transparent',
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -295,7 +366,7 @@ export function RecordsTab(): React.JSX.Element {
             <div
               key={`open:${run.id}`}
               style={rowHoverStyle(`open:${run.id}`)}
-              onClick={() => setExpandedId(expandedId === `open:${run.id}` ? null : `open:${run.id}`)}
+              onClick={() => setDialogRecord({ ...run, answer: '' })}
               onMouseEnter={() => setHoveredId(`open:${run.id}`)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -309,14 +380,13 @@ export function RecordsTab(): React.JSX.Element {
                 {run.calls.length} tool call(s) · started {formatTime(run.startedAt)}
               </div>
               {toolChips(run.calls)}
-              {expandedId === `open:${run.id}` && detailGrid({ ...run, answer: '' })}
             </div>
           ))}
           {records.map((run) => (
             <div
               key={run.id}
               style={rowHoverStyle(run.id)}
-              onClick={() => setExpandedId(expandedId === run.id ? null : run.id)}
+              onClick={() => setDialogRecord(run)}
               onMouseEnter={() => setHoveredId(run.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -380,7 +450,7 @@ export function RecordsTab(): React.JSX.Element {
                 </span>
               </div>
               {toolChips(run.calls)}
-              {expandedId === run.id && detailGrid(run)}
+              {toolChips(run.calls)}
             </div>
           ))}
         </>
