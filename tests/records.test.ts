@@ -8,6 +8,7 @@ import {
   RecordEventType,
   RecordManager,
   SETTLE_WINDOW_MS,
+  deleteRecordFromArchive,
   type Record as SettledRecord,
   type RecordEvent,
 } from '../src/records.ts'
@@ -357,6 +358,25 @@ describe('record manager (record_question opens, record_answer settles)', () => 
     const reloaded = new RecordManager('session-a', recordsFile, openFile)
     expect(reloaded.records()).toHaveLength(1)
     expect(reloaded.records()[0]!.id).toBe(settled!.id)
+  })
+
+  it('deletes one settled record from the archive by id', () => {
+    const { recordsFile, openFile, manager } = makeEnv()
+    manager.feed(questionCall(1, 1000, 'q1'))
+    manager.feed(calculateCall(2, 1100, 'c2'))
+    const first = manager.feed(answerCall(3, 1200, 'a1'))!
+    manager.feed(questionCall(4, 1300, 'q2'))
+    manager.feed(calculateCall(5, 1400, 'c5'))
+    const second = manager.feed(answerCall(6, 1500, 'a2'))!
+    expect(manager.records()).toHaveLength(2)
+    // Delete the newer record; the archive keeps the other one.
+    expect(deleteRecordFromArchive(recordsFile, second.id)).toBe(true)
+    const reloaded = new RecordManager('session-a', recordsFile, openFile)
+    expect(reloaded.records()).toHaveLength(1)
+    expect(reloaded.records()[0]!.id).toBe(first.id)
+    // Deleting an unknown id reports false and changes nothing.
+    expect(deleteRecordFromArchive(recordsFile, 'no-such-id')).toBe(false)
+    expect(new RecordManager('session-a', recordsFile, openFile).records()).toHaveLength(1)
   })
 
   it('starts empty for a missing or corrupt archive and corrupt open file', () => {

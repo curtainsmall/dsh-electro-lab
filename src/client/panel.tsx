@@ -220,7 +220,8 @@ const headerStyle: React.CSSProperties = {
 
 const backButtonStyle: React.CSSProperties = {
   background: 'none',
-  border: 'none',
+  border: '1px solid #2a2f3a',
+  borderRadius: 6,
   color: '#c8ccd4',
   cursor: 'pointer',
   fontSize: 13,
@@ -228,7 +229,6 @@ const backButtonStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 6,
   padding: '4px 8px',
-  borderRadius: 6,
 }
 
 const tabBarStyle: React.CSSProperties = {
@@ -243,6 +243,8 @@ const tabBarStyle: React.CSSProperties = {
 export function ElectroLabPanel(): React.JSX.Element | null {
   const open = useSyncExternalStore(panelStore.subscribe, () => panelStore.open)
   const [tab, setTab] = useState<'config' | 'records'>('records')
+  const [backHover, setBackHover] = useState(false)
+  const [tabHover, setTabHover] = useState<'config' | 'records' | null>(null)
 
   if (!open) return null
 
@@ -252,11 +254,14 @@ export function ElectroLabPanel(): React.JSX.Element | null {
       role="tab"
       aria-selected={tab === key}
       onClick={() => setTab(key)}
+      onMouseEnter={() => setTabHover(key)}
+      onMouseLeave={() => setTabHover(null)}
       style={{
         padding: '5px 12px',
-        border: 'none',
-        borderBottom: tab === key ? '2px solid #e8b34b' : '2px solid transparent',
-        background: 'none',
+        border: '1px solid #2a2f3a',
+        borderBottomColor: tab === key ? '#e8b34b' : '#2a2f3a',
+        borderRadius: 6,
+        background: tabHover === key ? '#22262e' : 'none',
         color: tab === key ? '#e8b34b' : '#c8ccd4',
         cursor: 'pointer',
         fontSize: 13,
@@ -281,10 +286,16 @@ export function ElectroLabPanel(): React.JSX.Element | null {
           type="button"
           aria-label="Back to session"
           onClick={() => panelStore.toggle()}
-          style={backButtonStyle}
+          onMouseEnter={() => setBackHover(true)}
+          onMouseLeave={() => setBackHover(false)}
+          style={{
+            ...backButtonStyle,
+            background: backHover ? '#22262e' : 'none',
+            borderColor: backHover ? '#39404d' : '#2a2f3a',
+          }}
         >
-          <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>‹</span>
-          <span>Back to session</span>
+          <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
+          <span style={{ lineHeight: 1 }}>Back to session</span>
         </button>
         <h2 style={{ margin: 0, fontSize: 15 }}>ElectroLab</h2>
       </div>

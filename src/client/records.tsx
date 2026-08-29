@@ -219,6 +219,9 @@ export function RecordsTab(): React.JSX.Element {
   const [response, setResponse] = useState<RecordsResponse | null>(null)
   const [failed, setFailed] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [delHoverId, setDelHoverId] = useState<string | null>(null)
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -240,7 +243,18 @@ export function RecordsTab(): React.JSX.Element {
       alive = false
       clearInterval(timer)
     }
-  }, [])
+  }, [refreshTick])
+
+  /** Delete one settled record from the archive (after confirmation) and refresh. */
+  const removeRecord = async (id: string): Promise<void> => {
+    if (!window.confirm('删除这条记录?此操作不可恢复。')) return
+    try {
+      await fetch(`${RECORDS_ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      setRefreshTick((tick) => tick + 1)
+    } catch {
+      // The poll retries; nothing else to do.
+    }
+  }
 
   if (failed && response === null) {
     return (
@@ -254,6 +268,17 @@ export function RecordsTab(): React.JSX.Element {
 
   const records = (response?.records ?? []).slice(0, DISPLAY_MAX_RECORDS)
   const openRecords = response?.open ?? []
+
+  /** Row style: the border is visible only while the card is expanded (hover brightens it). */
+  const rowHoverStyle = (id: string): React.CSSProperties => {
+    const expanded = expandedId === id
+    return {
+      ...rowStyle,
+      cursor: 'pointer',
+      background: hoveredId === id ? '#171b22' : rowStyle.background,
+      borderColor: expanded ? (hoveredId === id ? '#39404d' : '#2a2f3a') : 'transparent',
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -269,8 +294,10 @@ export function RecordsTab(): React.JSX.Element {
           {openRecords.map((run) => (
             <div
               key={`open:${run.id}`}
-              style={{ ...rowStyle, cursor: 'pointer' }}
+              style={rowHoverStyle(`open:${run.id}`)}
               onClick={() => setExpandedId(expandedId === `open:${run.id}` ? null : `open:${run.id}`)}
+              onMouseEnter={() => setHoveredId(`open:${run.id}`)}
+              onMouseLeave={() => setHoveredId(null)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#e8b34b', fontWeight: 600 }}>● in progress</span>
@@ -288,15 +315,38 @@ export function RecordsTab(): React.JSX.Element {
           {records.map((run) => (
             <div
               key={run.id}
-              style={{ ...rowStyle, cursor: 'pointer' }}
+              style={rowHoverStyle(run.id)}
               onClick={() => setExpandedId(expandedId === run.id ? null : run.id)}
+              onMouseEnter={() => setHoveredId(run.id)}
+              onMouseLeave={() => setHoveredId(null)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
                   {run.question || `record ${run.id}`}
                 </span>
-                <span style={{ color: '#8b93a5', fontSize: 11, flex: 'none' }}>
-                  {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
+                <span style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 'none' }}>
+                  <span style={{ color: '#8b93a5', fontSize: 11 }}>
+                    {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
+                  </span>
+                  <span
+                    role="button"
+                    title="删除这条记录"
+                    style={{
+                      color: delHoverId === run.id ? '#e08a8a' : '#8b93a5',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      lineHeight: 1,
+                      transition: 'color 0.12s',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void removeRecord(run.id)
+                    }}
+                    onMouseEnter={() => setDelHoverId(run.id)}
+                    onMouseLeave={() => setDelHoverId(null)}
+                  >
+                    ✕
+                  </span>
                 </span>
               </div>
               {run.error !== undefined && (

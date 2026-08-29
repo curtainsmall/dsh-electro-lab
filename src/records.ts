@@ -255,6 +255,22 @@ export function readRecordArchive(recordsFile: string): readonly Record[] {
   return loadArchive(recordsFile)
 }
 
+/**
+ * Delete one settled record from the archive (rewrites the file without
+ * it). Returns false when the id is not in the archive or the write fails.
+ */
+export function deleteRecordFromArchive(recordsFile: string, id: string): boolean {
+  try {
+    const records = loadArchive(recordsFile)
+    const next = records.filter((record) => record.id !== id)
+    if (next.length === records.length) return false
+    writeFileSync(recordsFile, next.length === 0 ? '' : `${next.map((record) => JSON.stringify(record)).join('\n')}\n`)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** The open snapshot map `{ [sessionId]: OpenSnapshot }`; a missing/corrupt file loads as empty. */
 type OpenStates = { [sessionId: string]: OpenSnapshot }
 

@@ -7,7 +7,7 @@ import type { Context } from 'cordis'
 import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
-import { RecordManager, readRecordArchive, type RecordEvent } from './records.ts'
+import { RecordManager, readRecordArchive, deleteRecordFromArchive, type RecordEvent } from './records.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -37,10 +37,17 @@ interface WebServerLike {
     kind: 'exact'
     path: string
     handler(req: unknown, res: {
+      statusCode?: number
       setHeader(name: string, value: string): void
       end(body: string): void
     }): void | Promise<void>
   }): () => void
+}
+
+/** Minimal request shape the endpoint reads (method + url for query parsing). */
+interface RequestLike {
+  method?: string
+  url?: string
 }
 
 /** The records page endpoint (same origin as the web app; the client polls it). */
@@ -89,12 +96,27 @@ export function apply(ctx: Context): void {
       getOrCreateManager(sessionId).feed(event as RecordEvent)
     }))
 
-    // The records page: all stored records plus any live open records, newest first.
+    // The records page: all stored records plus any live open records, newest
+    // first. The same path serves DELETE ?id= to remove one settled record.
     // webServer is an inject edge, so it is guaranteed ready here.
     disposers.push(ctx.webServer.register({
       kind: 'exact',
       path: RECORDS_PATH,
-      handler: (_req, res) => {
+      handler: (req, res) => {
+        const request = req as RequestLike
+        const method = request.method ?? 'GET'
+        if (method === 'DELETE') {
+          const id = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('id')
+          const deleted = id !== null && deleteRecordFromArchive(join(recordsHome, 'records.jsonl'), id)
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ deleted }))
+          return
+        }
+        if (method !== 'GET') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
         const open: Array<unknown> = []
         for (const manager of managers.values()) {
           const record = manager.view()
