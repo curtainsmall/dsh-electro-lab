@@ -1,31 +1,40 @@
 /**
- * Record marker tools: `record_start` and `record_end` bracket one five-step
- * calculation in the conversation. They are no-ops — the RecordManager reads
- * the tool/call events themselves: the event `arguments` (the model's raw
- * JSON text) are parsed by the manager. Exactly one `record_start` per
- * answer: a second one settles the open record as a duplicate-start error
- * record and opens a new one.
+ * Record marker tools: one five-step calculation is bracketed by
+ * `record_question` (opens the record AND submits the question text) and
+ * `record_answer` (submits the answer text AND settles the record), with
+ * `record_analyse` submitting the analysis in between. They are no-ops —
+ * the RecordManager reads the tool/call events themselves: the event
+ * `arguments` (the model's raw JSON text) are parsed by the manager.
+ *
+ * Exactly one `record_question` per answer: a second one settles the open
+ * record as a duplicate-start error record and opens a new one.
+ * `record_answer` with no open record keeps a duplicate-end error record.
  */
 import { defineJsonTool } from './helpers.ts'
 
-export const RECORD_START_TOOL = 'record_start'
-export const RECORD_END_TOOL = 'record_end'
+export const RECORD_QUESTION_TOOL = 'record_question'
+export const RECORD_ANALYSE_TOOL = 'record_analyse'
+export const RECORD_ANSWER_TOOL = 'record_answer'
+
+const textParam = { type: 'string' as const, description: 'the segment text, verbatim', required: true as const }
 
 export const recordTools = [
   defineJsonTool({
-    name: RECORD_START_TOOL,
-    description: 'Open a new electro-lab record: everything between this call and the next record_end is recorded (question/analysis texts, tool calls and results, answer). Call it once at the start of a five-step calculation — a second record_start while a record is open settles the open record as a duplicate-start error record and opens a new one.',
-    parameters: {},
+    name: RECORD_QUESTION_TOOL,
+    description: 'Open a new electro-lab record and submit the consolidated question (template part 1, verbatim). Call it FIRST, before any calculation tool — a second record_question while a record is open settles the open record as a duplicate-start error record and opens a new one.',
+    parameters: { text: textParam },
     execute: () => ({ ok: true }),
   }),
   defineJsonTool({
-    name: RECORD_END_TOOL,
-    description: 'Close the current electro-lab record: it is settled and stored as-is. Call it after the tool calls of a five-step calculation. Tool-phase models write their final texts after the last tool call, so pass the final texts here, copied verbatim: `question` (template part 1), `analyse` (part 2) and `answer` (part 5). A field left out falls back to the texts written between the markers.',
-    parameters: {
-      question: { type: 'string', description: 'the consolidated full question (template part 1), verbatim' },
-      analyse: { type: 'string', description: 'the analysis with formulas (template part 2), verbatim' },
-      answer: { type: 'string', description: 'the final answer (template part 5), verbatim' },
-    },
+    name: RECORD_ANALYSE_TOOL,
+    description: 'Submit the analysis text of the current record (template part 2, verbatim). Call it once between the tool calls; it has no effect without an open record.',
+    parameters: { text: textParam },
+    execute: () => ({ ok: true }),
+  }),
+  defineJsonTool({
+    name: RECORD_ANSWER_TOOL,
+    description: 'Submit the final answer text (template part 5, verbatim) and CLOSE the current record: it is settled and stored as-is. Call it LAST, after the tool calls. If you merge the whole five-part template into this text instead of splitting it, the parts are recovered automatically.',
+    parameters: { text: textParam },
     execute: () => ({ ok: true }),
   }),
 ]

@@ -12,20 +12,19 @@
  * anywhere.
  *
  * Bracket protocol — only what happens between the brackets is recorded:
- * - `record_start` opens a record; from then on the first assistant text is
- *   the `question`, pre-tool texts join the `analyse`, post-tool texts the
- *   `answer`; electro-lab tool calls/`tool/result`s are captured verbatim.
- *   Exactly ONE `record_start` per answer: a second `record_start` while a
- *   record is open settles it as a duplicate-start error record and opens a
- *   new one. There is no fold — the open record is never continued by a
- *   second start.
- * - `record_end` SETTLES the record immediately. Tool-phase models write
- *   their final texts after the last tool call, so `record_end` carries the
- *   three text payloads it would otherwise miss: `question` / `analyse` /
- *   `answer` in its arguments (the raw JSON text of the tool/call event,
- *   parsed here). At settle time a payload field wins; a missing or empty
- *   payload field falls back to the event-stream texts.
- * - `record_end` with no open record (or twice): an ERROR record
+ * - `record_question` OPENS the record and submits the question text (the
+ *   question does not depend on tool results, so it comes first); from then
+ *   on the first assistant text is the `question`, pre-tool texts join the
+ *   `analyse`, post-tool texts the `answer`; electro-lab tool calls and
+ *   `tool/result`s are captured verbatim. `record_analyse` submits the
+ *   analysis; a second `record_question` while a record is open settles it
+ *   as a duplicate-start error record and opens a new one. There is no fold
+ *   — the open record is never continued by a second open.
+ * - `record_answer` submits the answer text and SETTLES the record
+ *   immediately. When the answer text is the whole merged five-part
+ *   template, the parts are split out of it and fill the missing
+ *   question/analyse fields.
+ * - `record_answer` with no open record (or twice): an ERROR record
  *   (`DuplicateEnd`) is kept.
  * - A settled record with no tool call is an ERROR record (`Incomplete`).
  *   An error record always carries its collected data (when any) plus
@@ -59,7 +58,7 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { ALL_TOOLS } from './tools/index.ts'
 import { filterTool } from './tools/filter-tool.ts'
-import { RECORD_START_TOOL, RECORD_END_TOOL } from './tools/record-tools.ts'
+import { RECORD_QUESTION_TOOL, RECORD_ANALYSE_TOOL, RECORD_ANSWER_TOOL } from './tools/record-tools.ts'
 
 /** A record settles when no electro-lab activity arrives within this window. */
 export const SETTLE_WINDOW_MS = 30 * 60_000
@@ -76,8 +75,9 @@ export const RECORD_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...ALL_TOOLS.map((tool) => tool.name),
   filterTool.name,
   'solve_steps',
-  RECORD_START_TOOL,
-  RECORD_END_TOOL,
+  RECORD_QUESTION_TOOL,
+  RECORD_ANALYSE_TOOL,
+  RECORD_ANSWER_TOOL,
 ])
 
 /** Why a record is an error record. */
@@ -324,13 +324,8 @@ function joinParagraph(texts: string[]): string {
   return texts.join('\n\n').slice(0, MAX_TEXT_CHARS)
 }
 
-/**
- * The non-empty text payload fields a `record_end` call carried. The
- * tool/call event keeps the model's raw arguments JSON as a string (the
- * event system does not parse — parsing happens in the execution channel),
- * so the manager parses it here. A malformed or empty payload is ignored.
- */
-function payloadFromArguments(argumentsRaw: string | undefined): RecordEndPayload | undefined {
+/** The `text` field from a marker tool's arguments string, or undefined. */
+function textFromTextArgument(argumentsRaw: string | undefined): string | undefined {
   if (argumentsRaw === undefined || argumentsRaw === '') return undefined
   let parsed: unknown
   try {
@@ -339,12 +334,54 @@ function payloadFromArguments(argumentsRaw: string | undefined): RecordEndPayloa
     return undefined
   }
   if (parsed === null || typeof parsed !== 'object') return undefined
-  const payload: RecordEndPayload = {}
-  for (const field of ['question', 'analyse', 'answer'] as const) {
-    const value = (parsed as { [key: string]: unknown })[field]
-    if (typeof value === 'string' && value.trim().length > 0) payload[field] = value
+  const text = (parsed as { text?: unknown }).text
+  return typeof text === 'string' && text.trim().length > 0 ? text : undefined
+}
+
+/**
+ * Split a five-part template text into its segments by the part markers
+ * (`N. **标题（Title）**`). Returns undefined when no template structure is
+ * found.
+ */
+function splitTemplatePayload(text: string): { question?: string; analyse?: string; answer?: string } | undefined {
+  const segments = text.split(/\n(?=\d+\.\s)/).map((s) => s.trim()).filter((s) => s.length > 0)
+  if (segments.length < 2) return undefined
+  const result: { question?: string; analyse?: string; answer?: string } = {}
+  for (const segment of segments) {
+    if (/问题|Question/i.test(segment)) result.question = segment
+    else if (/分析|Analysis/i.test(segment)) result.analyse = segment
+    else if (/答案|Answer/i.test(segment)) result.answer = segment
   }
-  return Object.keys(payload).length === 0 ? undefined : payload
+  return result.question !== undefined || result.analyse !== undefined || result.answer !== undefined ? result : undefined
+}
+
+/**
+ * Resolve the three record texts at settle time. Priority per field:
+ * 1. the payload field given directly,
+ * 2. the text already collected in the open record (record_question /
+ *    record_analyse / event stream),
+ * 3. the part split out of a merged five-part template in the `answer`
+ *    payload (fills gaps only).
+ * The answer field is special: when the payload answer IS the merged
+ * template, its split answer wins (it drops the table segments).
+ */
+function resolveTexts(payload: RecordEndPayload | undefined, current: { question: string; analyse: string; answer: string }): RecordEndPayload {
+  const split = payload?.answer === undefined ? undefined : splitTemplatePayload(payload.answer)
+  const result: RecordEndPayload = {}
+  for (const field of ['question', 'analyse', 'answer'] as const) {
+    const direct = payload?.[field]
+    const existing = current[field]
+    if (field === 'answer' && direct !== undefined) {
+      result.answer = split?.answer ?? direct
+    } else if (direct !== undefined) {
+      result[field] = direct
+    } else if (existing !== '') {
+      result[field] = existing
+    } else if (split?.[field] !== undefined) {
+      result[field] = split[field]
+    }
+  }
+  return result
 }
 
 function snapshotToBuild(snapshot: OpenSnapshot): OpenBuild {
@@ -414,27 +451,42 @@ export class RecordManager {
       }
       case RecordEventType.ToolCall: {
         const name = event.data.name
-        if (name === RECORD_START_TOOL) {
+        if (name === RECORD_QUESTION_TOOL) {
+          // Opens the record AND submits the question text; the question
+          // does not depend on tool results, so it comes before any call.
+          const text = textFromTextArgument(event.data.arguments)
           if (this.open !== null) {
             // Duplicate start: keep the open record as an error record, then start fresh.
             settled = this.settle(event.time, {
               type: RecordErrorType.DuplicateStart,
-              message: 'record_start fired while a record was already open; it was settled as an error record',
+              message: 'record_question fired while a record was already open; it was settled as an error record',
             })
           }
           this.openRecord(event.time)
+          if (text !== undefined) {
+            const open = this.open
+            if (open !== null) this.open = { ...open, lastAt: event.time, question: text }
+          }
           break
         }
-        if (name === RECORD_END_TOOL) {
+        if (name === RECORD_ANALYSE_TOOL) {
+          const text = textFromTextArgument(event.data.arguments)
+          if (text !== undefined && this.open !== null) {
+            const open = this.open
+            this.open = { ...open, lastAt: event.time, analyseTexts: pushCapped(open.analyseTexts, text, MAX_TEXTS) }
+          }
+          break
+        }
+        if (name === RECORD_ANSWER_TOOL) {
+          // Submits the answer text AND settles the record immediately.
+          const text = textFromTextArgument(event.data.arguments)
           if (this.open !== null) {
-            // record_end settles immediately; its payload carries the final
-            // texts that tool-phase models write after the last tool call.
-            settled = this.settle(event.time, undefined, payloadFromArguments(event.data.arguments))
+            settled = this.settle(event.time, undefined, text === undefined ? undefined : { answer: text })
           } else {
             // Duplicate end: keep an empty error record.
             settled = this.recordError(event.time, {
               type: RecordErrorType.DuplicateEnd,
-              message: 'record_end fired with no open record',
+              message: 'record_answer fired with no open record',
             })
           }
           break
@@ -525,13 +577,18 @@ export class RecordManager {
   private settle(at: number, error?: RecordError, payload?: RecordEndPayload): Record {
     const open = this.open
     if (open === null) throw new Error('record manager: settle called with no open record')
+    const texts = resolveTexts(payload, {
+      question: open.question,
+      analyse: joinParagraph(open.analyseTexts),
+      answer: joinParagraph(open.answerTexts),
+    })
     const record: Record = {
       id: open.id,
       startedAt: open.startedAt,
       settledAt: at,
-      question: payload?.question ?? open.question,
-      analyse: payload?.analyse ?? joinParagraph(open.analyseTexts),
-      answer: payload?.answer ?? joinParagraph(open.answerTexts),
+      question: texts.question ?? '',
+      analyse: texts.analyse ?? '',
+      answer: texts.answer ?? '',
       calls: open.calls,
       results: open.results,
       ...(error !== undefined
