@@ -5,6 +5,13 @@
 # no file system, no network, no subagents. Runtime context snapshots are
 # suppressed; every number must come from a tool call result.
 #
+# The plugin itself is NOT mounted here: it is a global bundle plugin (the
+# package's cordis.patch.yml inserts it into the profile roster), exactly
+# like dsh-ssh or dsh-liangshen — a preset row for the same plugin would
+# mount it a second time, duplicate the tool registry and settle every
+# record twice. Sessions joining this preset use the globally mounted
+# plugin; the preset contributes only the persona.
+#
 # The five-part answer template is embedded IN the persona (not referenced):
 # a skill can be skipped by the model, a complete persona cannot — this is
 # the standing enforcement. The electro-lab-template skill carries the same
@@ -35,9 +42,3 @@
       Answer in 简体中文 unless the user writes in another language.
     complete: true
     includeRuntimeContext: false
-
-# The electro-lab plugin's toolset: expression engine, circuit analysis,
-# Smith chart, transforms, noise/dB, transmission line, electronics — plus
-# the solve_steps orchestrator and the electro-lab-template skill.
-- id: electro-lab
-  name: 'dsh-electro-lab'

@@ -68,19 +68,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => registerTools(ctx), 'dsh-electro-lab: tools')
   ctx.effect(() => registerSkills(ctx), 'dsh-electro-lab: skills')
 
-  // The plugin can be mounted from TWO places at once — the global bundle
-  // (the installed package's cordis.patch.yml) AND a session preset row —
-  // which would feed every event into two independent managers and settle
-  // every record twice. The session trace and the HTTP endpoint are
-  // therefore process singletons: only the first mount registers them.
-  let recordManagerMounted = false
-
   ctx.effect(() => {
-    if (recordManagerMounted) {
-      // Second mount: the listener and endpoint already exist — nothing to add.
-      return () => {}
-    }
-    recordManagerMounted = true
     const disposers: Array<() => void> = []
 
     // Session trace: feed every committed event into the session's record
@@ -119,7 +107,6 @@ export function apply(ctx: Context): void {
     }
 
     return () => {
-      recordManagerMounted = false
       for (const off of disposers) off()
     }
   }, 'dsh-electro-lab: records')
