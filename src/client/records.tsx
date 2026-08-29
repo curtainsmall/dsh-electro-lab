@@ -196,7 +196,9 @@ export function RecordsTab(): React.JSX.Element {
   if (failed && response === null) {
     return (
       <div style={rowStyle}>
-        <span style={{ color: '#e08a8a' }}>Records unavailable — the host endpoint is not reachable.</span>
+        <span style={{ color: '#8b93a5' }}>
+          No records detected yet — the records endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.
+        </span>
       </div>
     )
   }
