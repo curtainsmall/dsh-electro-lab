@@ -88,15 +88,90 @@ function plainText(text: string): React.JSX.Element {
   )
 }
 
-/** The tool calls as plain text rows (name + raw arguments). */
+/** Pretty-print a JSON arguments string (collapsed-panel summary); falls back to the raw text. */
+function formatJson(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2)
+  } catch {
+    return text
+  }
+}
+
+/** One JSON value as a collapsible tree node; objects and arrays fold, scalars render inline. */
+function JsonNode({ name, value, depth }: { name: string; value: unknown; depth: number }): React.JSX.Element {
+  const [open, setOpen] = useState(depth < 2)
+  if (value === null || typeof value !== 'object') {
+    return (
+      <div style={{ paddingLeft: depth * 14, fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{name.length > 0 ? `${name}: ` : ''}</span>
+        <span style={{ color: 'var(--dsw-alias-label-primary)' }}>{JSON.stringify(value)}</span>
+      </div>
+    )
+  }
+  const isArray = Array.isArray(value)
+  const entries: Array<[string, unknown]> = isArray
+    ? (value as unknown[]).map((item, index) => [String(index), item] as [string, unknown])
+    : Object.entries(value as Record<string, unknown>)
+  const summary = isArray ? `[…] ${entries.length} 项` : `{…} ${entries.length} 项`
+  return (
+    <div>
+      <div
+        style={{ paddingLeft: depth * 14, fontSize: 12, lineHeight: 1.6, cursor: 'pointer', color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
+        {name.length > 0 ? ` ${name}: ` : ' '}
+        {open ? '' : <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{summary}</span>}
+      </div>
+      {open && (
+        <div>
+          {entries.map(([key, item]) => (
+            <JsonNode key={key} name={isArray ? `[${key}]` : key} value={item} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** One tool call as a collapsible panel: the header shows the name, the body the arguments as a JSON tree. */
+function CallPanel({ call, defaultOpen }: { call: Call; defaultOpen: boolean }): React.JSX.Element {
+  const [open, setOpen] = useState(defaultOpen)
+  let parsed: unknown = call.arguments
+  if (call.arguments.length > 0) {
+    try {
+      parsed = JSON.parse(call.arguments)
+    } catch {
+      parsed = call.arguments
+    }
+  }
+  return (
+    <div style={{ border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, marginBottom: 8, overflow: 'hidden' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer', background: 'var(--dsw-alias-bg-base)' }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11 }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--dsw-alias-label-primary)' }}>{call.name}</span>
+        {!open && <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }}>{call.arguments.length > 0 ? formatJson(call.arguments) : ''}</span>}
+      </div>
+      {open && (
+        <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
+          {typeof parsed === 'string'
+            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsed}</div>
+            : <JsonNode name="" value={parsed} depth={0} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The tool calls: one collapsible panel per call (the first one open by default). */
 function plainCalls(calls: Call[]): React.JSX.Element {
   return (
     <div>
-      {calls.map((call) => (
-        <div key={call.callId} style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--dsw-alias-label-primary)' }}>
-          <span style={{ fontWeight: 600 }}>{call.name}</span>
-          {call.arguments.length > 0 ? ` ${call.arguments}` : ''}
-        </div>
+      {calls.map((call, index) => (
+        <CallPanel key={call.callId} call={call} defaultOpen={index === 0} />
       ))}
     </div>
   )
