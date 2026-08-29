@@ -5,7 +5,15 @@
  * Records are plugin-owned: they survive session deletion and restarts.
  */
 import { useEffect, useState } from 'react'
-import { t, useAppLocale } from './locales.ts'
+import { t, useAppLocale, type LocaleKey } from './locales.ts'
+
+/** Map a stored error type to its translated message key (codes stay raw; unknown types show no message). */
+function errorMessageKey(type: string): LocaleKey | string {
+  if (type === 'duplicate-start') return 'errorDuplicateStartMsg'
+  if (type === 'duplicate-end') return 'errorDuplicateEndMsg'
+  if (type === 'incomplete') return 'errorIncompleteMsg'
+  return ''
+}
 
 /* ── Records data shapes (mirror of the host store + endpoint) ─────────────── */
 
@@ -526,7 +534,7 @@ export function RecordsTab(): React.JSX.Element {
               {run.error !== undefined && (
                 <div style={{ marginTop: 4, color: 'var(--dsw-alias-state-error-primary)', font: '11px ui-monospace, monospace' }}>
                   ✗ {run.error.type}
-                  {run.error.message.length > 0 ? ` — ${run.error.message}` : ''}
+                  {run.error.message.length > 0 ? ` — ${t(errorMessageKey(run.error.type))}` : ''}
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>

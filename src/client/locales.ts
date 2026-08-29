@@ -33,6 +33,9 @@ const zh = {
   delete: '删除',
   deleteRecord: '删除这条记录',
   confirmDeleteAgain: '再次点击确认删除',
+  errorDuplicateStartMsg: '重复开启记录——原记录已作为错误记录结算。',
+  errorDuplicateEndMsg: '在无记录时调用了 record_answer。',
+  errorIncompleteMsg: '记录内没有工具调用:事件不足以构成一次计算。',
 } as const
 
 const en: Record<keyof typeof zh, string> = {
@@ -59,6 +62,9 @@ const en: Record<keyof typeof zh, string> = {
   delete: 'Delete',
   deleteRecord: 'Delete this record',
   confirmDeleteAgain: 'Click again to confirm',
+  errorDuplicateStartMsg: 'record_question fired while a record was already open; it was settled as an error record',
+  errorDuplicateEndMsg: 'record_answer fired with no open record',
+  errorIncompleteMsg: 'the record has no tool call: not enough events for a calculation',
 }
 
 export type LocaleKey = keyof typeof zh
@@ -104,10 +110,11 @@ function isZh(active: string): boolean {
   return active.toLowerCase().startsWith('zh')
 }
 
-/** Translate one key in the active language; `{name}` placeholders are replaced from args. */
-export function t(key: LocaleKey, args?: Record<string, string | number>): string {
+/** Translate one key in the active language; `{name}` placeholders are replaced from args. Unknown keys return themselves. */
+export function t(key: LocaleKey | string, args?: Record<string, string | number>): string {
   const dict = isZh(current.active) ? zh : en
-  let text = dict[key]
+  let text = dict[key as LocaleKey]
+  if (text === undefined) return key
   if (args !== undefined) {
     for (const [name, value] of Object.entries(args)) text = text.replace(`{${name}}`, String(value))
   }
