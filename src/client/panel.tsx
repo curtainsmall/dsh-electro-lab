@@ -13,6 +13,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RecordsTab } from './records.tsx'
+import { t, useAppLocale } from './locales.ts'
 
 /** Tiny shared store: open state + subscription for the nav button and the panel.
  *  Methods never use `this`: they are passed around detached (React's
@@ -241,6 +242,7 @@ const tabBarStyle: React.CSSProperties = {
 
 /** The panel body: title bar with a back-to-session button, tabs, content. */
 export function ElectroLabPanel(): React.JSX.Element | null {
+  useAppLocale() // Re-render when the active language changes.
   const open = useSyncExternalStore(panelStore.subscribe, () => panelStore.open)
   const [tab, setTab] = useState<'config' | 'records'>('records')
   const [backHover, setBackHover] = useState(false)
@@ -285,7 +287,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
       <div style={headerStyle}>
         <button
           type="button"
-          aria-label="返回会话"
+          aria-label={t('backToSession')}
           onClick={() => panelStore.toggle()}
           onMouseEnter={() => setBackHover(true)}
           onMouseLeave={() => setBackHover(false)}
@@ -296,13 +298,13 @@ export function ElectroLabPanel(): React.JSX.Element | null {
           }}
         >
           <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
-          <span style={{ lineHeight: 1 }}>返回会话</span>
+          <span style={{ lineHeight: 1 }}>{t('backToSession')}</span>
         </button>
         <h2 style={{ margin: 0, fontSize: 15 }}>ElectroLab</h2>
       </div>
       <div role="tablist" style={tabBarStyle}>
-        {tabButton('config', 'Config')}
-        {tabButton('records', 'Records')}
+        {tabButton('config', t('tabConfig'))}
+        {tabButton('records', t('tabRecords'))}
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
         {tab === 'records' ? <RecordsTab /> : <div />}

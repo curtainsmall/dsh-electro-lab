@@ -5,6 +5,7 @@
  * Records are plugin-owned: they survive session deletion and restarts.
  */
 import { useEffect, useState } from 'react'
+import { t, useAppLocale } from './locales.ts'
 
 /* ── Records data shapes (mirror of the host store + endpoint) ─────────────── */
 
@@ -277,11 +278,11 @@ function sectionBlock(section: DetailSection): React.JSX.Element {
 function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
   const [backHover, setBackHover] = useState(false)
   const sections: DetailSection[] = [
-    { key: 'question', label: '1 · 问题', content: record.question },
-    { key: 'analyse', label: '2 · 分析', content: record.analyse },
-    { key: 'calls', label: '3 · 工具调用', content: record.calls.length === 0 ? '' : plainCalls(record.calls) },
-    { key: 'results', label: '4 · 结果', content: record.results.length === 0 ? '' : plainResults(record.results) },
-    { key: 'answer', label: '5 · 答案', content: record.answer ?? '' },
+    { key: 'question', label: t('sectionQuestion'), content: record.question },
+    { key: 'analyse', label: t('sectionAnalyse'), content: record.analyse },
+    { key: 'calls', label: t('sectionCalls'), content: record.calls.length === 0 ? '' : plainCalls(record.calls) },
+    { key: 'results', label: t('sectionResults'), content: record.results.length === 0 ? '' : plainResults(record.results) },
+    { key: 'answer', label: t('sectionAnswer'), content: record.answer ?? '' },
   ]
 
   const jump = (key: string): void => {
@@ -314,7 +315,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           }}
         >
           <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
-          <span style={{ lineHeight: 1 }}>返回记录</span>
+          <span style={{ lineHeight: 1 }}>{t('backToRecords')}</span>
         </button>
         <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {record.question || `record ${record.id}`}
@@ -325,11 +326,11 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           id: {record.id}
         </div>
         <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, marginTop: 2 }}>
-          开始: {formatFull(record.startedAt)}
+          {t('startedAt')}: {formatFull(record.startedAt)}
         </div>
         {record.settledAt !== undefined && (
           <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, marginTop: 1 }}>
-            结束: {formatFull(record.settledAt)}
+            {t('settledAt')}: {formatFull(record.settledAt)}
           </div>
         )}
       </div>
@@ -369,6 +370,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
 /* ── Records tab ───────────────────────────────────────────────────────────── */
 
 export function RecordsTab(): React.JSX.Element {
+  useAppLocale() // Re-render when the active language changes.
   const [response, setResponse] = useState<RecordsResponse | null>(null)
   const [failed, setFailed] = useState(false)
   const [dialogRecord, setDialogRecord] = useState<DetailRecord | null>(null)
@@ -413,7 +415,7 @@ export function RecordsTab(): React.JSX.Element {
     return (
       <div style={rowStyle}>
         <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>
-          No records detected yet — the records endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.
+          {t('unreachable')}
         </span>
       </div>
     )
@@ -438,11 +440,11 @@ export function RecordsTab(): React.JSX.Element {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
-        Settled records of the five-step process across all sessions — stored on disk, refreshed automatically.
+        {t('headerNote')}
       </div>
       {records.length === 0 && openRecords.length === 0 ? (
         <div style={rowStyle}>
-          <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>No ElectroLab records yet — ask the agent for a calculation.</span>
+          <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{t('emptyHint')}</span>
         </div>
       ) : (
         <>
@@ -455,13 +457,13 @@ export function RecordsTab(): React.JSX.Element {
               onMouseLeave={() => setHoveredId(null)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: 'var(--dsw-alias-state-warn-primary)', fontWeight: 600 }}>● in progress</span>
+                <span style={{ color: 'var(--dsw-alias-state-warn-primary)', fontWeight: 600 }}>{t('inProgress')}</span>
               </div>
               <div style={{ marginTop: 4, fontSize: 12, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 }}>
                 {run.question || run.id}
               </div>
               <div style={{ marginTop: 4, fontSize: 12, color: 'var(--dsw-alias-label-primary)' }}>
-                {run.calls.length} tool call(s) · started {formatTime(run.startedAt)}
+                {t('toolCallsCount', { count: run.calls.length })} · {t('startedAt')} {formatTime(run.startedAt)}
               </div>
               {toolChips(run.calls)}
             </div>
@@ -493,7 +495,7 @@ export function RecordsTab(): React.JSX.Element {
                   </span>
                   <span
                     role="button"
-                    title="删除这条记录"
+                    title={t('deleteRecord')}
                     style={{
                       width: 22,
                       height: 22,
@@ -529,11 +531,10 @@ export function RecordsTab(): React.JSX.Element {
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11 }}>
-                  {run.calls.length} tool call(s)
-                  {run.results.some((result) => result.error !== undefined) ? `, ${run.results.filter((result) => result.error !== undefined).length} error(s)` : ''}
+                  {t('toolCallsCount', { count: run.calls.length })}
+                  {run.results.some((result) => result.error !== undefined) ? t('errorsCount', { count: run.results.filter((result) => result.error !== undefined).length }) : ''}
                 </span>
               </div>
-              {toolChips(run.calls)}
               {toolChips(run.calls)}
             </div>
           ))}
@@ -555,7 +556,7 @@ export function RecordsTab(): React.JSX.Element {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="删除记录确认"
+            aria-label={t('deleteTitle')}
             style={{
               width: 320,
               maxWidth: 'calc(100vw - 32px)',
@@ -567,8 +568,8 @@ export function RecordsTab(): React.JSX.Element {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>删除这条记录?</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>此操作不可恢复。</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('deleteTitle')}</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{t('irreversible')}</div>
             <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {deleteTarget.title}
             </div>
@@ -586,7 +587,7 @@ export function RecordsTab(): React.JSX.Element {
                 }}
                 onClick={() => setDeleteTarget(null)}
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 type="button"
@@ -606,7 +607,7 @@ export function RecordsTab(): React.JSX.Element {
                   void removeRecord(target.id)
                 }}
               >
-                删除
+                {t('delete')}
               </button>
             </div>
           </div>
