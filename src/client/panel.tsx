@@ -214,15 +214,15 @@ const headerStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 10,
   padding: '10px 14px',
-  borderBottom: '1px solid #2a2f3a',
+  borderBottom: '1px solid var(--dsw-alias-border-l2)',
   background: 'var(--dsw-specific-sidebar-fill, #171a21)',
 }
 
 const backButtonStyle: React.CSSProperties = {
   background: 'none',
-  border: '1px solid #2a2f3a',
+  border: '1px solid var(--dsw-alias-border-l2)',
   borderRadius: 6,
-  color: '#c8ccd4',
+  color: 'var(--dsw-alias-label-primary)',
   cursor: 'pointer',
   fontSize: 13,
   display: 'flex',
@@ -235,7 +235,7 @@ const tabBarStyle: React.CSSProperties = {
   display: 'flex',
   gap: 4,
   padding: '8px 14px 0',
-  borderBottom: '1px solid #2a2f3a',
+  borderBottom: '1px solid var(--dsw-alias-border-l2)',
   background: 'var(--dsw-specific-sidebar-fill, #171a21)',
 }
 
@@ -258,11 +258,11 @@ export function ElectroLabPanel(): React.JSX.Element | null {
       onMouseLeave={() => setTabHover(null)}
       style={{
         padding: '5px 12px',
-        border: '1px solid #2a2f3a',
-        borderBottomColor: tab === key ? '#e8b34b' : '#2a2f3a',
+        border: '1px solid var(--dsw-alias-border-l2)',
+        borderBottomColor: tab === key ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-border-l2)',
         borderRadius: 6,
-        background: tabHover === key ? '#22262e' : 'none',
-        color: tab === key ? '#e8b34b' : '#c8ccd4',
+        background: tabHover === key ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+        color: tab === key ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-label-primary)',
         cursor: 'pointer',
         fontSize: 13,
       }}
@@ -277,8 +277,9 @@ export function ElectroLabPanel(): React.JSX.Element | null {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        color: '#e6e8ec',
-        font: '13px/1.5 ui-sans-serif, system-ui, sans-serif',
+        background: 'var(--dsw-alias-bg-base)',
+        color: 'var(--dsw-alias-label-primary)',
+        font: '13px/1.5 var(--dsw-font-family)',
       }}
     >
       <div style={headerStyle}>
@@ -290,8 +291,8 @@ export function ElectroLabPanel(): React.JSX.Element | null {
           onMouseLeave={() => setBackHover(false)}
           style={{
             ...backButtonStyle,
-            background: backHover ? '#22262e' : 'none',
-            borderColor: backHover ? '#39404d' : '#2a2f3a',
+            background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+            borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
           }}
         >
           <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>

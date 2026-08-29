@@ -60,9 +60,9 @@ const DISPLAY_MAX_RECORDS = 100
 
 const rowStyle: React.CSSProperties = {
   padding: '8px 10px',
-  background: '#111318',
+  background: 'var(--dsw-alias-bg-layer-2)',
   borderRadius: 6,
-  border: '1px solid #2a2f3a',
+  border: '1px solid var(--dsw-alias-border-l2)',
 }
 
 function formatTime(time: number): string {
@@ -84,10 +84,10 @@ const paragraphStyle: React.CSSProperties = {
   maxHeight: 140,
   overflow: 'auto',
   padding: '6px 8px',
-  background: '#0d0f14',
+  background: 'var(--dsw-alias-bg-base)',
   borderRadius: 4,
-  border: '1px solid #232833',
-  color: '#aab2c0',
+  border: '1px solid var(--dsw-alias-border-l1)',
+  color: 'var(--dsw-alias-label-secondary)',
   font: '12px/1.6 ui-sans-serif, system-ui, sans-serif',
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
@@ -99,10 +99,10 @@ function callsBox(calls: Call[]): React.JSX.Element | null {
   return (
     <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
       {calls.map((call) => (
-        <div key={call.callId} style={{ background: '#0a0d12', borderRadius: 4, border: '1px solid #1e2530', padding: '4px 8px' }}>
-          <span style={{ color: '#7fbf9a', font: '11px ui-monospace, monospace' }}>{call.name}</span>
+        <div key={call.callId} style={{ background: 'var(--dsw-alias-bg-base)', borderRadius: 4, border: '1px solid var(--dsw-alias-border-l1)', padding: '4px 8px' }}>
+          <span style={{ color: 'var(--dsw-alias-state-success-primary)', font: '11px ui-monospace, monospace' }}>{call.name}</span>
           {call.arguments.length > 0 && (
-            <span style={{ color: '#8b93a5', font: '11px ui-monospace, monospace' }}> {call.arguments}</span>
+            <span style={{ color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace' }}> {call.arguments}</span>
           )}
         </div>
       ))}
@@ -116,14 +116,14 @@ function resultsBox(results: Result[]): React.JSX.Element | null {
   return (
     <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
       {results.map((result) => (
-        <div key={result.callId} style={{ background: '#0a0d12', borderRadius: 4, border: '1px solid #1e2530', padding: '4px 8px' }}>
+        <div key={result.callId} style={{ background: 'var(--dsw-alias-bg-base)', borderRadius: 4, border: '1px solid var(--dsw-alias-border-l1)', padding: '4px 8px' }}>
           {result.error !== undefined && (
-            <div style={{ color: '#e08a8a', font: '11px ui-monospace, monospace' }}>
+            <div style={{ color: 'var(--dsw-alias-state-error-primary)', font: '11px ui-monospace, monospace' }}>
               ✗ {result.error.name} ({result.error.code})
             </div>
           )}
           {result.content.length > 0 && (
-            <div style={{ color: '#9fc3ae', font: '11px/1.6 ui-monospace, monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 100, overflow: 'auto' }}>
+            <div style={{ color: 'var(--dsw-alias-state-success-primary)', font: '11px/1.6 ui-monospace, monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 100, overflow: 'auto' }}>
               {result.content}
             </div>
           )}
@@ -146,9 +146,9 @@ function toolChips(calls: Call[]): React.JSX.Element | null {
           style={{
             padding: '1px 6px',
             borderRadius: 4,
-            background: '#1c2b22',
-            border: '1px solid #2c4a3a',
-            color: '#7fbf9a',
+            background: 'var(--dsw-alias-bg-layer-2)',
+            border: '1px solid var(--dsw-alias-border-l2)',
+            color: 'var(--dsw-alias-state-success-primary)',
             font: '11px ui-monospace, monospace',
           }}
         >
@@ -179,10 +179,10 @@ function stepCell(label: string, content: React.JSX.Element | string | null): Re
   const empty = content === null || (typeof content === 'string' && content.length === 0)
   return (
     <>
-      <div style={{ color: '#8b93a5', fontSize: 11, fontWeight: 600, paddingTop: 2 }}>{label}</div>
+      <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, fontWeight: 600, paddingTop: 2 }}>{label}</div>
       <div style={{ minWidth: 0 }}>
         {empty
-          ? <span style={{ color: '#5b6270', fontSize: 11 }}>—</span>
+          ? <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }}>—</span>
           : typeof content === 'string'
             ? <div style={paragraphStyle}>{content}</div>
             : content}
@@ -194,11 +194,11 @@ function stepCell(label: string, content: React.JSX.Element | string | null): Re
 /** The expanded detail: identity, timestamps, and the five steps in a grid. */
 function detailGrid(record: DetailRecord): React.JSX.Element {
   return (
-    <div style={{ marginTop: 8, borderTop: '1px solid #232833', paddingTop: 8 }}>
-      <div style={{ color: '#8b93a5', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
+    <div style={{ marginTop: 8, borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: 8 }}>
+      <div style={{ color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
         id: {record.id}
       </div>
-      <div style={{ color: '#8b93a5', fontSize: 11, marginTop: 2 }}>
+      <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, marginTop: 2 }}>
         started: {formatFull(record.startedAt)}
         {record.settledAt !== undefined ? ` · settled: ${formatFull(record.settledAt)}` : ''}
       </div>
@@ -259,7 +259,7 @@ export function RecordsTab(): React.JSX.Element {
   if (failed && response === null) {
     return (
       <div style={rowStyle}>
-        <span style={{ color: '#8b93a5' }}>
+        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>
           No records detected yet — the records endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.
         </span>
       </div>
@@ -275,19 +275,19 @@ export function RecordsTab(): React.JSX.Element {
     return {
       ...rowStyle,
       cursor: 'pointer',
-      background: hoveredId === id ? '#171b22' : rowStyle.background,
-      borderColor: expanded ? (hoveredId === id ? '#39404d' : '#2a2f3a') : 'transparent',
+      background: hoveredId === id ? 'var(--dsw-alias-interactive-bg-hover)' : rowStyle.background,
+      borderColor: expanded ? (hoveredId === id ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)') : 'transparent',
     }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ fontSize: 12, color: '#8b93a5' }}>
+      <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
         Settled records of the five-step process across all sessions — stored on disk, refreshed automatically.
       </div>
       {records.length === 0 && openRecords.length === 0 ? (
         <div style={rowStyle}>
-          <span style={{ color: '#8b93a5' }}>No ElectroLab records yet — ask the agent for a calculation.</span>
+          <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>No ElectroLab records yet — ask the agent for a calculation.</span>
         </div>
       ) : (
         <>
@@ -300,12 +300,12 @@ export function RecordsTab(): React.JSX.Element {
               onMouseLeave={() => setHoveredId(null)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: '#e8b34b', fontWeight: 600 }}>● in progress</span>
+                <span style={{ color: 'var(--dsw-alias-state-warn-primary)', fontWeight: 600 }}>● in progress</span>
               </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4', fontWeight: 600 }}>
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 }}>
                 {run.question || run.id}
               </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: '#c8ccd4' }}>
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--dsw-alias-label-primary)' }}>
                 {run.calls.length} tool call(s) · started {formatTime(run.startedAt)}
               </div>
               {toolChips(run.calls)}
@@ -321,18 +321,18 @@ export function RecordsTab(): React.JSX.Element {
               onMouseLeave={() => setHoveredId(null)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
+                <span style={{ color: 'var(--dsw-alias-label-primary)', fontSize: 12, fontWeight: 600 }}>
                   {run.question || `record ${run.id}`}
                 </span>
                 <span style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 'none' }}>
-                  <span style={{ color: '#8b93a5', fontSize: 11 }}>
+                  <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11 }}>
                     {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
                   </span>
                   <span
                     role="button"
                     title="删除这条记录"
                     style={{
-                      color: delHoverId === run.id ? '#e08a8a' : '#8b93a5',
+                      color: delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)',
                       fontSize: 13,
                       cursor: 'pointer',
                       lineHeight: 1,
@@ -350,13 +350,13 @@ export function RecordsTab(): React.JSX.Element {
                 </span>
               </div>
               {run.error !== undefined && (
-                <div style={{ marginTop: 4, color: '#e08a8a', font: '11px ui-monospace, monospace' }}>
+                <div style={{ marginTop: 4, color: 'var(--dsw-alias-state-error-primary)', font: '11px ui-monospace, monospace' }}>
                   ✗ {run.error.type}
                   {run.error.message.length > 0 ? ` — ${run.error.message}` : ''}
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: '#8b93a5', fontSize: 11 }}>
+                <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11 }}>
                   {run.calls.length} tool call(s)
                   {run.results.some((result) => result.error !== undefined) ? `, ${run.results.filter((result) => result.error !== undefined).length} error(s)` : ''}
                 </span>
