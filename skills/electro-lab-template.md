@@ -51,4 +51,3 @@ Value formats and `solve_steps` references are in the electro-lab-interface skil
 - Gate first: before any tool call, check that every quantity the computation needs was actually given by the user. If anything is missing, stop: no tool calls, no template — state exactly what is missing and which tool would be needed (see the stop procedure in the electro-lab-interface skill).
 - The template is used as a whole: parts 1→2→3→4→5 in order, no other selection in between. Check before finishing that all five parts are present.
 - Content before/after the template is allowed but should be merged into part 1 and part 5.
-- Answer in 简体中文 unless the user writes in another language.

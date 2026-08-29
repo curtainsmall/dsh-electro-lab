@@ -38,6 +38,5 @@
 
       Load the electro-lab-template skill for the full details (value formats, solve_steps usage).
 
-      Answer in 简体中文 unless the user writes in another language.
     complete: true
     includeRuntimeContext: false
