@@ -221,7 +221,7 @@ export function RecordsTab(): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [delHoverId, setDelHoverId] = useState<string | null>(null)
-  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
@@ -246,7 +246,7 @@ export function RecordsTab(): React.JSX.Element {
     }
   }, [refreshTick])
 
-  /** Delete one settled record from the archive and refresh. The two-click confirm is inline (window.confirm is unsupported in embedded webviews). */
+  /** Delete one settled record from the archive and refresh. */
   const removeRecord = async (id: string): Promise<void> => {
     try {
       await fetch(`${RECORDS_ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
@@ -320,7 +320,7 @@ export function RecordsTab(): React.JSX.Element {
               onMouseEnter={() => setHoveredId(run.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <span style={{
                   color: 'var(--dsw-alias-label-primary)',
                   fontSize: 12,
@@ -335,38 +335,35 @@ export function RecordsTab(): React.JSX.Element {
                 </span>
                 <span style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 'none' }}>
                   <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, whiteSpace: 'nowrap' }}>
-                    {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
+                    {formatTime(run.startedAt)}
                   </span>
                   <span
                     role="button"
-                    title={confirmId === run.id ? '再次点击确认删除' : '删除这条记录'}
+                    title="删除这条记录"
                     style={{
-                      color: confirmId === run.id ? 'var(--dsw-alias-state-error-primary)' : (delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)'),
+                      width: 22,
+                      height: 22,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                      border: '1px solid transparent',
+                      borderRadius: 4,
+                      color: delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)',
+                      borderColor: delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'transparent',
                       fontSize: 12,
-                      fontWeight: confirmId === run.id ? 600 : 400,
                       cursor: 'pointer',
                       lineHeight: 1,
-                      minWidth: 64,
-                      textAlign: 'center',
-                      transition: 'color 0.12s',
-                      whiteSpace: 'nowrap',
+                      transition: 'color 0.12s, border-color 0.12s',
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (confirmId === run.id) {
-                        setConfirmId(null)
-                        void removeRecord(run.id)
-                      } else {
-                        setConfirmId(run.id)
-                      }
+                      setDeleteTarget({ id: run.id, title: run.question || `record ${run.id}` })
                     }}
                     onMouseEnter={() => setDelHoverId(run.id)}
-                    onMouseLeave={() => {
-                      setDelHoverId(null)
-                      setConfirmId(null)
-                    }}
+                    onMouseLeave={() => setDelHoverId(null)}
                   >
-                    {confirmId === run.id ? '确认删除?' : '✕'}
+                    ✕
                   </span>
                 </span>
               </div>
@@ -387,6 +384,79 @@ export function RecordsTab(): React.JSX.Element {
             </div>
           ))}
         </>
+      )}
+      {deleteTarget !== null && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--dsw-alias-bg-mask-1)',
+          }}
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="删除记录确认"
+            style={{
+              width: 320,
+              maxWidth: 'calc(100vw - 32px)',
+              background: 'var(--dsw-alias-bg-layer-2)',
+              border: '1px solid var(--dsw-alias-border-l2)',
+              borderRadius: 10,
+              padding: 16,
+              boxShadow: 'var(--dsw-shadow-lv3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 600, fontSize: 14 }}>删除这条记录?</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>此操作不可恢复。</div>
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {deleteTarget.title}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button
+                type="button"
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--dsw-alias-border-l2)',
+                  background: 'none',
+                  color: 'var(--dsw-alias-label-primary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+                onClick={() => setDeleteTarget(null)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--dsw-alias-state-error-primary)',
+                  background: 'none',
+                  color: 'var(--dsw-alias-state-error-primary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  const target = deleteTarget
+                  setDeleteTarget(null)
+                  void removeRecord(target.id)
+                }}
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
