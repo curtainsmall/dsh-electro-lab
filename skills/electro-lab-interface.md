@@ -4,7 +4,7 @@ description: "Operational interface of the electro-lab toolset: value object for
 whenToUse: "Any answer that involves numbers, measurements, or quantitative claims through the electro-lab toolset"
 ---
 
-# Electro-Lab Interface
+# DeepSeek Harness ElectroLab Interface
 
 The operational details of the electro-lab toolset. This skill is template-independent — it applies whether or not an answer template is used. If the user asks for the template structure, follow the electro-lab-template skill instead.
 

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-29
+
+### Added
+
+- Client **Records** panel: a sidebar nav entry toggles a panel listing every settled record across all sessions, read through the same-origin endpoint `/api/dsh-electro-lab/records` (polled every 5 s).
+- Records are stored as **one immutable JSONL line per settle** in `~/.dsh-electro-lab/records.jsonl` (outside `$DSH_HOME`; override with `DSH_ELECTRO_LAB_HOME`), surviving session deletion and restarts; an interrupted open record is persisted to `open-record.json` and restored by the constructor on restart. Records are built from sessions but never feed back into them.
+- Five-step answer template (question, analysis with formulas, tool calls, results, answer) in the template skill and the packaged preset persona; the record schema mirrors it — `question`/`analyse`/`answer` paragraphs plus structured `calls`/`results` arrays (raw arguments JSON, full outputs, error identity).
+- Record deletion: the endpoint serves DELETE ?id= to remove one settled record (the JSONL archive is rewritten without it), confirmed through a themed popup dialog (works in embedded webviews).
+- The panel and records page use the dsw theme tokens (same system as the SSH panel), so they follow light/dark themes and skins; record cards highlight on hover, titles stay on one truncated line with an ellipsis, and the expanded card shows the full five steps in a grid.
+
+### Changed
+
+- **Record protocol**: `record_question` opens a record and submits the question, `record_analyse` submits the analysis, `record_answer` submits the answer and settles. Only bracketed content is recorded; the marker calls never appear in `calls`. Disorder semantics keep error records with data preserved (`duplicate-start`, `duplicate-end`, `incomplete`); a merged five-part template in the answer text is split into the fields automatically. Part-title lines are stripped from the record texts (`1. 分析（Analyse）`, `2. 计划（Plan）`, …) both when split out of a merged template and when submitted directly. The RecordManager owns all record state (JSONL archive + open snapshot), reads the real dsh-session event shapes, and the plugin mounts once.
+
+### Removed
+
+- The interactive Smith chart and the session-header button from the client (the impedance/reflection math remains available through the RF tools).
+
 ## [0.4.0] - 2026-08-28
 
 ### Added
@@ -74,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.5.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.0
 [0.4.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.4.0
 [0.3.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.3.0
 [0.2.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.2.0

@@ -3,7 +3,6 @@
  * of standard waveforms, and window functions. IO is JSON-and-complex-only;
  * sequences are arrays of kind-'none' value snapshots.
  */
-import { Complex } from 'complex.js'
 import {
   WaveformKind,
   WindowKind,

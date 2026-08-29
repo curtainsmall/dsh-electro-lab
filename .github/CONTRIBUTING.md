@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to **dsh-electro-lab**.
+Thanks for your interest in contributing to **DeepSeek Harness ElectroLab**.
 
 [English](CONTRIBUTING.md) | [简体中文](../docs/CONTRIBUTING.zh-CN.md)
 

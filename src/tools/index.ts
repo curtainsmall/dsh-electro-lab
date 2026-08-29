@@ -19,6 +19,7 @@ import { createSolveStepsTool } from './solve-steps.ts'
 import { unitTools } from './unit-tools.ts'
 import { signalQualityTools } from './signal-quality-tools.ts'
 import { seriesTools } from './series-tools.ts'
+import { recordTools } from './record-tools.ts'
 
 declare module 'cordis' {
   interface Context {
@@ -26,7 +27,7 @@ declare module 'cordis' {
   }
 }
 
-export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools, ...noiseTools, ...transmissionTools, ...electronicsTools, ...unitTools, ...signalQualityTools, ...seriesTools]
+export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools, ...noiseTools, ...transmissionTools, ...electronicsTools, ...unitTools, ...signalQualityTools, ...seriesTools, ...recordTools]
 
 /** Register all tools (the orchestrator is bound to the live context); returns one disposer that unregisters every tool. */
 export function registerTools(ctx: Context): () => void {

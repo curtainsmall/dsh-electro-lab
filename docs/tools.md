@@ -106,3 +106,11 @@ All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every to
 | Tool | Purpose |
 |---|---|
 | `solve_steps` | Meta-tool: runs a chain of steps serially with `@stepN` references |
+
+## Records
+
+| Tool | Purpose |
+|---|---|
+| `record_question` | Open a record and submit the consolidated question (template part 1); a second open settles the open record as a duplicate-start error record |
+| `record_analyse` | Submit the analysis text (template part 2) into the open record |
+| `record_answer` | Submit the answer text (template part 5) and settle the record; a merged five-part template is split automatically |

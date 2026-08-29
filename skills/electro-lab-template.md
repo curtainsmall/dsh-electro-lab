@@ -1,22 +1,22 @@
 ---
 name: electro-lab-template
-description: "Mandatory five-part answer template for electro-lab calculations: 1 analyse (natural language), 2 plan (math/physics), 3 tool calls (table), 4 results (table), 5 answer (natural language) — used as a whole, in order, with no other selection in between"
+description: "Mandatory five-part answer template for electro-lab calculations: 1 question (consolidated restatement), 2 analysis (approach with formulas), 3 tool calls (table), 4 results (table), 5 answer (natural language) — used as a whole, in order, with no other selection in between, bracketed by record_question (opens + question text) and record_answer (answer text + settles) marker calls"
 whenToUse: "An electro-lab workflow is triggered: the answer reports results obtained through the electro-lab toolset (any tool call appears in it). In the electro-lab preset the persona embeds the same template"
 ---
 
-# Electro-Lab Answer Template
+# DeepSeek Harness ElectroLab Answer Template
 
-Answer with the five parts below, in this order, **as a whole** — do not insert other selections, alternatives, or digressions between the template steps. Before finishing, check that all five parts are present, in order, with nothing else in between. You may add content before or after the template, but it is suggested to merge it into part 1 (analyse) and part 5 (answer), since those are the natural-language parts.
+Answer with the five parts below, in this order, **as a whole** — do not insert other selections, alternatives, or digressions between the template steps. Before finishing, check that all five parts are present, in order, with nothing else in between. You may add content before or after the template, but it is suggested to merge it into part 1 (question) and part 5 (answer), since those are the natural-language parts.
 
 ## Template
 
-### 1. Analyse (natural language)
+### 1. Question (natural language)
 
-Restate the problem in your own words: the known values with their units, the target quantity, and the approach in plain language.
+Restate the complete question being solved, in one consolidated form: merge every user input — including follow-ups and refinements — into a single full question that needs no further context. This is what the rest of the answer solves.
 
-### 2. Plan (mathematical / physical language)
+### 2. Analysis (approach with formulas)
 
-Give the solving steps in mathematical and physical terms: the formulas, the quantities they involve, and their physical meaning. No numbers yet — the plan states what will be computed and how.
+The known values with their units, the target quantity, and the solving approach: the formulas in mathematical and physical terms, what each quantity means, and how the computation proceeds. No computed numbers yet — only the given knowns and the plan to reach the target.
 
 ### 3. Tool calls (table)
 
@@ -29,6 +29,18 @@ List the result of every call, one row per call, in the same order as part 3. Ev
 ### 5. Answer (natural language)
 
 Organize the final answer in natural language: what the result means physically, with units. Reason only from the results in part 4.
+
+## Record protocol (bracketing)
+
+Every answer is bracketed by two marker-tool calls — only the content between them is recorded (question/analysis texts, tool calls, results, answer):
+
+- Call `record_question` FIRST, before any calculation tool, passing the consolidated question (template part 1, verbatim) as `text`.
+- Call `record_analyse` once between the tool calls, passing the analysis (template part 2, verbatim) as `text`.
+- Call `record_answer` LAST, after the tool calls, passing the final answer (template part 5, verbatim) as `text` — it settles the record immediately.
+
+The submitted texts contain the CONTENT ONLY — no part titles such as `1. 问题（Question）` or `2. 分析（Analysis）`.
+
+A second `record_question` while a record is open settles the open one as a duplicate-start error record and starts a new one; `record_answer` with no open record keeps a duplicate-end error record. Call each marker exactly once per answer.
 
 ## Operational details
 

@@ -12,7 +12,7 @@
  * preserved — a stale preset would drift from the tools the plugin
  * actually registers.
  */
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
+import { readdirSync, mkdirSync, copyFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 

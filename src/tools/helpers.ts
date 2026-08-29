@@ -2,7 +2,7 @@
  * Shared tool-building helpers: the JSON-and-complex IO parameter schema,
  * the JSON output contract, and a thin defineTool wrapper.
  */
-import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec, type ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
+import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { QuantityKind } from '../math/quantity-kind.ts'
 import { Form } from '../math/convert.ts'
@@ -88,7 +88,7 @@ export function defineJsonTool<S extends ParameterSchemaSpec>(
     execute: (args, exec) => Promise.resolve(options.execute(args, exec)),
     output: {
       schema: { type: 'json' },
-      render: (args, value) => renderText(value as JsonValue),
+      render: (_args, value) => renderText(value as JsonValue),
     },
   })
 }

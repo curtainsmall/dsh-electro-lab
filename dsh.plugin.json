@@ -1,6 +1,6 @@
 {
   "id": "dsh-external/dsh-electro-lab",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "main": "./lib/index.js",
   "description": "DSH plugin: electrical & electronics problem solving",
   "engines": {
