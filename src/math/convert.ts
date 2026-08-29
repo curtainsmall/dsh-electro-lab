@@ -8,12 +8,12 @@
  * INPUT — enum-union of two mutually exclusive forms (oneOf in the
  * schema, so exactly one branch matches):
  *   rect  { form: Form.Rect,  re, im, kind }
- *   polar { form: Form.Polar, mag, angRad, kind }   (angles are radians — SI)
+ *   polar { form: Form.Polar, mag, ang, kind }   (angles are radians — SI)
  *
  * OUTPUT — a complete snapshot, both projections always present:
  *   { re, im, kind, mag, ang }
  * The output feeds straight back into any input branch (re/im → rect,
- * mag + angRad → polar).
+ * mag + ang → polar).
  *
  * Validation is layered: the parameter schema bakes the expected kind
  * into an enum and the form into consts (framework-level), and these
@@ -53,7 +53,7 @@ export type RectValue = {
 export type PolarRadiansValue = {
   form: Form.Polar
   mag: number
-  angRad: number
+  ang: number
   kind: QuantityKind
 }
 
@@ -83,7 +83,7 @@ export function expectQuantity(value: ComplexValue, expected: QuantityKind): voi
 }
 
 function polarAngle(value: PolarRadiansValue): number {
-  return value.angRad
+  return value.ang
 }
 
 /** Unwrap to a complex.js value, validating the kind. Output snapshots

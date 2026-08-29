@@ -33,7 +33,7 @@ export function createValueParam<const U extends QuantityKind>(kind: U, descript
       properties: {
         form: { type: 'string'; const: Form.Polar; description: string; required: true }
         mag: { type: 'number'; description: string; required: true }
-        angRad: { type: 'number'; description: string; required: true }
+        ang: { type: 'number'; description: string; required: true }
         kind: { type: 'string'; enum: [U]; description: string; required: true }
       }
     },
@@ -59,7 +59,7 @@ export function createValueParam<const U extends QuantityKind>(kind: U, descript
         properties: {
           form: { type: 'string', const: Form.Polar, description: 'polar form', required: true },
           mag: { type: 'number', description: 'mag in base SI units', required: true },
-          angRad: { type: 'number', description: 'phase angle in radians', required: true },
+          ang: { type: 'number', description: 'phase angle in radians', required: true },
           kind: { type: 'string', enum: [kind], description: `kind (fixed): ${kind}`, required: true },
         },
       },

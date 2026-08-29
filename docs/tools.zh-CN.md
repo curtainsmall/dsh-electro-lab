@@ -1,6 +1,6 @@
 # 工具目录
 
-DeepSeek Harness ElectroLab 插件的全部工具,按领域分组。所有工具遵循同一值对象契约:输入为 `{form, re, im, kind}`(rect)或 `{form, mag, angRad, kind}`(polar),均为 SI 基本单位;输出为 `{re, im, kind, mag, angRad}` 快照。✅ 标记组合工具(一次调用编排多个数学内核)。
+DeepSeek Harness ElectroLab 插件的全部工具,按领域分组。所有工具遵循同一值对象契约:输入为 `{form, re, im, kind}`(rect)或 `{form, mag, ang, kind}`(polar),均为 SI 基本单位;输出为 `{re, im, kind, mag, ang}` 快照。✅ 标记组合工具(一次调用编排多个数学内核)。
 
 ## 表达式与代数
 

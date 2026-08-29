@@ -7,8 +7,8 @@ function createRectValue(re: number, im: number, kind: QuantityKind): { form: Fo
   return { form: Form.Rect, re, im, kind }
 }
 
-function createPolarRadiansValue(mag: number, angRad: number, kind: QuantityKind): { form: Form.Polar; mag: number; angRad: number; kind: QuantityKind } {
-  return { form: Form.Polar, mag, angRad, kind }
+function createPolarRadiansValue(mag: number, ang: number, kind: QuantityKind): { form: Form.Polar; mag: number; ang: number; kind: QuantityKind } {
+  return { form: Form.Polar, mag, ang, kind }
 }
 
 describe('toScalar — unwrap with kind validation', () => {
