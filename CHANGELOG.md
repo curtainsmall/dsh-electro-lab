@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-08-29
+
+### Added
+
+- Dual-language UI: every panel and records-page string moves into zh/en dictionaries registered into the DSH locale service; components re-render when the user switches language.
+- Collapsible result panels in the detail page, matching the tool-call sections: one panel per result (titled by the matching call), outputs as a recursive collapsible JSON tree when parseable.
+- Record error messages translate with the UI; error codes and tool error identifiers stay raw.
+
+### Changed
+
+- The complex output snapshot renames the angle key `angRad` to `ang` (value unchanged: phase angle in radians, SI); polar inputs keep `angRad`.
+- The preset persona and skills no longer force Simplified Chinese — the model follows the user language.
+
 ## [0.5.1] - 2026-08-29
 
 ### Added
@@ -104,6 +117,7 @@ oiseFigureDb`, `gainDb`, `magnitudeDb`, `returnLossDb`…) — dB is a log scale
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.6.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.6.0
 [0.5.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.1
 [0.5.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.0
 [0.4.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.4.0
