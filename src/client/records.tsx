@@ -221,6 +221,7 @@ export function RecordsTab(): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [delHoverId, setDelHoverId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
@@ -245,9 +246,8 @@ export function RecordsTab(): React.JSX.Element {
     }
   }, [refreshTick])
 
-  /** Delete one settled record from the archive (after confirmation) and refresh. */
+  /** Delete one settled record from the archive and refresh. The two-click confirm is inline (window.confirm is unsupported in embedded webviews). */
   const removeRecord = async (id: string): Promise<void> => {
-    if (!window.confirm('删除这条记录?此操作不可恢复。')) return
     try {
       await fetch(`${RECORDS_ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
       setRefreshTick((tick) => tick + 1)
@@ -330,22 +330,34 @@ export function RecordsTab(): React.JSX.Element {
                   </span>
                   <span
                     role="button"
-                    title="删除这条记录"
+                    title={confirmId === run.id ? '再次点击确认删除' : '删除这条记录'}
                     style={{
-                      color: delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)',
-                      fontSize: 13,
+                      color: confirmId === run.id ? 'var(--dsw-alias-state-error-primary)' : (delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)'),
+                      fontSize: 12,
+                      fontWeight: confirmId === run.id ? 600 : 400,
                       cursor: 'pointer',
                       lineHeight: 1,
+                      minWidth: 30,
+                      textAlign: 'center',
                       transition: 'color 0.12s',
+                      whiteSpace: 'nowrap',
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
-                      void removeRecord(run.id)
+                      if (confirmId === run.id) {
+                        setConfirmId(null)
+                        void removeRecord(run.id)
+                      } else {
+                        setConfirmId(run.id)
+                      }
                     }}
                     onMouseEnter={() => setDelHoverId(run.id)}
-                    onMouseLeave={() => setDelHoverId(null)}
+                    onMouseLeave={() => {
+                      setDelHoverId(null)
+                      setConfirmId(null)
+                    }}
                   >
-                    ✕
+                    {confirmId === run.id ? '确认删除?' : '✕'}
                   </span>
                 </span>
               </div>
