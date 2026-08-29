@@ -117,11 +117,11 @@ const SIDEBAR_COLUMN_SELECTOR = '[data-pane="sidebar"], [class*="sidebarCol"]'
 const ENTRY_ATTR = 'data-dsh-electrolab-entry'
 /** The rail family this entry joins, in shell order — placed after the last one. */
 const ENTRY_FAMILY = ['[data-dsh-taskboard-entry]', '[data-dsh-ssh-entry]', '[data-dsh-skill-explorer-entry]']
-/** Font Awesome-style bolt glyph, rendered like the shell's 16px line icons. */
+/** Oscilloscope trace glyph: a sine wave on a baseline — the electro-lab identity, rendered like the shell's 16px line icons. */
 const ENTRY_ICON =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M9.1 1 3.4 9.1h3.5l-.8 5.9 5.9-8.4H8.2L9.1 1z"/></svg>'
+  '<path d="M2 8h2c.5-3.5 1.5-3.5 2 0s1.5 3.5 2 0 1.5-3.5 2 0 1.5 3.5 2 0h2"/></svg>'
 /** Entry styles: the exact rules the SSH/task-board/skills entries use, self-contained. */
 const ENTRY_CSS = `
 .dsh-elab-entry{box-sizing:border-box;width:100%;min-height:36px;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:8px;align-items:center;gap:10px;padding:0 10px;font-size:13px;display:flex}
