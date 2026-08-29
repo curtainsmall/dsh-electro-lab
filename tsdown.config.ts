@@ -20,7 +20,6 @@
  *
  * Types ship from lib/types (tsc -p tsconfig.build.json), not from tsdown.
  */
-import { builtinModules } from 'node:module'
 import type { UserConfig } from 'tsdown'
 
 /** Module specifiers the web shell shares into the frozen module table (the official PLATFORM_MODULES list, plus the runtime/client exemption). */

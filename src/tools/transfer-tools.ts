@@ -5,7 +5,6 @@
  * { numerator, denominator } coefficient arrays (the output of
  * rational_coefficients, the single storage form).
  */
-import { Complex } from 'complex.js'
 import {
   Variable,
   solveDifferenceEquation,
