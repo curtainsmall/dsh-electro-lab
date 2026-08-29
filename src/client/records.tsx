@@ -186,15 +186,47 @@ function plainCalls(calls: Call[]): React.JSX.Element {
   )
 }
 
-/** The tool results as plain text rows (full output, error identity inline). */
-function plainResults(results: Result[]): React.JSX.Element {
+/** One tool result as a collapsible panel: the header shows the tool name (resolved by callId), the body the output as a JSON tree or plain text — the output is recorded verbatim, even when it is an error message. */
+function ResultPanel({ result, name }: { result: Result; name: string }): React.JSX.Element {
+  const [open, setOpen] = useState(true)
+  let parsed: unknown = result.content
+  if (result.content.length > 0) {
+    try {
+      parsed = JSON.parse(result.content)
+    } catch {
+      parsed = result.content
+    }
+  }
+  return (
+    <div style={{ border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, marginBottom: 8, overflow: 'hidden' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer', background: 'var(--dsw-alias-bg-base)', userSelect: 'none' }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>{name}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
+          {typeof parsed === 'string'
+            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsed}</div>
+            : <JsonNode name="" value={parsed} depth={0} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The tool results: one collapsible panel per result, named after the matching call. */
+function plainResults(results: Result[], calls: Call[]): React.JSX.Element {
+  const nameOf = (result: Result, index: number): string => {
+    const call = calls.find((c) => c.callId === result.callId)
+    return call?.name ?? `${t('resultItem')} ${index + 1}`
+  }
   return (
     <div>
-      {results.map((result) => (
-        <div key={result.callId} style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--dsw-alias-label-primary)' }}>
-          {result.error !== undefined ? `✗ ${result.error.name} (${result.error.code})` : ''}
-          {result.content.length > 0 ? `${result.error !== undefined ? '\n' : ''}${result.content}` : ''}
-        </div>
+      {results.map((result, index) => (
+        <ResultPanel key={result.callId} result={result} name={nameOf(result, index)} />
       ))}
     </div>
   )
@@ -289,7 +321,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     { key: 'question', label: t('sectionQuestion'), content: record.question },
     { key: 'analyse', label: t('sectionAnalyse'), content: record.analyse },
     { key: 'calls', label: t('sectionCalls'), content: record.calls.length === 0 ? '' : plainCalls(record.calls) },
-    { key: 'results', label: t('sectionResults'), content: record.results.length === 0 ? '' : plainResults(record.results) },
+    { key: 'results', label: t('sectionResults'), content: record.results.length === 0 ? '' : plainResults(record.results, record.calls) },
     { key: 'answer', label: t('sectionAnswer'), content: record.answer ?? '' },
   ]
 
