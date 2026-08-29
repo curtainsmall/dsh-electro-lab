@@ -79,54 +79,112 @@ function formatFull(time: number): string {
   return new Date(time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' })
 }
 
-const paragraphStyle: React.CSSProperties = {
-  marginTop: 6,
-  maxHeight: 140,
-  overflow: 'auto',
-  padding: '6px 8px',
-  background: 'var(--dsw-alias-bg-base)',
-  borderRadius: 4,
-  border: '1px solid var(--dsw-alias-border-l1)',
-  color: 'var(--dsw-alias-label-secondary)',
-  font: '12px/1.6 ui-sans-serif, system-ui, sans-serif',
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-word',
+/** Plain text block: no box, no inner scroll — the dialog's single outer scrollbar owns scrolling. */
+function plainText(text: string): React.JSX.Element {
+  return (
+    <div style={{ lineHeight: 1.6, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      {text}
+    </div>
+  )
 }
 
-/** The structured tool calls, one row each with the raw arguments. */
-function callsBox(calls: Call[]): React.JSX.Element | null {
-  if (calls.length === 0) return null
+/** Pretty-print a JSON arguments string (collapsed-panel summary); falls back to the raw text. */
+function formatJson(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2)
+  } catch {
+    return text
+  }
+}
+
+/** One JSON value as a collapsible tree node; objects and arrays fold, scalars render inline. */
+function JsonNode({ name, value, depth }: { name: string; value: unknown; depth: number }): React.JSX.Element {
+  const [open, setOpen] = useState(true)
+  if (value === null || typeof value !== 'object') {
+    return (
+      <div style={{ paddingLeft: depth * 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{name.length > 0 ? `${name}: ` : ''}</span>
+        <span style={{ color: 'var(--dsw-alias-label-primary)' }}>{JSON.stringify(value)}</span>
+      </div>
+    )
+  }
+  const isArray = Array.isArray(value)
+  const entries: Array<[string, unknown]> = isArray
+    ? (value as unknown[]).map((item, index) => [String(index), item] as [string, unknown])
+    : Object.entries(value as Record<string, unknown>)
+  const summary = isArray ? `[…] ${entries.length} 项` : `{…} ${entries.length} 项`
   return (
-    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {calls.map((call) => (
-        <div key={call.callId} style={{ background: 'var(--dsw-alias-bg-base)', borderRadius: 4, border: '1px solid var(--dsw-alias-border-l1)', padding: '4px 8px' }}>
-          <span style={{ color: 'var(--dsw-alias-state-success-primary)', font: '11px ui-monospace, monospace' }}>{call.name}</span>
-          {call.arguments.length > 0 && (
-            <span style={{ color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace' }}> {call.arguments}</span>
-          )}
+    <div>
+      <div
+        style={{ paddingLeft: depth * 14, lineHeight: 1.6, cursor: 'pointer', color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'none' }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
+        {name.length > 0 ? ` ${name}: ` : ' '}
+        {open ? '' : <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{summary}</span>}
+      </div>
+      {open && (
+        <div>
+          {entries.map(([key, item]) => (
+            <JsonNode key={key} name={isArray ? `[${key}]` : key} value={item} depth={depth + 1} />
+          ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+/** One tool call as a collapsible panel: the header shows the name, the body the arguments as a JSON tree. */
+function CallPanel({ call }: { call: Call }): React.JSX.Element {
+  const [open, setOpen] = useState(true)
+  let parsed: unknown = call.arguments
+  if (call.arguments.length > 0) {
+    try {
+      parsed = JSON.parse(call.arguments)
+    } catch {
+      parsed = call.arguments
+    }
+  }
+  return (
+    <div style={{ border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, marginBottom: 8, overflow: 'hidden' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer', background: 'var(--dsw-alias-bg-base)', userSelect: 'none' }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>{call.name}</span>
+        {!open && <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{call.arguments.length > 0 ? formatJson(call.arguments) : ''}</span>}
+      </div>
+      {open && (
+        <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
+          {typeof parsed === 'string'
+            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsed}</div>
+            : <JsonNode name="" value={parsed} depth={0} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The tool calls: one collapsible panel per call, all expanded by default. */
+function plainCalls(calls: Call[]): React.JSX.Element {
+  return (
+    <div>
+      {calls.map((call) => (
+        <CallPanel key={call.callId} call={call} />
       ))}
     </div>
   )
 }
 
-/** The structured tool results, keeping the full output and error identity. */
-function resultsBox(results: Result[]): React.JSX.Element | null {
-  if (results.length === 0) return null
+/** The tool results as plain text rows (full output, error identity inline). */
+function plainResults(results: Result[]): React.JSX.Element {
   return (
-    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div>
       {results.map((result) => (
-        <div key={result.callId} style={{ background: 'var(--dsw-alias-bg-base)', borderRadius: 4, border: '1px solid var(--dsw-alias-border-l1)', padding: '4px 8px' }}>
-          {result.error !== undefined && (
-            <div style={{ color: 'var(--dsw-alias-state-error-primary)', font: '11px ui-monospace, monospace' }}>
-              ✗ {result.error.name} ({result.error.code})
-            </div>
-          )}
-          {result.content.length > 0 && (
-            <div style={{ color: 'var(--dsw-alias-state-success-primary)', font: '11px/1.6 ui-monospace, monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 100, overflow: 'auto' }}>
-              {result.content}
-            </div>
-          )}
+        <div key={result.callId} style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--dsw-alias-label-primary)' }}>
+          {result.error !== undefined ? `✗ ${result.error.name} (${result.error.code})` : ''}
+          {result.content.length > 0 ? `${result.error !== undefined ? '\n' : ''}${result.content}` : ''}
         </div>
       ))}
     </div>
@@ -159,9 +217,9 @@ function toolChips(calls: Call[]): React.JSX.Element | null {
   )
 }
 
-/* ── Detail view: id, timestamps, and the five steps in order ───────────────── */
+/* ── Detail dialog: id, timestamps, and the five steps with sticky headings ── */
 
-/** Everything the detail view shows; settled records and open records both fit. */
+/** Everything the detail dialog shows; settled records and open records both fit. */
 interface DetailRecord {
   id: string
   startedAt: number
@@ -174,40 +232,135 @@ interface DetailRecord {
   error?: RecordError
 }
 
-/** One grid row: step title (left) + content (right); empty content shows a placeholder. */
-function stepCell(label: string, content: React.JSX.Element | string | null): React.JSX.Element {
-  const empty = content === null || (typeof content === 'string' && content.length === 0)
+/** The five steps of the record, in order. */
+interface DetailSection {
+  key: string
+  label: string
+  content: React.JSX.Element | string | null
+}
+
+/** One section: a sticky heading (sticks to the top of the shared scroll area until the next section pushes it away) plus the content below it. */
+function sectionBlock(section: DetailSection): React.JSX.Element {
   return (
-    <>
-      <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, fontWeight: 600, paddingTop: 2 }}>{label}</div>
-      <div style={{ minWidth: 0 }}>
-        {empty
-          ? <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }}>—</span>
-          : typeof content === 'string'
-            ? <div style={paragraphStyle}>{content}</div>
-            : content}
+    <section id={`elab-sec-${section.key}`} style={{ scrollMarginTop: 0 }}>
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 1,
+          background: 'var(--dsw-alias-bg-layer-2)',
+          borderBottom: '1px solid var(--dsw-alias-border-l2)',
+          padding: '6px 12px',
+          fontWeight: 600,
+          color: 'var(--dsw-alias-label-primary)',
+        }}
+      >
+        {section.label}
       </div>
-    </>
+      <div style={{ padding: '10px 12px' }}>
+        {section.content === null || (typeof section.content === 'string' && section.content.length === 0)
+          ? <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 12 }}>—</span>
+          : typeof section.content === 'string'
+            ? plainText(section.content)
+            : section.content}
+      </div>
+    </section>
   )
 }
 
-/** The expanded detail: identity, timestamps, and the five steps in a grid. */
-function detailGrid(record: DetailRecord): React.JSX.Element {
+/**
+ * The record detail as a PAGE covering the records tab: a back header, a
+ * left table of contents (click to jump to a section heading) and ONE
+ * shared scroll area on the right whose section headings stick to the top
+ * while scrolling — no nested scrollbars, no framework, no popup shell.
+ */
+function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
+  const [backHover, setBackHover] = useState(false)
+  const sections: DetailSection[] = [
+    { key: 'question', label: '1 · 问题', content: record.question },
+    { key: 'analyse', label: '2 · 分析', content: record.analyse },
+    { key: 'calls', label: '3 · 工具调用', content: record.calls.length === 0 ? '' : plainCalls(record.calls) },
+    { key: 'results', label: '4 · 结果', content: record.results.length === 0 ? '' : plainResults(record.results) },
+    { key: 'answer', label: '5 · 答案', content: record.answer ?? '' },
+  ]
+
+  const jump = (key: string): void => {
+    const element = document.getElementById(`elab-sec-${key}`)
+    element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
-    <div style={{ marginTop: 8, borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: 8 }}>
-      <div style={{ color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
-        id: {record.id}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, fontSize: 'var(--dsw-font-markdown-base-font-size)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--dsw-alias-border-l2)' }}>
+        <button
+          type="button"
+          aria-label="返回记录"
+          onClick={onBack}
+          onMouseEnter={() => setBackHover(true)}
+          onMouseLeave={() => setBackHover(false)}
+          style={{
+            alignSelf: 'flex-start',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 8px',
+            borderRadius: 6,
+            border: '1px solid var(--dsw-alias-border-l2)',
+            borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
+            background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+            color: 'var(--dsw-alias-label-primary)',
+            cursor: 'pointer',
+            fontSize: 13,
+          }}
+        >
+          <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
+          <span style={{ lineHeight: 1 }}>返回记录</span>
+        </button>
+        <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {record.question || `record ${record.id}`}
+        </div>
       </div>
-      <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, marginTop: 2 }}>
-        started: {formatFull(record.startedAt)}
-        {record.settledAt !== undefined ? ` · settled: ${formatFull(record.settledAt)}` : ''}
+      <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--dsw-alias-border-l1)', background: 'var(--dsw-alias-bg-base)' }}>
+        <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, font: '13px ui-monospace, monospace', wordBreak: 'break-all' }}>
+          id: {record.id}
+        </div>
+        <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, marginTop: 2 }}>
+          开始: {formatFull(record.startedAt)}
+        </div>
+        {record.settledAt !== undefined && (
+          <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, marginTop: 1 }}>
+            结束: {formatFull(record.settledAt)}
+          </div>
+        )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '6px 10px', marginTop: 8 }}>
-        {stepCell('1 · 问题', record.question)}
-        {stepCell('2 · 分析', record.analyse)}
-        {stepCell('3 · 工具调用', record.calls.length === 0 ? '' : callsBox(record.calls))}
-        {stepCell('4 · 结果', record.results.length === 0 ? '' : resultsBox(record.results))}
-        {stepCell('5 · 答案', record.answer ?? '')}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* Table of contents: fixed, jumps to the section headings. */}
+        <nav style={{ width: 150, flex: 'none', borderRight: '1px solid var(--dsw-alias-border-l2)', overflowY: 'auto', padding: '8px 0' }}>
+          {sections.map((section) => (
+            <div
+              key={section.key}
+              role="button"
+              style={{
+                padding: '6px 12px',
+                fontSize: 13,
+                color: 'var(--dsw-alias-label-secondary)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              onClick={() => jump(section.key)}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--dsw-alias-label-primary)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--dsw-alias-label-secondary)' }}
+            >
+              {section.label}
+            </div>
+          ))}
+        </nav>
+        {/* The ONE scroll area; its headings stick to the top. */}
+        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+          {sections.map((section) => sectionBlock(section))}
+        </div>
       </div>
     </div>
   )
@@ -218,7 +371,7 @@ function detailGrid(record: DetailRecord): React.JSX.Element {
 export function RecordsTab(): React.JSX.Element {
   const [response, setResponse] = useState<RecordsResponse | null>(null)
   const [failed, setFailed] = useState(false)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [dialogRecord, setDialogRecord] = useState<DetailRecord | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [delHoverId, setDelHoverId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
@@ -266,19 +419,21 @@ export function RecordsTab(): React.JSX.Element {
     )
   }
 
+  // The detail page covers the records tab.
+  if (dialogRecord !== null) {
+    return <RecordDetailPage record={dialogRecord} onBack={() => setDialogRecord(null)} />
+  }
+
   const records = (response?.records ?? []).slice(0, DISPLAY_MAX_RECORDS)
   const openRecords = response?.open ?? []
 
-  /** Row style: the border is visible only while the card is expanded (hover brightens it). */
-  const rowHoverStyle = (id: string): React.CSSProperties => {
-    const expanded = expandedId === id
-    return {
-      ...rowStyle,
-      cursor: 'pointer',
-      background: hoveredId === id ? 'var(--dsw-alias-interactive-bg-hover)' : rowStyle.background,
-      borderColor: expanded ? (hoveredId === id ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)') : 'transparent',
-    }
-  }
+  /** Row style: the border shows on hover (the detail now opens as a dialog). */
+  const rowHoverStyle = (id: string): React.CSSProperties => ({
+    ...rowStyle,
+    cursor: 'pointer',
+    background: hoveredId === id ? 'var(--dsw-alias-interactive-bg-hover)' : rowStyle.background,
+    borderColor: hoveredId === id ? 'var(--dsw-alias-border-l1)' : 'transparent',
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -295,7 +450,7 @@ export function RecordsTab(): React.JSX.Element {
             <div
               key={`open:${run.id}`}
               style={rowHoverStyle(`open:${run.id}`)}
-              onClick={() => setExpandedId(expandedId === `open:${run.id}` ? null : `open:${run.id}`)}
+              onClick={() => setDialogRecord({ ...run, answer: '' })}
               onMouseEnter={() => setHoveredId(`open:${run.id}`)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -309,21 +464,20 @@ export function RecordsTab(): React.JSX.Element {
                 {run.calls.length} tool call(s) · started {formatTime(run.startedAt)}
               </div>
               {toolChips(run.calls)}
-              {expandedId === `open:${run.id}` && detailGrid({ ...run, answer: '' })}
             </div>
           ))}
           {records.map((run) => (
             <div
               key={run.id}
               style={rowHoverStyle(run.id)}
-              onClick={() => setExpandedId(expandedId === run.id ? null : run.id)}
+              onClick={() => setDialogRecord(run)}
               onMouseEnter={() => setHoveredId(run.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <span style={{
                   color: 'var(--dsw-alias-label-primary)',
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 600,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -334,7 +488,7 @@ export function RecordsTab(): React.JSX.Element {
                   {run.question || `record ${run.id}`}
                 </span>
                 <span style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 'none' }}>
-                  <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>
                     {formatTime(run.startedAt)}
                   </span>
                   <span
@@ -380,7 +534,7 @@ export function RecordsTab(): React.JSX.Element {
                 </span>
               </div>
               {toolChips(run.calls)}
-              {expandedId === run.id && detailGrid(run)}
+              {toolChips(run.calls)}
             </div>
           ))}
         </>

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-08-29
+
+### Added
+
+- Record detail as a tab-covering page: a back header with the record title, id and timestamps, a left table of contents that jumps to each section heading, and ONE shared scroll area where the five part headings stick to the top while scrolling (plain text only, no nested scrollbars).
+- Collapsible tool-call panels in the detail page: one panel per call (expanded by default), arguments rendered as a recursive collapsible JSON tree.
+
+### Changed
+
+- Detail texts use the session-chat font size; id/timestamps, the table of contents and the record-card title/timestamp use the navbar size. The back-to-record button matches the back-to-session button, with the title on its own line beneath; the panel back button now reads 返回会话.
+
 ## [0.5.0] - 2026-08-29
 
 ### Added
@@ -83,7 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Tool surface normalized to SI quantity naming: arguments and outputs are named by quantity instead of by unit for SI quantities (`phaseAngle`, `phase`, `snr`, `returnLoss`…), while dB quantities keep the `Db` suffix (`noiseFigureDb`, `gainDb`, `magnitudeDb`, `returnLossDb`…) — dB is a log scale that can represent values beyond the linear number range, so it is not implied by the kind. Units stay documented in the descriptions and in the value `kind`.
+- Tool surface normalized to SI quantity naming: arguments and outputs are named by quantity instead of by unit for SI quantities (`phaseAngle`, `phase`, `snr`, `returnLoss`…), while dB quantities keep the `Db` suffix (
+oiseFigureDb`, `gainDb`, `magnitudeDb`, `returnLossDb`…) — dB is a log scale that can represent values beyond the linear number range, so it is not implied by the kind. Units stay documented in the descriptions and in the value `kind`.
 - Angles are radians everywhere on the tool boundary (SI): the polar value form carries `angRad` only, `ac_power.phaseAngle` and the Bode `phase` output are in radians.
 
 ## [0.1.0-beta.1] - 2026-08-26
@@ -92,6 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.5.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.1
 [0.5.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.0
 [0.4.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.4.0
 [0.3.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.3.0
