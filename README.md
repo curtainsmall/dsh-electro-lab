@@ -6,7 +6,7 @@ An electrical & electronics calculation plugin for the DeepSeek Harness: circuit
 
 ## Features
 
-- **ElectroLab Mode** — the `electro-lab` agent preset isolates the session to the plugin's calculation tools: no shell, no file system, no network.
+- **ElectroLab Mode** — the **ElectroLab 模式** agent preset isolates the session to the plugin's calculation tools: no shell, no file system, no network.
 - **Calculations you can trust** — every number comes from a tool call result, never from memory or hand arithmetic.
 - **Records for inspection** — every five-step solve is settled to disk and browsable in the client panel.
 
@@ -22,7 +22,7 @@ Published on npm — stable releases on the `latest` dist-tag, prereleases on `b
 
 ## Usage
 
-The plugin registers its tools, skills and the `electro-lab` agent preset on mount. Pick the preset when starting a session: all numeric values must come from tool calls, and the preset stops when conditions are insufficient.
+The plugin registers its tools, skills and the **ElectroLab 模式** agent preset on mount. Pick the preset when starting a session: all numeric values must come from tool calls, and the preset stops when conditions are insufficient.
 
 ## Development
 
