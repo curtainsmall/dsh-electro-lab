@@ -1,6 +1,6 @@
 ---
 name: electro-lab-template
-description: "Mandatory five-part answer template for electro-lab calculations: 1 question (consolidated restatement), 2 analysis (approach with formulas), 3 tool calls (table), 4 results (table), 5 answer (natural language) — used as a whole, in order, with no other selection in between"
+description: "Mandatory five-part answer template for electro-lab calculations: 1 question (consolidated restatement), 2 analysis (approach with formulas), 3 tool calls (table), 4 results (table), 5 answer (natural language) — used as a whole, in order, with no other selection in between, bracketed by one record_start / one record_end marker call"
 whenToUse: "An electro-lab workflow is triggered: the answer reports results obtained through the electro-lab toolset (any tool call appears in it). In the electro-lab preset the persona embeds the same template"
 ---
 
@@ -29,6 +29,19 @@ List the result of every call, one row per call, in the same order as part 3. Ev
 ### 5. Answer (natural language)
 
 Organize the final answer in natural language: what the result means physically, with units. Reason only from the results in part 4.
+
+## Record protocol (bracketing)
+
+Every answer is bracketed by two marker-tool calls — only the content between them is recorded (question/analysis texts, tool calls, results, answer):
+
+- Call `record_start` before part 1 of the template.
+- Call `record_end` after part 5.
+
+`record_start` opens the record — exactly once per answer:
+
+- Call `record_start` before part 1 of the template.
+- Call `record_end` after part 5.
+- A second `record_start` while a record is open settles the open one as a duplicate-start error record and starts a new one. There is no fold: never call `record_start` twice for one answer — if you already opened a record, keep working inside it and end it with `record_end`.
 
 ## Operational details
 

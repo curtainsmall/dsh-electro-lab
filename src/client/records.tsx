@@ -20,7 +20,12 @@ interface Result {
   error?: { name: string; code: string }
 }
 
-interface SettledRun {
+interface RecordError {
+  type: string
+  message: string
+}
+
+interface SettledRecord {
   id: string
   startedAt: number
   settledAt: number
@@ -29,9 +34,10 @@ interface SettledRun {
   answer: string
   calls: Call[]
   results: Result[]
+  error?: RecordError
 }
 
-interface OpenRun {
+interface OpenRecord {
   id: string
   startedAt: number
   lastAt: number
@@ -42,8 +48,8 @@ interface OpenRun {
 }
 
 interface RecordsResponse {
-  records: SettledRun[]
-  open: OpenRun[]
+  records: SettledRecord[]
+  open: OpenRecord[]
 }
 
 const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
@@ -196,20 +202,20 @@ export function RecordsTab(): React.JSX.Element {
   }
 
   const records = (response?.records ?? []).slice(0, DISPLAY_MAX_RECORDS)
-  const openRuns = response?.open ?? []
+  const openRecords = response?.open ?? []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 12, color: '#8b93a5' }}>
-        Settled runs of the five-step process across all sessions — stored on disk, refreshed automatically.
+        Settled records of the five-step process across all sessions — stored on disk, refreshed automatically.
       </div>
-      {records.length === 0 && openRuns.length === 0 ? (
+      {records.length === 0 && openRecords.length === 0 ? (
         <div style={rowStyle}>
-          <span style={{ color: '#8b93a5' }}>No electro-lab runs recorded yet — ask the agent for a calculation.</span>
+          <span style={{ color: '#8b93a5' }}>No electro-lab records yet — ask the agent for a calculation.</span>
         </div>
       ) : (
         <>
-          {openRuns.map((run) => (
+          {openRecords.map((run) => (
             <div key={`open:${run.id}`} style={rowStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#e8b34b', fontWeight: 600 }}>● in progress</span>
@@ -229,12 +235,18 @@ export function RecordsTab(): React.JSX.Element {
             <div key={run.id} style={rowStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#c8ccd4', fontSize: 12, fontWeight: 600 }}>
-                  {run.question || `run ${run.id}`}
+                  {run.question || `record ${run.id}`}
                 </span>
                 <span style={{ color: '#8b93a5', fontSize: 11, flex: 'none' }}>
                   {formatTime(run.startedAt)} – {formatTime(run.settledAt)}
                 </span>
               </div>
+              {run.error !== undefined && (
+                <div style={{ marginTop: 4, color: '#e08a8a', font: '11px ui-monospace, monospace' }}>
+                  ✗ {run.error.type}
+                  {run.error.message.length > 0 ? ` — ${run.error.message}` : ''}
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: '#8b93a5', fontSize: 11 }}>
                   {run.calls.length} tool call(s)

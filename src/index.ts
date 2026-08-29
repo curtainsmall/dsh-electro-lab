@@ -7,8 +7,7 @@ import type { Context } from 'cordis'
 import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
-import { RecordManager, type RecordEvent } from './records.ts'
-import { createRecordStore, type RecordStore } from './record-store.ts'
+import { RecordManager, readRecordArchive, type RecordEvent } from './records.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -23,10 +22,9 @@ declare module 'cordis' {
   }
 }
 
-/** Minimal structural shape of a session (id + event log reads). */
+/** Minimal structural shape of a session (id only — the log is never read). */
 interface SessionLike {
   id?: string
-  events?: readonly unknown[]
 }
 
 /** Minimal structural shape of the web-server route registry. */
@@ -55,31 +53,32 @@ export function apply(ctx: Context): void {
   // restarts and even a full DSH uninstall — and the client panel reads the
   // whole store through one HTTP endpoint: one page, all sessions.
   const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-electro-lab')
-  const store: RecordStore = createRecordStore(join(recordsHome, 'records.jsonl'))
   const managers = new Map<string, RecordManager>()
 
   ctx.effect(() => {
     const disposers: Array<() => void> = []
 
     // Session trace: feed every committed event into the session's record
-    // manager. The first event of a session rebuilds the manager by feeding
-    // the FULL log first — that only restores build state (an in-progress
-    // record keeps tracking); the settled records it returns are ignored,
-    // because records are live-only: they were appended when they settled,
-    // and the archive is authoritative. Only the record settled by the
-    // incoming event itself is appended.
+    // manager, which owns ALL record state — the JSONL archive
+    // (records.jsonl: a settled record is appended the moment it settles)
+    // and the interrupted-open snapshot (open-record.json: persisted after
+    // every event, restored by the constructor on the first event after a
+    // restart). Nothing is ever rebuilt from the session log — no fold, the
+    // log is never re-read.
     disposers.push(ctx.on('session/event', (session, event) => {
       const s = session as SessionLike
       const sessionId = s.id
       if (sessionId === undefined) return
       let manager = managers.get(sessionId)
       if (manager === undefined) {
-        manager = new RecordManager()
-        for (const stored of s.events ?? []) manager.feed(stored as RecordEvent)
+        manager = new RecordManager(
+          sessionId,
+          join(recordsHome, 'records.jsonl'),
+          join(recordsHome, 'open-record.json'),
+        )
         managers.set(sessionId, manager)
       }
-      const settled = manager.feed(event as RecordEvent)
-      if (settled !== null) store.append(settled)
+      manager.feed(event as RecordEvent)
     }))
 
     // The records page: all stored records plus any live open records, newest first.
@@ -91,11 +90,14 @@ export function apply(ctx: Context): void {
         handler: (_req, res) => {
           const open: Array<unknown> = []
           for (const manager of managers.values()) {
-            const record = manager.view().open
+            const record = manager.view()
             if (record !== null) open.push(record)
           }
           res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ records: [...store.list()].reverse(), open }))
+          res.end(JSON.stringify({
+            records: [...readRecordArchive(join(recordsHome, 'records.jsonl'))].reverse(),
+            open,
+          }))
         },
       }))
     }

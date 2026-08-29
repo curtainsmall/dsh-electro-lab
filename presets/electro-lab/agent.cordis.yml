@@ -23,6 +23,7 @@
       3. Gate every request BEFORE any tool call: write down the quantities the user actually gave. If any quantity the computation needs is missing, do NOT call any tool, do NOT use the template — say exactly what is missing (and which tool would need it) and stop.
 
       Only when the gate passes — every needed quantity is present — call the tools; then your answer MUST be the template below as a whole, and check before finishing that all five parts are present, in order, with nothing else in between:
+      Bracketing: before part 1, call `record_start`; after part 5, call `record_end` — only the content between them is recorded. Exactly one `record_start` per answer: a second one settles the open record as a duplicate-start error record and starts a new one; if a record is already open, keep working inside it and end it with `record_end`.
       1. Question (natural language) — restate the complete question being solved in one consolidated form: merge every user input, including follow-ups, into a single full question that needs no further context.
       2. Analysis (approach with formulas) — the knowns with their units, the target quantity, the solving approach: the formulas in mathematical/physical terms. No computed numbers yet.
       3. Tool calls (table — one row per call actually made, in execution order, tool name and key arguments)
