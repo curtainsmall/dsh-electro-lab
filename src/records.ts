@@ -175,14 +175,17 @@ interface RecordEventBase {
 
 /**
  * One session event the manager understands, discriminated on `type`; the
- * optional fields ride the union member they belong to (union types over
- * enums with optional fields).
+ * shapes mirror the real dsh-session event vocabulary:
+ * - `assistant/message` carries the text as `data.message.content` (the
+ *   assembled AssistantMessage),
+ * - `tool/result` has NO `callId` on data — the pairing key and the output
+ *   text live in `data.message.content[0]` (the ToolResultBlock).
  */
 export type RecordEvent =
   | (RecordEventBase & { type: RecordEventType.UserMessage; data: { content?: unknown } })
-  | (RecordEventBase & { type: RecordEventType.AssistantMessage; data: { content?: unknown } })
+  | (RecordEventBase & { type: RecordEventType.AssistantMessage; data: { message?: { content?: unknown } } })
   | (RecordEventBase & { type: RecordEventType.ToolCall; data: { name: string; callId?: string; arguments?: string } })
-  | (RecordEventBase & { type: RecordEventType.ToolResult; data: { callId: string; error?: { name: string; code: string }; message?: unknown } })
+  | (RecordEventBase & { type: RecordEventType.ToolResult; data: { message?: { content?: unknown[] }; error?: { name: string; code: string } } })
   | (RecordEventBase & { type: RecordEventType.TurnEnd; data: object })
 
 /** The in-progress record: built from events that do not arrive at once. */
@@ -301,11 +304,15 @@ function textFromContent(content: unknown): string {
   return parts.join('\n').slice(0, MAX_TEXT_CHARS)
 }
 
-/** Extract the tool-output text from a `tool/result` payload (message.content[0] is the ToolResultBlock). */
-function textFromResultData(data: Extract<RecordEvent, { type: RecordEventType.ToolResult }>['data']): string {
+/**
+ * The ToolResultBlock of a `tool/result` payload: `message.content[0]`. It
+ * carries the pairing key (`toolCallId`) and the tool output (`content`) —
+ * the real event data has no `callId` field of its own.
+ */
+function resultBlock(data: Extract<RecordEvent, { type: RecordEventType.ToolResult }>['data']): { toolCallId?: unknown; content?: unknown } | undefined {
   const message = data.message as { content?: unknown[] } | undefined
-  const block = message?.content?.[0] as { type?: unknown; content?: unknown } | undefined
-  return block?.type === 'tool-result' ? textFromContent(block.content) : ''
+  const block = message?.content?.[0]
+  return block !== null && typeof block === 'object' ? block as { toolCallId?: unknown; content?: unknown } : undefined
 }
 
 function pushCapped<T>(list: T[], item: T, cap: number): T[] {
@@ -393,7 +400,7 @@ export class RecordManager {
         break
       }
       case RecordEventType.AssistantMessage: {
-        const text = textFromContent(event.data.content)
+        const text = textFromContent(event.data.message?.content)
         if (text.length === 0 || this.open === null) break
         const open = this.open
         if (open.question === '' && open.calls.length === 0) {
@@ -448,11 +455,16 @@ export class RecordManager {
       }
       case RecordEventType.ToolResult: {
         const open = this.open
-        const callId = event.data.callId
-        if (open === null || !open.pending.includes(callId)) break
+        // The real tool/result event has NO callId on data — the pairing key
+        // and the output text live in the ToolResultBlock
+        // (message.content[0].toolCallId).
+        const block = resultBlock(event.data)
+        const rawCallId = block?.toolCallId
+        const callId = typeof rawCallId === 'string' ? rawCallId : undefined
+        if (open === null || callId === undefined || !open.pending.includes(callId)) break
         const result: RecordResult = {
           callId,
-          content: textFromResultData(event.data),
+          content: block?.content === undefined ? '' : textFromContent(block.content),
           ...(event.data.error === undefined ? {} : { error: event.data.error }),
         }
         this.open = {

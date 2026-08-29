@@ -18,7 +18,7 @@ function event(type: RecordEventType, seq: number, time: number, data: Record<st
 
 const textContent = (text: string) => [{ type: 'text', text }]
 const userMessage = (seq: number, time: number, text?: string) => event(RecordEventType.UserMessage, seq, time, text === undefined ? {} : { content: textContent(text) })
-const assistantMessage = (seq: number, time: number, text: string) => event(RecordEventType.AssistantMessage, seq, time, { content: textContent(text) })
+const assistantMessage = (seq: number, time: number, text: string) => event(RecordEventType.AssistantMessage, seq, time, { message: { content: textContent(text) } })
 const startCall = (seq: number, time: number, callId = `s${seq}`) =>
   event(RecordEventType.ToolCall, seq, time, { name: 'record_start', callId })
 const endCall = (seq: number, time: number, callId = `e${seq}`, args?: string) =>
@@ -27,7 +27,6 @@ const calculateCall = (seq: number, time: number, callId = `c${seq}`, args = '{"
   event(RecordEventType.ToolCall, seq, time, { name: 'calculate', callId, arguments: args })
 const calculateResult = (seq: number, time: number, callId: string, error?: { name: string; code: string }, content?: unknown) =>
   event(RecordEventType.ToolResult, seq, time, {
-    callId,
     error,
     message: content === undefined ? undefined : { content: [{ type: 'tool-result', toolCallId: callId, content }] },
   })
@@ -151,7 +150,7 @@ describe('record manager (markers read from the tool/call events)', () => {
     manager.feed(calculateResult(3, 1200, 'c2', undefined, textContent('{"re": 50, "im": 0}')))
     manager.feed(assistantMessage(4, 1300, '中间文本'))
     manager.feed(calculateCall(5, 1400, 'c5'))
-    manager.feed(calculateResult(6, 1500, 'c5'))
+    manager.feed(calculateResult(6, 1500, 'c5', undefined, textContent('{"re": 225, "im": 0}')))
     const settled = manager.feed(endCall(7, 1600))
     expect(settled!.calls).toHaveLength(2)
     expect(settled!.results).toHaveLength(2)
