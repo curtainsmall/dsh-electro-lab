@@ -4,7 +4,7 @@ description: "Mandatory five-part answer template for electro-lab calculations: 
 whenToUse: "An electro-lab workflow is triggered: the answer reports results obtained through the electro-lab toolset (any tool call appears in it). In the electro-lab preset the persona embeds the same template"
 ---
 
-# Electro-Lab Answer Template
+# DeepSeek Harness ElectroLab Answer Template
 
 Answer with the five parts below, in this order, **as a whole** — do not insert other selections, alternatives, or digressions between the template steps. Before finishing, check that all five parts are present, in order, with nothing else in between. You may add content before or after the template, but it is suggested to merge it into part 1 (question) and part 5 (answer), since those are the natural-language parts.
 

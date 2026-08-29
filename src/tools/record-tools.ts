@@ -21,7 +21,7 @@ const textParam = { type: 'string' as const, description: 'the segment text, ver
 export const recordTools = [
   defineJsonTool({
     name: RECORD_QUESTION_TOOL,
-    description: 'Open a new electro-lab record and submit the consolidated question (template part 1, verbatim). Call it FIRST, before any calculation tool — a second record_question while a record is open settles the open record as a duplicate-start error record and opens a new one.',
+    description: 'Open a new ElectroLab record and submit the consolidated question (template part 1, verbatim). Call it FIRST, before any calculation tool — a second record_question while a record is open settles the open record as a duplicate-start error record and opens a new one.',
     parameters: { text: textParam },
     execute: () => ({ ok: true }),
   }),

@@ -1,6 +1,6 @@
 # 参与贡献
 
-感谢你对 **dsh-electro-lab** 的关注与贡献。
+感谢你对 **DeepSeek Harness ElectroLab** 的关注与贡献。
 
 [English](../.github/CONTRIBUTING.md) | [简体中文](CONTRIBUTING.zh-CN.md)
 

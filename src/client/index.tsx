@@ -1,5 +1,5 @@
 /**
- * Client half of dsh-electro-lab: the ElectroLab run-records panel.
+ * Client half of DSH ElectroLab: the ElectroLab run-records panel.
  *
  * Registers two pieces of UI, both in the SSH/task-board style:
  * - a nav entry in the sidebar rail (DOM-mounted beside the SSH, task-board

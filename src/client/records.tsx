@@ -262,7 +262,7 @@ export function RecordsTab(): React.JSX.Element {
       </div>
       {records.length === 0 && openRecords.length === 0 ? (
         <div style={rowStyle}>
-          <span style={{ color: '#8b93a5' }}>No electro-lab records yet — ask the agent for a calculation.</span>
+          <span style={{ color: '#8b93a5' }}>No ElectroLab records yet — ask the agent for a calculation.</span>
         </div>
       ) : (
         <>

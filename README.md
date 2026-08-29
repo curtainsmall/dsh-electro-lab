@@ -6,15 +6,9 @@ An electrical & electronics calculation plugin for the DeepSeek Harness: circuit
 
 ## Features
 
-- **Calculation** — complex expression evaluation, rational-coefficient algebra and series sums.
-- **Circuits** — impedance networks, matching, filters, transients and resonance.
-- **Electronics** — op-amp configurations, dividers and LED drive.
-- **RF & transmission** — Smith chart, reflections, matching and line parameters.
-- **Signal quality** — distortion, jitter and ADC budgets.
-- **Noise & dB** — noise sources and dB conversions.
-- **DSP** — transforms, statistics and transfer functions.
-- **Unit conversion** — any unit to any unit of the same family.
-- **Workflow** — multi-step orchestration, a client panel (settled records) and a packaged agent preset.
+- **ElectroLab Mode** — the `electro-lab` agent preset isolates the session to the plugin's calculation tools: no shell, no file system, no network.
+- **Calculations you can trust** — every number comes from a tool call result, never from memory or hand arithmetic.
+- **Records for inspection** — every five-step solve is settled to disk and browsable in the client panel.
 
 All tools are listed in [tools.md](docs/tools.md).
 

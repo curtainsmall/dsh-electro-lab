@@ -117,7 +117,7 @@ const SIDEBAR_COLUMN_SELECTOR = '[data-pane="sidebar"], [class*="sidebarCol"]'
 const ENTRY_ATTR = 'data-dsh-electrolab-entry'
 /** The rail family this entry joins, in shell order — placed after the last one. */
 const ENTRY_FAMILY = ['[data-dsh-taskboard-entry]', '[data-dsh-ssh-entry]', '[data-dsh-skill-explorer-entry]']
-/** Oscilloscope trace glyph: a sine wave on a baseline — the electro-lab identity, rendered like the shell's 16px line icons. */
+/** Oscilloscope trace glyph: a sine wave on a baseline — the ElectroLab identity, rendered like the shell's 16px line icons. */
 const ENTRY_ICON =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
