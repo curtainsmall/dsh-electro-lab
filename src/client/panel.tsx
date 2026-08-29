@@ -285,7 +285,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
       <div style={headerStyle}>
         <button
           type="button"
-          aria-label="Back to session"
+          aria-label="返回会话"
           onClick={() => panelStore.toggle()}
           onMouseEnter={() => setBackHover(true)}
           onMouseLeave={() => setBackHover(false)}
@@ -296,7 +296,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
           }}
         >
           <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
-          <span style={{ lineHeight: 1 }}>Back to session</span>
+          <span style={{ lineHeight: 1 }}>返回会话</span>
         </button>
         <h2 style={{ margin: 0, fontSize: 15 }}>ElectroLab</h2>
       </div>

@@ -82,7 +82,7 @@ function formatFull(time: number): string {
 /** Plain text block: no box, no inner scroll — the dialog's single outer scrollbar owns scrolling. */
 function plainText(text: string): React.JSX.Element {
   return (
-    <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+    <div style={{ lineHeight: 1.6, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
       {text}
     </div>
   )
@@ -99,10 +99,10 @@ function formatJson(text: string): string {
 
 /** One JSON value as a collapsible tree node; objects and arrays fold, scalars render inline. */
 function JsonNode({ name, value, depth }: { name: string; value: unknown; depth: number }): React.JSX.Element {
-  const [open, setOpen] = useState(depth < 2)
+  const [open, setOpen] = useState(true)
   if (value === null || typeof value !== 'object') {
     return (
-      <div style={{ paddingLeft: depth * 14, fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      <div style={{ paddingLeft: depth * 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
         <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{name.length > 0 ? `${name}: ` : ''}</span>
         <span style={{ color: 'var(--dsw-alias-label-primary)' }}>{JSON.stringify(value)}</span>
       </div>
@@ -116,7 +116,7 @@ function JsonNode({ name, value, depth }: { name: string; value: unknown; depth:
   return (
     <div>
       <div
-        style={{ paddingLeft: depth * 14, fontSize: 12, lineHeight: 1.6, cursor: 'pointer', color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+        style={{ paddingLeft: depth * 14, lineHeight: 1.6, cursor: 'pointer', color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'none' }}
         onClick={() => setOpen(!open)}
       >
         <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
@@ -135,8 +135,8 @@ function JsonNode({ name, value, depth }: { name: string; value: unknown; depth:
 }
 
 /** One tool call as a collapsible panel: the header shows the name, the body the arguments as a JSON tree. */
-function CallPanel({ call, defaultOpen }: { call: Call; defaultOpen: boolean }): React.JSX.Element {
-  const [open, setOpen] = useState(defaultOpen)
+function CallPanel({ call }: { call: Call }): React.JSX.Element {
+  const [open, setOpen] = useState(true)
   let parsed: unknown = call.arguments
   if (call.arguments.length > 0) {
     try {
@@ -148,12 +148,12 @@ function CallPanel({ call, defaultOpen }: { call: Call; defaultOpen: boolean }):
   return (
     <div style={{ border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, marginBottom: 8, overflow: 'hidden' }}>
       <div
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer', background: 'var(--dsw-alias-bg-base)' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer', background: 'var(--dsw-alias-bg-base)', userSelect: 'none' }}
         onClick={() => setOpen(!open)}
       >
-        <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11 }}>{open ? '▾' : '▸'}</span>
-        <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--dsw-alias-label-primary)' }}>{call.name}</span>
-        {!open && <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }}>{call.arguments.length > 0 ? formatJson(call.arguments) : ''}</span>}
+        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>{call.name}</span>
+        {!open && <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{call.arguments.length > 0 ? formatJson(call.arguments) : ''}</span>}
       </div>
       {open && (
         <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
@@ -166,12 +166,12 @@ function CallPanel({ call, defaultOpen }: { call: Call; defaultOpen: boolean }):
   )
 }
 
-/** The tool calls: one collapsible panel per call (the first one open by default). */
+/** The tool calls: one collapsible panel per call, all expanded by default. */
 function plainCalls(calls: Call[]): React.JSX.Element {
   return (
     <div>
-      {calls.map((call, index) => (
-        <CallPanel key={call.callId} call={call} defaultOpen={index === 0} />
+      {calls.map((call) => (
+        <CallPanel key={call.callId} call={call} />
       ))}
     </div>
   )
@@ -251,7 +251,6 @@ function sectionBlock(section: DetailSection): React.JSX.Element {
           background: 'var(--dsw-alias-bg-layer-2)',
           borderBottom: '1px solid var(--dsw-alias-border-l2)',
           padding: '6px 12px',
-          fontSize: 13,
           fontWeight: 600,
           color: 'var(--dsw-alias-label-primary)',
         }}
@@ -276,6 +275,7 @@ function sectionBlock(section: DetailSection): React.JSX.Element {
  * while scrolling — no nested scrollbars, no framework, no popup shell.
  */
 function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
+  const [backHover, setBackHover] = useState(false)
   const sections: DetailSection[] = [
     { key: 'question', label: '1 · 问题', content: record.question },
     { key: 'analyse', label: '2 · 分析', content: record.analyse },
@@ -290,39 +290,48 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--dsw-alias-border-l2)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, fontSize: 'var(--dsw-font-markdown-base-font-size)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--dsw-alias-border-l2)' }}>
         <button
           type="button"
+          aria-label="返回记录"
+          onClick={onBack}
+          onMouseEnter={() => setBackHover(true)}
+          onMouseLeave={() => setBackHover(false)}
           style={{
+            alignSelf: 'flex-start',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
             padding: '4px 8px',
             borderRadius: 6,
             border: '1px solid var(--dsw-alias-border-l2)',
-            background: 'none',
+            borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
+            background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
             color: 'var(--dsw-alias-label-primary)',
             cursor: 'pointer',
             fontSize: 13,
           }}
-          onClick={onBack}
         >
           <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
           <span style={{ lineHeight: 1 }}>返回记录</span>
         </button>
-        <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {record.question || `record ${record.id}`}
         </div>
       </div>
       <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--dsw-alias-border-l1)', background: 'var(--dsw-alias-bg-base)' }}>
-        <div style={{ color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
+        <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, font: '13px ui-monospace, monospace', wordBreak: 'break-all' }}>
           id: {record.id}
         </div>
-        <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, marginTop: 2 }}>
-          started: {formatFull(record.startedAt)}
-          {record.settledAt !== undefined ? ` · settled: ${formatFull(record.settledAt)}` : ''}
+        <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, marginTop: 2 }}>
+          开始: {formatFull(record.startedAt)}
         </div>
+        {record.settledAt !== undefined && (
+          <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, marginTop: 1 }}>
+            结束: {formatFull(record.settledAt)}
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* Table of contents: fixed, jumps to the section headings. */}
@@ -333,7 +342,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               role="button"
               style={{
                 padding: '6px 12px',
-                fontSize: 12,
+                fontSize: 13,
                 color: 'var(--dsw-alias-label-secondary)',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
@@ -468,7 +477,7 @@ export function RecordsTab(): React.JSX.Element {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <span style={{
                   color: 'var(--dsw-alias-label-primary)',
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 600,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -479,7 +488,7 @@ export function RecordsTab(): React.JSX.Element {
                   {run.question || `record ${run.id}`}
                 </span>
                 <span style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 'none' }}>
-                  <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>
                     {formatTime(run.startedAt)}
                   </span>
                   <span
