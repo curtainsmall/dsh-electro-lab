@@ -12,13 +12,17 @@ import { RecordManager, readRecordArchive, type RecordEvent } from './records.ts
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
 
-/** Services required before mounting: the tool registry. */
-export const inject = ['tools']
+/** Services required before mounting: the tool registry and the web server (endpoint host). */
+export const inject = ['tools', 'webServer']
 
 declare module 'cordis' {
   interface Events {
     /** Post-commit append feed (dsh-session's own declaration; mirrored loosely here). */
     'session/event'(session: unknown, event: unknown): void
+  }
+  interface Context {
+    /** The web server the records endpoint registers on (same pattern as dsh-remote-web-ui). */
+    webServer: WebServerLike
   }
 }
 
@@ -86,25 +90,23 @@ export function apply(ctx: Context): void {
     }))
 
     // The records page: all stored records plus any live open records, newest first.
-    const webServer = ctx.get('webServer') as WebServerLike | undefined
-    if (webServer !== undefined) {
-      disposers.push(webServer.register({
-        kind: 'exact',
-        path: RECORDS_PATH,
-        handler: (_req, res) => {
-          const open: Array<unknown> = []
-          for (const manager of managers.values()) {
-            const record = manager.view()
-            if (record !== null) open.push(record)
-          }
-          res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({
-            records: [...readRecordArchive(join(recordsHome, 'records.jsonl'))].reverse(),
-            open,
-          }))
-        },
-      }))
-    }
+    // webServer is an inject edge, so it is guaranteed ready here.
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: RECORDS_PATH,
+      handler: (_req, res) => {
+        const open: Array<unknown> = []
+        for (const manager of managers.values()) {
+          const record = manager.view()
+          if (record !== null) open.push(record)
+        }
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({
+          records: [...readRecordArchive(join(recordsHome, 'records.jsonl'))].reverse(),
+          open,
+        }))
+      },
+    }))
 
     return () => {
       for (const off of disposers) off()
