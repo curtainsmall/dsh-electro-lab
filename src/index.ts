@@ -42,20 +42,45 @@ interface WebServerLike {
 /** The records page endpoint (same origin as the web app; the client polls it). */
 const RECORDS_PATH = '/api/dsh-electro-lab/records'
 
+// Module-level record state, shared by EVERY mount of the plugin (the global
+// bundle row AND a session preset row can both apply it): one manager per
+// session, one disk archive, one snapshot file. Records live under the
+// user's home — `~/.dsh-electro-lab/`, deliberately OUTSIDE $DSH_HOME so
+// they survive session deletion, restarts and even a full DSH uninstall.
+const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-electro-lab')
+const managers = new Map<string, RecordManager>()
+
+/** Get (or lazily create) the session's record manager. */
+function getOrCreateManager(sessionId: string): RecordManager {
+  let manager = managers.get(sessionId)
+  if (manager === undefined) {
+    manager = new RecordManager(
+      sessionId,
+      join(recordsHome, 'records.jsonl'),
+      join(recordsHome, 'open-record.json'),
+    )
+    managers.set(sessionId, manager)
+  }
+  return manager
+}
+
 export function apply(ctx: Context): void {
   ctx.effect(() => registerTools(ctx), 'dsh-electro-lab: tools')
   ctx.effect(() => registerSkills(ctx), 'dsh-electro-lab: skills')
 
-  // Run records, plugin-owned: the manager observes session events WITHOUT
-  // touching the session (no appends, no custom event types), settled records
-  // are appended one-shot to disk under the user's home — `~/.dsh-electro-lab/`,
-  // deliberately OUTSIDE $DSH_HOME so the records survive session deletion,
-  // restarts and even a full DSH uninstall — and the client panel reads the
-  // whole store through one HTTP endpoint: one page, all sessions.
-  const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-electro-lab')
-  const managers = new Map<string, RecordManager>()
+  // The plugin can be mounted from TWO places at once — the global bundle
+  // (the installed package's cordis.patch.yml) AND a session preset row —
+  // which would feed every event into two independent managers and settle
+  // every record twice. The session trace and the HTTP endpoint are
+  // therefore process singletons: only the first mount registers them.
+  let recordManagerMounted = false
 
   ctx.effect(() => {
+    if (recordManagerMounted) {
+      // Second mount: the listener and endpoint already exist — nothing to add.
+      return () => {}
+    }
+    recordManagerMounted = true
     const disposers: Array<() => void> = []
 
     // Session trace: feed every committed event into the session's record
@@ -69,16 +94,7 @@ export function apply(ctx: Context): void {
       const s = session as SessionLike
       const sessionId = s.id
       if (sessionId === undefined) return
-      let manager = managers.get(sessionId)
-      if (manager === undefined) {
-        manager = new RecordManager(
-          sessionId,
-          join(recordsHome, 'records.jsonl'),
-          join(recordsHome, 'open-record.json'),
-        )
-        managers.set(sessionId, manager)
-      }
-      manager.feed(event as RecordEvent)
+      getOrCreateManager(sessionId).feed(event as RecordEvent)
     }))
 
     // The records page: all stored records plus any live open records, newest first.
@@ -103,6 +119,7 @@ export function apply(ctx: Context): void {
     }
 
     return () => {
+      recordManagerMounted = false
       for (const off of disposers) off()
     }
   }, 'dsh-electro-lab: records')

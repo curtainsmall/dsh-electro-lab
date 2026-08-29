@@ -19,10 +19,14 @@
  *   record is open settles it as a duplicate-start error record and opens a
  *   new one. There is no fold — the open record is never continued by a
  *   second start.
- * - `record_end` settles the open record. Texts before `record_start` and
- *   after `record_end` are NOT recorded.
- * - `record_end` with no open record: an empty ERROR record (`DuplicateEnd`)
- *   is kept.
+ * - `record_end` SETTLES the record immediately. Tool-phase models write
+ *   their final texts after the last tool call, so `record_end` carries the
+ *   three text payloads it would otherwise miss: `question` / `analyse` /
+ *   `answer` in its arguments (the raw JSON text of the tool/call event,
+ *   parsed here). At settle time a payload field wins; a missing or empty
+ *   payload field falls back to the event-stream texts.
+ * - `record_end` with no open record (or twice): an ERROR record
+ *   (`DuplicateEnd`) is kept.
  * - A settled record with no tool call is an ERROR record (`Incomplete`).
  *   An error record always carries its collected data (when any) plus
  *   `error: { type, message }`.
@@ -72,6 +76,8 @@ export const RECORD_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...ALL_TOOLS.map((tool) => tool.name),
   filterTool.name,
   'solve_steps',
+  RECORD_START_TOOL,
+  RECORD_END_TOOL,
 ])
 
 /** Why a record is an error record. */
@@ -195,6 +201,18 @@ interface OpenBuild {
   answerTexts: string[]
 }
 
+/**
+ * The text payload a `record_end` call may carry: tool-phase models write
+ * their final texts after the last tool call, so the model passes them in
+ * the closing marker's arguments. A missing or empty field falls back to
+ * the event-stream texts.
+ */
+export interface RecordEndPayload {
+  question?: string
+  analyse?: string
+  answer?: string
+}
+
 /* ── Disk helpers: the JSONL archive and the open snapshot file ─────────────── */
 
 /** Load the archive: every parseable line is a record; torn lines and duplicate ids are skipped. */
@@ -299,6 +317,29 @@ function joinParagraph(texts: string[]): string {
   return texts.join('\n\n').slice(0, MAX_TEXT_CHARS)
 }
 
+/**
+ * The non-empty text payload fields a `record_end` call carried. The
+ * tool/call event keeps the model's raw arguments JSON as a string (the
+ * event system does not parse — parsing happens in the execution channel),
+ * so the manager parses it here. A malformed or empty payload is ignored.
+ */
+function payloadFromArguments(argumentsRaw: string | undefined): RecordEndPayload | undefined {
+  if (argumentsRaw === undefined || argumentsRaw === '') return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(argumentsRaw)
+  } catch {
+    return undefined
+  }
+  if (parsed === null || typeof parsed !== 'object') return undefined
+  const payload: RecordEndPayload = {}
+  for (const field of ['question', 'analyse', 'answer'] as const) {
+    const value = (parsed as { [key: string]: unknown })[field]
+    if (typeof value === 'string' && value.trim().length > 0) payload[field] = value
+  }
+  return Object.keys(payload).length === 0 ? undefined : payload
+}
+
 function snapshotToBuild(snapshot: OpenSnapshot): OpenBuild {
   return {
     id: snapshot.id,
@@ -379,7 +420,9 @@ export class RecordManager {
         }
         if (name === RECORD_END_TOOL) {
           if (this.open !== null) {
-            settled = this.settle(event.time)
+            // record_end settles immediately; its payload carries the final
+            // texts that tool-phase models write after the last tool call.
+            settled = this.settle(event.time, undefined, payloadFromArguments(event.data.arguments))
           } else {
             // Duplicate end: keep an empty error record.
             settled = this.recordError(event.time, {
@@ -466,17 +509,17 @@ export class RecordManager {
     this.open = snapshotToBuild(snapshot)
   }
 
-  /** Settle the open record: freeze it and return it. */
-  private settle(at: number, error?: RecordError): Record {
+  /** Settle the open record: freeze it and return it. Payload fields win over event-stream texts. */
+  private settle(at: number, error?: RecordError, payload?: RecordEndPayload): Record {
     const open = this.open
     if (open === null) throw new Error('record manager: settle called with no open record')
     const record: Record = {
       id: open.id,
       startedAt: open.startedAt,
       settledAt: at,
-      question: open.question,
-      analyse: joinParagraph(open.analyseTexts),
-      answer: joinParagraph(open.answerTexts),
+      question: payload?.question ?? open.question,
+      analyse: payload?.analyse ?? joinParagraph(open.analyseTexts),
+      answer: payload?.answer ?? joinParagraph(open.answerTexts),
       calls: open.calls,
       results: open.results,
       ...(error !== undefined

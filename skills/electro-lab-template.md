@@ -35,13 +35,9 @@ Organize the final answer in natural language: what the result means physically,
 Every answer is bracketed by two marker-tool calls — only the content between them is recorded (question/analysis texts, tool calls, results, answer):
 
 - Call `record_start` before part 1 of the template.
-- Call `record_end` after part 5.
+- Call `record_end` right after the tool calls. `record_end` settles the record immediately, so pass the final texts in its arguments, copied verbatim: `question` (part 1), `analyse` (part 2) and `answer` (part 5). A field left out falls back to the texts written between the markers.
 
-`record_start` opens the record — exactly once per answer:
-
-- Call `record_start` before part 1 of the template.
-- Call `record_end` after part 5.
-- A second `record_start` while a record is open settles the open one as a duplicate-start error record and starts a new one. There is no fold: never call `record_start` twice for one answer — if you already opened a record, keep working inside it and end it with `record_end`.
+A second `record_start` while a record is open settles the open one as a duplicate-start error record and starts a new one. There is no fold: never call `record_start` twice for one answer — if you already opened a record, keep working inside it and close it with `record_end`.
 
 ## Operational details
 
