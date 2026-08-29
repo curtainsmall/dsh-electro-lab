@@ -355,18 +355,32 @@ function textFromTextArgument(argumentsRaw: string | undefined): string | undefi
 }
 
 /**
+ * Remove numbered part-title lines (`1. 分析（Analyse）`, `2. 计划（Plan）`,
+ * …) from a directly submitted question/analyse text, so the record holds
+ * the content only. Content lines starting with `- ` or plain paragraphs
+ * are untouched. The answer payload keeps its structure — the merged
+ * template needs its markers to split.
+ */
+function stripPartTitles(text: string): string {
+  return text.replace(/^\d+\.[ \t]*[^\n]*$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/**
  * Split a five-part template text into its segments by the part markers
- * (`N. **标题（Title）**`). Returns undefined when no template structure is
- * found.
+ * (`N. **标题（Title）**`) and strip each segment's title line, so the
+ * record texts hold the content only. Returns undefined when no template
+ * structure is found.
  */
 function splitTemplatePayload(text: string): { question?: string; analyse?: string; answer?: string } | undefined {
   const segments = text.split(/\n(?=\d+\.\s)/).map((s) => s.trim()).filter((s) => s.length > 0)
   if (segments.length < 2) return undefined
   const result: { question?: string; analyse?: string; answer?: string } = {}
   for (const segment of segments) {
-    if (/问题|Question/i.test(segment)) result.question = segment
-    else if (/分析|Analysis/i.test(segment)) result.analyse = segment
-    else if (/答案|Answer/i.test(segment)) result.answer = segment
+    // Drop the segment's own title line (e.g. `1. **问题（Question）**`).
+    const body = segment.replace(/^\d+\.[ \t]*[^\n]*/, '').trim()
+    if (/问题|Question/i.test(segment)) result.question = body
+    else if (/分析|Analysis/i.test(segment)) result.analyse = body
+    else if (/答案|Answer/i.test(segment)) result.answer = body
   }
   return result.question !== undefined || result.analyse !== undefined || result.answer !== undefined ? result : undefined
 }
@@ -481,7 +495,7 @@ export class RecordManager {
           this.openRecord(event.time)
           if (text !== undefined) {
             const open = this.open
-            if (open !== null) this.open = { ...open, lastAt: event.time, question: text }
+            if (open !== null) this.open = { ...open, lastAt: event.time, question: stripPartTitles(text) }
           }
           break
         }
@@ -489,7 +503,7 @@ export class RecordManager {
           const text = textFromTextArgument(event.data.arguments)
           if (text !== undefined && this.open !== null) {
             const open = this.open
-            this.open = { ...open, lastAt: event.time, analyseTexts: pushCapped(open.analyseTexts, text, MAX_TEXTS) }
+            this.open = { ...open, lastAt: event.time, analyseTexts: pushCapped(open.analyseTexts, stripPartTitles(text), MAX_TEXTS) }
           }
           break
         }

@@ -131,11 +131,12 @@ describe('record manager (record_question opens, record_answer settles)', () => 
       'Z ≈ 50 Ω。',
     ].join('\n')
     const settled = manager.feed(answerCall(4, 1300, merged))
-    // The merged template fills the missing analyse; the answer drops the tables.
-    expect(settled!.analyse).toContain('分析')
+    // The merged template fills the missing analyse; the part titles and the
+    // tables are stripped from the record texts.
     expect(settled!.analyse).toContain('Z = 1/(1/R')
-    expect(settled!.answer).toContain('答案')
+    expect(settled!.analyse).not.toContain('分析（Analysis）')
     expect(settled!.answer).toContain('Z ≈ 50 Ω')
+    expect(settled!.answer).not.toContain('答案（Answer）')
     expect(settled!.answer).not.toContain('工具调用')
     // A direct question wins over the merged one.
     expect(settled!.question).toBe('在电路 [R = 50 Ω ∥ L = 50 µH] 上求总阻抗。')
@@ -145,6 +146,33 @@ describe('record manager (record_question opens, record_answer settles)', () => 
     const plain = manager.feed(answerCall(7, 1600, '就是一段普通回答'))
     expect(plain!.answer).toBe('就是一段普通回答')
     expect(plain!.question).toBe('q2')
+  })
+
+  it('strips part-title lines from directly submitted question/analyse texts', () => {
+    const { manager } = makeEnv()
+    const titled = [
+      '1. 问题（Question）',
+      '在电路 [R ∥ L = 100 mH] 上求总阻抗。',
+    ].join('\n')
+    manager.feed(questionCall(1, 1000, titled))
+    manager.feed(calculateCall(2, 1100, 'c2'))
+    const analyse = [
+      '1. 分析（Analyse）',
+      '   - 已知量：R = 50 Ω。',
+      '',
+      '2. 计划（Plan）',
+      '   - 用 circuit_impedance 计算。',
+    ].join('\n')
+    manager.feed(analyseCall(3, 1200, analyse))
+    const settled = manager.feed(answerCall(4, 1300, 'Z ≈ 50 Ω。'))
+    expect(settled!.question).toBe('在电路 [R ∥ L = 100 mH] 上求总阻抗。')
+    expect(settled!.question).not.toContain('问题（Question）')
+    expect(settled!.analyse).toContain('- 已知量')
+    expect(settled!.analyse).toContain('- 用 circuit_impedance')
+    expect(settled!.analyse).not.toContain('分析（Analyse）')
+    expect(settled!.analyse).not.toContain('计划（Plan）')
+    // Content lines starting with a dash survive; the answer text is untouched.
+    expect(settled!.answer).toBe('Z ≈ 50 Ω。')
   })
 
   it('a malformed answer argument is ignored but the record still settles', () => {

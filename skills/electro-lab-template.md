@@ -38,6 +38,8 @@ Every answer is bracketed by two marker-tool calls — only the content between 
 - Call `record_analyse` once between the tool calls, passing the analysis (template part 2, verbatim) as `text`.
 - Call `record_answer` LAST, after the tool calls, passing the final answer (template part 5, verbatim) as `text` — it settles the record immediately.
 
+The submitted texts contain the CONTENT ONLY — no part titles such as `1. 问题（Question）` or `2. 分析（Analysis）`.
+
 A second `record_question` while a record is open settles the open one as a duplicate-start error record and starts a new one; `record_answer` with no open record keeps a duplicate-end error record. Call each marker exactly once per answer.
 
 ## Operational details
