@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-08-29
 
 ### Added
 
-- Client **Records** panel in SSH style: a sidebar nav entry toggles a panel listing every settled record across all sessions, read through the same-origin endpoint `/api/dsh-electro-lab/records` (polled every 5 s).
+- Client **Records** panel: a sidebar nav entry toggles a panel listing every settled record across all sessions, read through the same-origin endpoint `/api/dsh-electro-lab/records` (polled every 5 s).
 - Records are stored as **one immutable JSONL line per settle** in `~/.dsh-electro-lab/records.jsonl` (outside `$DSH_HOME`; override with `DSH_ELECTRO_LAB_HOME`), surviving session deletion and restarts; an interrupted open record is persisted to `open-record.json` and restored by the constructor on restart. Records are built from sessions but never feed back into them.
 - Five-step answer template (question, analysis with formulas, tool calls, results, answer) in the template skill and the packaged preset persona; the record schema mirrors it — `question`/`analyse`/`answer` paragraphs plus structured `calls`/`results` arrays (raw arguments JSON, full outputs, error identity).
 
@@ -90,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.5.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.0
 [0.4.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.4.0
 [0.3.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.3.0
 [0.2.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.2.0
