@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The complex output snapshot renames the angle key `angRad` to `ang` (value unchanged: phase angle in radians, SI); polar inputs keep `angRad`.
+- The angle key is `ang` everywhere — input and output — since the phase angle is always radians (SI); the old `angRad` name is gone.
 - The preset persona and skills no longer force Simplified Chinese — the model follows the user language.
 
 ## [0.5.1] - 2026-08-29
