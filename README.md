@@ -14,7 +14,7 @@ An electrical & electronics calculation plugin for the DeepSeek Harness: circuit
 - **Noise & dB** — noise sources and dB conversions.
 - **DSP** — transforms, statistics and transfer functions.
 - **Unit conversion** — any unit to any unit of the same family.
-- **Workflow** — multi-step orchestration, a client panel (settled run records) and a packaged agent preset.
+- **Workflow** — multi-step orchestration, a client panel (settled records) and a packaged agent preset.
 
 All tools are listed in [tools.md](docs/tools.md).
 

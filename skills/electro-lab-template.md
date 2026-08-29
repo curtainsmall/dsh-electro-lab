@@ -1,6 +1,6 @@
 ---
 name: electro-lab-template
-description: "Mandatory five-part answer template for electro-lab calculations: 1 question (consolidated restatement), 2 analysis (approach with formulas), 3 tool calls (table), 4 results (table), 5 answer (natural language) — used as a whole, in order, with no other selection in between, bracketed by one record_start / one record_end marker call"
+description: "Mandatory five-part answer template for electro-lab calculations: 1 question (consolidated restatement), 2 analysis (approach with formulas), 3 tool calls (table), 4 results (table), 5 answer (natural language) — used as a whole, in order, with no other selection in between, bracketed by record_question (opens + question text) and record_answer (answer text + settles) marker calls"
 whenToUse: "An electro-lab workflow is triggered: the answer reports results obtained through the electro-lab toolset (any tool call appears in it). In the electro-lab preset the persona embeds the same template"
 ---
 

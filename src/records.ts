@@ -30,7 +30,7 @@
  *   An error record always carries its collected data (when any) plus
  *   `error: { type, message }`.
  *
- * Fallback boundaries (record still closes if the model forgets `record_end`):
+ * Fallback boundaries (record still closes if the model forgets `record_answer`):
  * - a new `user/message` arrives,
  * - `turn/end`,
  * - no electro-lab activity arrives within {@link SETTLE_WINDOW_MS}.
@@ -82,9 +82,9 @@ export const RECORD_TOOL_NAMES: ReadonlySet<string> = new Set([
 
 /** Why a record is an error record. */
 export enum RecordErrorType {
-  /** `record_start` fired while a record was already open: the old one was settled with its data and a new one opened. */
+  /** `record_question` fired while a record was already open: the old one was settled with its data and a new one opened. */
   DuplicateStart = 'duplicate-start',
-  /** `record_end` fired with no open record: an empty error record was kept. */
+  /** `record_answer` fired with no open record: an empty error record was kept. */
   DuplicateEnd = 'duplicate-end',
   /** The record settled with no tool call inside the brackets: the events were not enough for a calculation. */
   Incomplete = 'incomplete',
@@ -205,9 +205,9 @@ interface OpenBuild {
 }
 
 /**
- * The text payload a `record_end` call may carry: tool-phase models write
- * their final texts after the last tool call, so the model passes them in
- * the closing marker's arguments. A missing or empty field falls back to
+ * The text payload a `record_answer` call may carry: the model submits the
+ * answer text (sometimes with the whole merged five-part template, which
+ * {@link resolveTexts} splits out). A missing or empty field falls back to
  * the event-stream texts.
  */
 export interface RecordEndPayload {
@@ -602,7 +602,7 @@ export class RecordManager {
     return record
   }
 
-  /** Keep an error record with no open build behind it (e.g. duplicate `record_end`). */
+  /** Keep an error record with no open build behind it (e.g. duplicate `record_answer`). */
   private recordError(at: number, error: RecordError): Record {
     const record: Record = {
       id: randomUUID(),
