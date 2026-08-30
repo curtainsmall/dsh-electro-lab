@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-08-30
+
+### Added
+
+- Markdown export of a record (save-file picker with a download fallback): a localized H1, the id and timestamps as separate paragraphs, the five steps as unnumbered H2 sections, and each tool call as an H3 block with `Parameters` / `Result` H4 headings — value objects render in compact mathematical notation (`100 Ω`, `100 + 25j Ω`, `1 ∠ 0 rad`) and the outermost JSON braces are dropped.
+- Compact mathematical display for value objects in the records page: rect/polar inputs and serialized outputs (`{re, im, kind, …}`) render as one math line with the unit from `kind` and no expansion; numbers use standard notation (6 significant digits, scientific for extreme magnitudes).
+- Tool calls and results merged into one collapsible panel per call in the detail page (name → parameters → result); strings that embed JSON unwrap into trees.
+- Record cards show the record id beneath the title (11 px monospace).
+- Multi-select mode: a select button toggles selection of settled records — selected cards get the accent border plus a tint heavier than hover; a delete button batch-deletes the selection through a confirm dialog.
+- Visible scrollbars in both themes (label-colored thumbs with the padding-box rounding trick) now that the page-level blur root cause is gone.
+- Persona hard rules: value parameters must be value objects, never stringified JSON or bare numbers; the model must read the electro-lab-template skill before any tool call; `record_analyse` must precede the first calculation tool and hold only the conditions and the approach — every computed value belongs in `record_answer`.
+
+### Changed
+
+- The in-chat five-part template is dropped — records carry the structure, the chat answer stays natural; the template skill is now the record protocol.
+- Circuit network leaves are complex value objects (`{form, re, im, kind}` with kind `resistance` | `inductance` | `capacitance`); the bare-number `{kind, value}` leaf DSL is rejected by validation.
+- Records page polish: the Config tab and the header hint are gone (a single tab remains, styled like the dsh-ssh panel tabs); record cards are borderless ghosts that highlight only their border on hover; buttons and hover borders use solid label colors visible in both themes.
+- Exported blocks switch from `json` to `text` fences, since value objects are rendered as math lines rather than raw JSON.
+
+### Removed
+
+- The single-record delete button on cards — batch delete covers deletion.
+
 ## [0.6.0] - 2026-08-29
 
 ### Added
@@ -117,6 +140,7 @@ oiseFigureDb`, `gainDb`, `magnitudeDb`, `returnLossDb`…) — dB is a log scale
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.7.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.7.0
 [0.6.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.6.0
 [0.5.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.1
 [0.5.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.0

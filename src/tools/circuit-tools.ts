@@ -17,10 +17,20 @@ import {
   combineSeriesImpedances,
   type NetworkElement,
 } from '../math/circuits.ts'
-import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
+import { toComplex, toScalar, serializeComplex, serializeReal, type ComplexValue } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
 import { defineJsonTool, createValueParam } from './helpers.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
+
+/** Element kind → quantity kind: the leaf value object's kind must match. */
+const ELEMENT_QUANTITY_KINDS: Record<ElementKind, QuantityKind> = {
+  [ElementKind.Resistance]: QuantityKind.Resistance,
+  [ElementKind.Inductance]: QuantityKind.Inductance,
+  [ElementKind.Capacitance]: QuantityKind.Capacitance,
+}
+
+/** The three element kinds accepted as leaves (explicit set: enum reverse mappings are not emitted at runtime). */
+const ELEMENT_KINDS = new Set<string>([ElementKind.Resistance, ElementKind.Inductance, ElementKind.Capacitance])
 
 export const circuitTools = [
   defineJsonTool({
@@ -54,9 +64,9 @@ export const circuitTools = [
   }),
   defineJsonTool({
     name: 'circuit_impedance',
-    description: 'Total impedance of a (possibly nested) network at a frequency. The network is a tree: a leaf is {"kind": "resistance"|"inductance"|"capacitance", "value": number}; a group is {"topology": "series"|"parallel", "elements": [node, ...]}. Nested groups are allowed. Returns the driving-point impedance.',
+    description: 'Total impedance of a (possibly nested) network at a frequency. The network is a tree: a leaf is a complex value object of kind resistance|inductance|capacitance; a group is {"topology": "series"|"parallel", "elements": [node, ...]}. Nested groups are allowed. Returns the driving-point impedance.',
     parameters: {
-      network: { type: 'json', description: 'network tree, e.g. {"topology":"series","elements":[{"kind":"resistance","value":10},{"kind":"inductance","value":0.001}]}', required: true },
+      network: { type: 'json', description: 'network tree, e.g. {"topology":"series","elements":[{"form":"rect","re":10,"im":0,"kind":"resistance"},{"form":"rect","re":0.001,"im":0,"kind":"inductance"}]}', required: true },
       frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency'), required: true },
     },
     execute: (args) => {
@@ -185,31 +195,32 @@ export const circuitTools = [
   }),
 ]
 
-/** Validate a raw JSON network tree into a typed NetworkElement. */
+/** Validate a raw JSON network tree into a typed NetworkElement; leaves are complex value objects. */
 export function validateNetwork(input: unknown): NetworkElement {
   if (typeof input !== 'object' || input === null) throw new Error('network must be an object')
   const node = input as Record<string, unknown>
-  if (typeof node['kind'] === 'string') {
-    const kind = node['kind'] as ElementKind
-    if (![ElementKind.Resistance, ElementKind.Inductance, ElementKind.Capacitance].includes(kind)) {
-      throw new Error(`unknown element kind "${kind}"`)
+  if (typeof node['topology'] !== 'string') {
+    // leaf: a complex value object whose kind selects the element
+    const kind = node['kind']
+    if (typeof kind !== 'string' || !ELEMENT_KINDS.has(kind)) {
+      throw new Error(`unknown element kind "${String(kind)}"`)
     }
-    const value = node['value']
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-      throw new Error(`element "${kind}" needs a non-negative finite value`)
+    const expected = ELEMENT_QUANTITY_KINDS[kind as ElementKind]
+    if (expected === undefined) throw new Error(`unknown element kind "${kind}"`)
+    let value: number
+    try {
+      value = toScalar(node as ComplexValue, expected)
+    } catch (error) {
+      throw new Error(`element "${kind}" needs a non-negative real ${kind} value (${error instanceof Error ? error.message : String(error)})`)
     }
-    return { kind, value }
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`element "${kind}" needs a non-negative real value`)
+    }
+    return { kind: kind as ElementKind, value }
   }
-  switch (node['topology']) {
-    case CircuitMode.Series:
-    case CircuitMode.Parallel: {
-      const elements = node['elements']
-      if (!Array.isArray(elements) || elements.length === 0) {
-        throw new Error('a group needs a non-empty elements array')
-      }
-      return { topology: node['topology'] as CircuitMode, elements: elements.map((child) => validateNetwork(child)) }
-    }
-    default:
-      throw new Error('network node must be {"kind": ...} or {"topology": ..., "elements": [...]}')
+  const elements = node['elements']
+  if (!Array.isArray(elements) || elements.length === 0) {
+    throw new Error('a group needs a non-empty elements array')
   }
+  return { topology: node['topology'] as CircuitMode, elements: elements.map((child) => validateNetwork(child)) }
 }

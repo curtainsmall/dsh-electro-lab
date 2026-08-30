@@ -69,9 +69,26 @@ const DISPLAY_MAX_RECORDS = 100
 
 const rowStyle: React.CSSProperties = {
   padding: '10px 12px',
-  background: 'var(--dsw-alias-bg-layer-2)',
+  background: 'none',
   borderRadius: 6,
-  border: '1px solid var(--dsw-alias-border-l2)',
+  border: '1px solid transparent',
+}
+
+/** Static info rows (empty / unreachable) keep a visible outline; record cards stay borderless until hovered. */
+const outlinedRowStyle: React.CSSProperties = {
+  ...rowStyle,
+  borderColor: 'var(--dsw-alias-border-l2)',
+}
+
+/** Small ghost button for the records-page header (select / cancel). */
+const headerButtonStyle: React.CSSProperties = {
+  padding: '4px 10px',
+  fontSize: 13,
+  color: 'var(--dsw-alias-label-primary)',
+  background: 'none',
+  border: '1px solid var(--dsw-alias-label-tertiary)',
+  borderRadius: 6,
+  cursor: 'pointer',
 }
 
 function formatTime(time: number): string {
@@ -97,18 +114,131 @@ function plainText(text: string): React.JSX.Element {
   )
 }
 
-/** Pretty-print a JSON arguments string (collapsed-panel summary); falls back to the raw text. */
+/** Serialize a parsed JSON value with value objects replaced by their compact math form (e.g. `"resistance": 100 Ω`). */
+function jsonWithMath(value: unknown, indent = 0): string {
+  const pad = (n: number): string => '  '.repeat(n)
+  if (isValueObject(value)) return formatValueObject(value)
+  if (value === null) return 'null'
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]'
+    return `[\n${value.map((item) => `${pad(indent + 1)}${jsonWithMath(item, indent + 1)}`).join(',\n')}\n${pad(indent)}]`
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) return '{}'
+    return `{\n${entries.map(([key, item]) => `${pad(indent + 1)}${JSON.stringify(key)}: ${jsonWithMath(item, indent + 1)}`).join(',\n')}\n${pad(indent)}}`
+  }
+  return JSON.stringify(value)
+}
+
+/** Like jsonWithMath, but the outermost object renders without braces — its entries become a plain list. */
+function jsonTop(value: unknown): string {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value) && !isValueObject(value)) {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) return ''
+    return entries.map(([key, item]) => `${JSON.stringify(key)}: ${jsonWithMath(item, 1)}`).join('\n')
+  }
+  return jsonWithMath(value)
+}
+
+/** Pretty-print an arguments string with value objects as math lines; falls back to the raw text. */
 function formatJson(text: string): string {
   try {
-    return JSON.stringify(JSON.parse(text), null, 2)
+    return jsonTop(JSON.parse(text))
   } catch {
     return text
   }
 }
 
+/** Unit symbol per value kind, for the compact mathematical display. */
+const VALUE_UNITS: Record<string, string> = {
+  frequency: 'Hz',
+  resistance: 'Ω',
+  capacitance: 'F',
+  inductance: 'H',
+  voltage: 'V',
+  current: 'A',
+  power: 'W',
+  time: 's',
+  angle: 'rad',
+  log: 'dB',
+  none: '',
+}
+
+/** True when the value is one of the value-object shapes the tools exchange: rect/polar input or the serialized output. */
+function isValueObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const v = value as Record<string, unknown>
+  const isNum = (x: unknown): x is number => typeof x === 'number'
+  const isStr = (x: unknown): x is string => typeof x === 'string'
+  if (v.form === 'rect') return isNum(v.re) && isNum(v.im) && isStr(v.kind)
+  if (v.form === 'polar') return isNum(v.mag) && isNum(v.ang) && isStr(v.kind)
+  return isNum(v.re) && isNum(v.im) && isStr(v.kind)
+}
+
+/** Format a number in standard mathematical notation: up to 6 significant digits, scientific for very small/large magnitudes. */
+function fmtNum(x: number): string {
+  if (Object.is(x, -0)) x = 0
+  const abs = Math.abs(x)
+  if (abs !== 0 && (abs >= 1e7 || abs < 1e-4)) {
+    const [mant, exp] = x.toExponential(5).split('e')
+    const m = String(Number(mant))
+    const e = String(Number(exp))
+    return `${m}e${e}`
+  }
+  return String(Number(x.toPrecision(6)))
+}
+
+/** Compact mathematical display of a value object, e.g. `100 Ω`, `100 + 25j Ω`, `1 ∠ 0 rad`. */
+function formatValueObject(value: Record<string, unknown>): string {
+  const kind = typeof value.kind === 'string' ? value.kind : 'none'
+  const unit = VALUE_UNITS[kind] ?? ''
+  const withUnit = (body: string): string => (unit.length > 0 ? `${body} ${unit}` : body)
+  const show = (x: unknown): string => (typeof x === 'number' ? fmtNum(x) : String(x))
+  if (value.form !== 'polar' && typeof value.re === 'number' && typeof value.im === 'number') {
+    const re = value.re
+    const im = value.im
+    let body: string
+    if (im === 0) body = show(re)
+    else if (re === 0) body = `${show(im)}j`
+    else body = im < 0 ? `${show(re)} - ${show(-im)}j` : `${show(re)} + ${show(im)}j`
+    return withUnit(body)
+  }
+  if (typeof value.mag === 'number' && typeof value.ang === 'number') {
+    return withUnit(`${show(value.mag)} ∠ ${show(value.ang)} rad`)
+  }
+  return JSON.stringify(value)
+}
+
+/** A value object as one compact line in mathematical notation — no expansion. */
+function ValueNode({ name, value, depth }: { name: string; value: Record<string, unknown>; depth: number }): React.JSX.Element {
+  return (
+    <div style={{ paddingLeft: depth * 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{name.length > 0 ? `${name}: ` : ''}</span>
+      <span style={{ color: 'var(--dsw-alias-label-primary)' }}>{formatValueObject(value)}</span>
+    </div>
+  )
+}
+
 /** One JSON value as a collapsible tree node; objects and arrays fold, scalars render inline. */
 function JsonNode({ name, value, depth }: { name: string; value: unknown; depth: number }): React.JSX.Element {
   const [open, setOpen] = useState(true)
+  // A string that embeds JSON (e.g. a value object recorded verbatim as a JSON
+  // string inside the arguments) renders as its parsed tree instead of a raw
+  // text leaf, so every object in a call's parameters/result shows as a tree.
+  if (typeof value === 'string' && (value.trimStart().startsWith('{') || value.trimStart().startsWith('['))) {
+    try {
+      const parsed: unknown = JSON.parse(value)
+      if (parsed !== null && typeof parsed === 'object') {
+        return <JsonNode name={name} value={parsed} depth={depth} />
+      }
+    } catch {
+      // Not JSON after all — fall through to the scalar leaf.
+    }
+  }
+  if (isValueObject(value)) {
+    return <ValueNode name={name} value={value} depth={depth} />
+  }
   if (value === null || typeof value !== 'object') {
     return (
       <div style={{ paddingLeft: depth * 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
@@ -143,15 +273,23 @@ function JsonNode({ name, value, depth }: { name: string; value: unknown; depth:
   )
 }
 
-/** One tool call as a collapsible panel: the header shows the name, the body the arguments as a JSON tree. */
-function CallPanel({ call }: { call: Call }): React.JSX.Element {
+/** One tool call merged with its result in a single collapsible panel: name, parameters, then result, in order. */
+function CallResultPanel({ call, result }: { call: Call; result: Result | undefined }): React.JSX.Element {
   const [open, setOpen] = useState(true)
-  let parsed: unknown = call.arguments
+  let parsedArgs: unknown = call.arguments
   if (call.arguments.length > 0) {
     try {
-      parsed = JSON.parse(call.arguments)
+      parsedArgs = JSON.parse(call.arguments)
     } catch {
-      parsed = call.arguments
+      parsedArgs = call.arguments
+    }
+  }
+  let parsedResult: unknown = result?.content ?? ''
+  if (result !== undefined && result.content.length > 0) {
+    try {
+      parsedResult = JSON.parse(result.content)
+    } catch {
+      parsedResult = result.content
     }
   }
   return (
@@ -162,71 +300,34 @@ function CallPanel({ call }: { call: Call }): React.JSX.Element {
       >
         <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
         <span style={{ fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>{call.name}</span>
-        {!open && <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{call.arguments.length > 0 ? formatJson(call.arguments) : ''}</span>}
       </div>
       {open && (
         <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
-          {typeof parsed === 'string'
-            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsed}</div>
-            : <JsonNode name="" value={parsed} depth={0} />}
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 }}>{t('params')}</div>
+          {typeof parsedArgs === 'string'
+            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsedArgs}</div>
+            : <JsonNode name="" value={parsedArgs} depth={0} />}
+          {result !== undefined && (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', marginTop: 8, marginBottom: 4 }}>{t('resultItem')}</div>
+              {typeof parsedResult === 'string'
+                ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsedResult}</div>
+                : <JsonNode name="" value={parsedResult} depth={0} />}
+            </>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-/** The tool calls: one collapsible panel per call, all expanded by default. */
-function plainCalls(calls: Call[]): React.JSX.Element {
+/** The tool calls merged with their results: one collapsible panel per call. */
+function mergedCalls(calls: Call[], results: Result[]): React.JSX.Element {
+  const resultOf = (callId: string): Result | undefined => results.find((r) => r.callId === callId)
   return (
     <div>
       {calls.map((call) => (
-        <CallPanel key={call.callId} call={call} />
-      ))}
-    </div>
-  )
-}
-
-/** One tool result as a collapsible panel: the header shows the tool name (resolved by callId), the body the output as a JSON tree or plain text — the output is recorded verbatim, even when it is an error message. */
-function ResultPanel({ result, name }: { result: Result; name: string }): React.JSX.Element {
-  const [open, setOpen] = useState(true)
-  let parsed: unknown = result.content
-  if (result.content.length > 0) {
-    try {
-      parsed = JSON.parse(result.content)
-    } catch {
-      parsed = result.content
-    }
-  }
-  return (
-    <div style={{ border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, marginBottom: 8, overflow: 'hidden' }}>
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer', background: 'var(--dsw-alias-bg-base)', userSelect: 'none' }}
-        onClick={() => setOpen(!open)}
-      >
-        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
-        <span style={{ fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>{name}</span>
-      </div>
-      {open && (
-        <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
-          {typeof parsed === 'string'
-            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsed}</div>
-            : <JsonNode name="" value={parsed} depth={0} />}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** The tool results: one collapsible panel per result, named after the matching call. */
-function plainResults(results: Result[], calls: Call[]): React.JSX.Element {
-  const nameOf = (result: Result, index: number): string => {
-    const call = calls.find((c) => c.callId === result.callId)
-    return call?.name ?? `${t('resultItem')} ${index + 1}`
-  }
-  return (
-    <div>
-      {results.map((result, index) => (
-        <ResultPanel key={result.callId} result={result} name={nameOf(result, index)} />
+        <CallResultPanel key={call.callId} call={call} result={resultOf(call.callId)} />
       ))}
     </div>
   )
@@ -310,6 +411,82 @@ function sectionBlock(section: DetailSection): React.JSX.Element {
 }
 
 /**
+ * Build the exported markdown: an H1 `DeepSeek Harness ElectroLab Exported`
+ * (localized), the id/timestamps as body text, then five H2 sections (no
+ * index numbers) with the step contents as body text.
+ */
+function buildRecordMarkdown(record: DetailRecord): string {
+  const lines: string[] = []
+  lines.push(`# DeepSeek Harness ElectroLab ${t('exported')}`, '')
+  // Blank lines between the metadata rows: markdown renders adjacent lines as one paragraph.
+  lines.push(`id: ${record.id}`, '')
+  lines.push(`${t('startedAt')}: ${formatFull(record.startedAt)}`, '')
+  if (record.settledAt !== undefined) lines.push(`${t('settledAt')}: ${formatFull(record.settledAt)}`, '')
+  lines.push(`## ${t('stepQuestion')}`, '', record.question, '')
+  lines.push(`## ${t('stepAnalyse')}`, '', record.analyse, '')
+  const nameOf = (callId: string, index: number): string => {
+    const call = record.calls.find((c) => c.callId === callId)
+    return call?.name ?? `${t('resultItem')} ${index + 1}`
+  }
+  lines.push(`## ${t('stepCalls')}`, '')
+  for (const call of record.calls) {
+    lines.push(`### ${call.name}`, '')
+    if (call.arguments.length > 0) {
+      lines.push(`#### ${t('params')}`, '', '```text', formatJson(call.arguments), '```', '')
+    }
+    const result = record.results.find((r) => r.callId === call.callId)
+    if (result !== undefined) {
+      const trimmed = result.content.trim()
+      if (trimmed.length > 0) {
+        lines.push(`#### ${t('resultItem')}`, '')
+        try {
+          const parsed: unknown = JSON.parse(trimmed)
+          lines.push('```text', jsonTop(parsed), '```', '')
+        } catch {
+          lines.push(result.content, '')
+        }
+      }
+    }
+  }
+  lines.push(`## ${t('stepAnswer')}`, '', record.answer ?? '', '')
+  return lines.join('\n')
+}
+
+/** Save the record as a markdown file: a save-file picker when available, a download fallback otherwise. */
+async function exportRecordFile(record: DetailRecord): Promise<void> {
+  const markdown = buildRecordMarkdown(record)
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+  const suggestedName = `electro-lab-${record.id.slice(0, 8)}.md`
+  const picker = (window as unknown as {
+    showSaveFilePicker?: (options: {
+      suggestedName: string
+      types: Array<{ description: string; accept: Record<string, string[]> }>
+    }) => Promise<{ createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }> }>
+  }).showSaveFilePicker
+  if (picker !== undefined) {
+    try {
+      const handle = await picker({
+        suggestedName,
+        types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+      })
+      const writable = await handle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+      return
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return // user cancelled
+      // Fall through to the download fallback on any other failure.
+    }
+  }
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = suggestedName
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+/**
  * The record detail as a PAGE covering the records tab: a back header, a
  * left table of contents (click to jump to a section heading) and ONE
  * shared scroll area on the right whose section headings stick to the top
@@ -317,11 +494,11 @@ function sectionBlock(section: DetailSection): React.JSX.Element {
  */
 function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
   const [backHover, setBackHover] = useState(false)
+  const [exportHover, setExportHover] = useState(false)
   const sections: DetailSection[] = [
     { key: 'question', label: t('sectionQuestion'), content: record.question },
     { key: 'analyse', label: t('sectionAnalyse'), content: record.analyse },
-    { key: 'calls', label: t('sectionCalls'), content: record.calls.length === 0 ? '' : plainCalls(record.calls) },
-    { key: 'results', label: t('sectionResults'), content: record.results.length === 0 ? '' : plainResults(record.results, record.calls) },
+    { key: 'calls', label: t('sectionCalls'), content: record.calls.length === 0 ? '' : mergedCalls(record.calls, record.results) },
     { key: 'answer', label: t('sectionAnswer'), content: record.answer ?? '' },
   ]
 
@@ -333,30 +510,55 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, fontSize: 'var(--dsw-font-markdown-base-font-size)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--dsw-alias-border-l2)' }}>
-        <button
-          type="button"
-          aria-label="返回记录"
-          onClick={onBack}
-          onMouseEnter={() => setBackHover(true)}
-          onMouseLeave={() => setBackHover(false)}
-          style={{
-            alignSelf: 'flex-start',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 8px',
-            borderRadius: 6,
-            border: '1px solid var(--dsw-alias-border-l2)',
-            borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
-            background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-            color: 'var(--dsw-alias-label-primary)',
-            cursor: 'pointer',
-            fontSize: 13,
-          }}
-        >
-          <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
-          <span style={{ lineHeight: 1 }}>{t('backToRecords')}</span>
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            aria-label={t('backToRecords')}
+            onClick={onBack}
+            onMouseEnter={() => setBackHover(true)}
+            onMouseLeave={() => setBackHover(false)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--dsw-alias-label-tertiary)',
+              borderColor: backHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
+              background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+              color: 'var(--dsw-alias-label-primary)',
+              cursor: 'pointer',
+              fontSize: 13,
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
+            <span style={{ lineHeight: 1 }}>{t('backToRecords')}</span>
+          </button>
+          <button
+            type="button"
+            aria-label={t('exportRecord')}
+            title={t('exportRecord')}
+            onClick={() => void exportRecordFile(record)}
+            onMouseEnter={() => setExportHover(true)}
+            onMouseLeave={() => setExportHover(false)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--dsw-alias-label-tertiary)',
+              borderColor: exportHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
+              background: exportHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+              color: 'var(--dsw-alias-label-primary)',
+              cursor: 'pointer',
+              fontSize: 13,
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>↓</span>
+            <span style={{ lineHeight: 1 }}>{t('exportRecord')}</span>
+          </button>
+        </div>
         <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {record.question || `record ${record.id}`}
         </div>
@@ -415,9 +617,10 @@ export function RecordsTab(): React.JSX.Element {
   const [failed, setFailed] = useState(false)
   const [dialogRecord, setDialogRecord] = useState<DetailRecord | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [delHoverId, setDelHoverId] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ ids: string[]; heading: string } | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let alive = true
@@ -453,7 +656,7 @@ export function RecordsTab(): React.JSX.Element {
 
   if (failed && response === null) {
     return (
-      <div style={rowStyle}>
+      <div style={outlinedRowStyle}>
         <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>
           {t('unreachable')}
         </span>
@@ -469,21 +672,71 @@ export function RecordsTab(): React.JSX.Element {
   const records = (response?.records ?? []).slice(0, DISPLAY_MAX_RECORDS)
   const openRecords = response?.open ?? []
 
-  /** Row style: the border shows on hover (the detail now opens as a dialog). */
-  const rowHoverStyle = (id: string): React.CSSProperties => ({
-    ...rowStyle,
-    cursor: 'pointer',
-    background: hoveredId === id ? 'var(--dsw-alias-interactive-bg-hover)' : rowStyle.background,
-    borderColor: hoveredId === id ? 'var(--dsw-alias-border-l1)' : 'transparent',
-  })
+  /** Toggle one record in the selection (select mode). */
+  const toggleSelect = (id: string): void => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  /** Leave select mode and drop the selection. */
+  const exitSelectMode = (): void => {
+    setSelectMode(false)
+    setSelected(new Set())
+  }
+
+  /** Row style: borderless, only the border highlights on hover; a selected card gets the accent border + tint — heavier than hover. */
+  const rowHoverStyle = (id: string): React.CSSProperties => {
+    const isSelected = selectMode && selected.has(id)
+    return {
+      ...rowStyle,
+      cursor: 'pointer',
+      borderColor: isSelected
+        ? 'var(--dsw-alias-state-business-primary)'
+        : hoveredId === id
+          ? 'var(--dsw-alias-label-primary)'
+          : 'transparent',
+      background: isSelected ? 'var(--dsw-alias-interactive-bg-active)' : 'none',
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
-        {t('headerNote')}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        {selectMode ? (
+          <button type="button" style={headerButtonStyle} onClick={exitSelectMode}>
+            {t('cancelSelect')}
+          </button>
+        ) : (
+          <button type="button" style={headerButtonStyle} onClick={() => setSelectMode(true)}>
+            {t('select')}
+          </button>
+        )}
+        {selectMode && (
+          <button
+            type="button"
+            disabled={selected.size === 0}
+            onClick={() => setDeleteTarget({
+              ids: [...selected],
+              heading: t('deleteSelectedTitle', { count: selected.size }),
+            })}
+            style={{
+              ...headerButtonStyle,
+              color: 'var(--dsw-alias-state-error-primary)',
+              borderColor: 'var(--dsw-alias-state-error-primary)',
+              opacity: selected.size === 0 ? 0.45 : 1,
+              cursor: selected.size === 0 ? 'default' : 'pointer',
+            }}
+          >
+            {t('delete')}
+          </button>
+        )}
       </div>
       {records.length === 0 && openRecords.length === 0 ? (
-        <div style={rowStyle}>
+        <div style={outlinedRowStyle}>
           <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{t('emptyHint')}</span>
         </div>
       ) : (
@@ -492,7 +745,7 @@ export function RecordsTab(): React.JSX.Element {
             <div
               key={`open:${run.id}`}
               style={rowHoverStyle(`open:${run.id}`)}
-              onClick={() => setDialogRecord({ ...run, answer: '' })}
+              onClick={() => { if (!selectMode) setDialogRecord({ ...run, answer: '' }) }}
               onMouseEnter={() => setHoveredId(`open:${run.id}`)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -512,7 +765,7 @@ export function RecordsTab(): React.JSX.Element {
             <div
               key={run.id}
               style={rowHoverStyle(run.id)}
-              onClick={() => setDialogRecord(run)}
+              onClick={() => { if (selectMode) toggleSelect(run.id); else setDialogRecord(run) }}
               onMouseEnter={() => setHoveredId(run.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -533,35 +786,10 @@ export function RecordsTab(): React.JSX.Element {
                   <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>
                     {formatTime(run.startedAt)}
                   </span>
-                  <span
-                    role="button"
-                    title={t('deleteRecord')}
-                    style={{
-                      width: 22,
-                      height: 22,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                      border: '1px solid transparent',
-                      borderRadius: 4,
-                      color: delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)',
-                      borderColor: delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'transparent',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      lineHeight: 1,
-                      transition: 'color 0.12s, border-color 0.12s',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDeleteTarget({ id: run.id, title: run.question || `record ${run.id}` })
-                    }}
-                    onMouseEnter={() => setDelHoverId(run.id)}
-                    onMouseLeave={() => setDelHoverId(null)}
-                  >
-                    ✕
-                  </span>
                 </span>
+              </div>
+              <div style={{ marginTop: 4, color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
+                {run.id}
               </div>
               {run.error !== undefined && (
                 <div style={{ marginTop: 4, color: 'var(--dsw-alias-state-error-primary)', font: '11px ui-monospace, monospace' }}>
@@ -596,7 +824,7 @@ export function RecordsTab(): React.JSX.Element {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={t('deleteTitle')}
+            aria-label={deleteTarget.heading}
             style={{
               width: 320,
               maxWidth: 'calc(100vw - 32px)',
@@ -608,11 +836,8 @@ export function RecordsTab(): React.JSX.Element {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('deleteTitle')}</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{deleteTarget.heading}</div>
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{t('irreversible')}</div>
-            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {deleteTarget.title}
-            </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <button
                 type="button"
@@ -644,7 +869,8 @@ export function RecordsTab(): React.JSX.Element {
                 onClick={() => {
                   const target = deleteTarget
                   setDeleteTarget(null)
-                  void removeRecord(target.id)
+                  for (const id of target.ids) void removeRecord(id)
+                  if (target.ids.length > 1) exitSelectMode()
                 }}
               >
                 {t('delete')}

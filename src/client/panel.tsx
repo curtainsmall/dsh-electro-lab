@@ -59,6 +59,24 @@ export function mountElectroLabPanel(): () => void {
     [data-pane="conversation"], [class*="centerCol"] { position: relative; }
     [data-dsh-electrolab-view] { position: absolute; inset: 0; z-index: 40;
       background: var(--dsw-alias-bg-base, #171a21); overflow: auto; }
+    /* Visible scrollbars in both themes: the shell's scrollbar-bg-l2 is
+       near-white in light themes, so label-tertiary is used — a solid color
+       on dark and light backgrounds. Safe since the extension now scales the
+       iframe with CSS zoom (relayout), not transform:scale (post-raster
+       scaling that blurred everything). */
+    [data-dsh-electrolab-view]::-webkit-scrollbar,
+    [data-dsh-electrolab-view] ::-webkit-scrollbar { width: 10px; height: 10px; }
+    [data-dsh-electrolab-view]::-webkit-scrollbar-track,
+    [data-dsh-electrolab-view] ::-webkit-scrollbar-track { background: transparent; }
+    [data-dsh-electrolab-view]::-webkit-scrollbar-thumb,
+    [data-dsh-electrolab-view] ::-webkit-scrollbar-thumb {
+      background: var(--dsw-alias-label-tertiary);
+      border: 2px solid transparent;
+      border-radius: 5px;
+      background-clip: padding-box; }
+    [data-dsh-electrolab-view]::-webkit-scrollbar-thumb:hover,
+    [data-dsh-electrolab-view] ::-webkit-scrollbar-thumb:hover {
+      background: var(--dsw-alias-label-primary); }
   `
   document.head.appendChild(style)
 
@@ -221,7 +239,7 @@ const headerStyle: React.CSSProperties = {
 
 const backButtonStyle: React.CSSProperties = {
   background: 'none',
-  border: '1px solid var(--dsw-alias-border-l2)',
+  border: '1px solid var(--dsw-alias-label-tertiary)',
   borderRadius: 6,
   color: 'var(--dsw-alias-label-primary)',
   cursor: 'pointer',
@@ -234,44 +252,36 @@ const backButtonStyle: React.CSSProperties = {
 
 const tabBarStyle: React.CSSProperties = {
   display: 'flex',
-  gap: 4,
+  gap: 2,
+  flex: 'none',
   padding: '8px 14px 0',
-  borderBottom: '1px solid var(--dsw-alias-border-l2)',
-  background: 'var(--dsw-specific-sidebar-fill, #171a21)',
+  borderBottom: '1px solid var(--dsw-alias-border-l1)',
+}
+
+/** Active tab button, styled exactly like the dsh-ssh panel tabs (panel.module.css .tab + .tab[data-active]). */
+function tabButtonStyle(hovered: boolean): React.CSSProperties {
+  return {
+    padding: '7px 14px',
+    fontSize: 13,
+    color: 'var(--dsw-alias-label-primary)',
+    fontWeight: 600,
+    background: hovered ? 'var(--dsw-alias-interactive-bg-hover)' : 'transparent',
+    border: 'none',
+    borderBottom: '2px solid var(--dsw-alias-state-business-primary)',
+    borderRadius: '6px 6px 0 0',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  }
 }
 
 /** The panel body: title bar with a back-to-session button, tabs, content. */
 export function ElectroLabPanel(): React.JSX.Element | null {
   useAppLocale() // Re-render when the active language changes.
   const open = useSyncExternalStore(panelStore.subscribe, () => panelStore.open)
-  const [tab, setTab] = useState<'config' | 'records'>('records')
   const [backHover, setBackHover] = useState(false)
-  const [tabHover, setTabHover] = useState<'config' | 'records' | null>(null)
+  const [tabHover, setTabHover] = useState(false)
 
   if (!open) return null
-
-  const tabButton = (key: 'config' | 'records', label: string): React.JSX.Element => (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={tab === key}
-      onClick={() => setTab(key)}
-      onMouseEnter={() => setTabHover(key)}
-      onMouseLeave={() => setTabHover(null)}
-      style={{
-        padding: '5px 12px',
-        border: '1px solid var(--dsw-alias-border-l2)',
-        borderBottomColor: tab === key ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-border-l2)',
-        borderRadius: 6,
-        background: tabHover === key ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-        color: tab === key ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-label-primary)',
-        cursor: 'pointer',
-        fontSize: 13,
-      }}
-    >
-      {label}
-    </button>
-  )
 
   return (
     <div
@@ -294,7 +304,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
           style={{
             ...backButtonStyle,
             background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-            borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
+            borderColor: backHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
           }}
         >
           <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
@@ -302,12 +312,22 @@ export function ElectroLabPanel(): React.JSX.Element | null {
         </button>
         <h2 style={{ margin: 0, fontSize: 15 }}>ElectroLab</h2>
       </div>
-      <div role="tablist" style={tabBarStyle}>
-        {tabButton('config', t('tabConfig'))}
-        {tabButton('records', t('tabRecords'))}
+      <div role="tablist" style={tabBarStyle} data-dsh-part="tab-bar">
+        <button
+          type="button"
+          role="tab"
+          aria-selected="true"
+          data-active=""
+          data-dsh-part="tab"
+          onMouseEnter={() => setTabHover(true)}
+          onMouseLeave={() => setTabHover(false)}
+          style={tabButtonStyle(tabHover)}
+        >
+          {t('tabRecords')}
+        </button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
-        {tab === 'records' ? <RecordsTab /> : <div />}
+        <RecordsTab />
       </div>
     </div>
   )

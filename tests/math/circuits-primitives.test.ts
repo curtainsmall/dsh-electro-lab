@@ -81,12 +81,21 @@ describe('calcNetworkImpedance — nested topologies', () => {
 
 describe('validateNetwork', () => {
   it('accepts valid trees and rejects malformed ones', () => {
-    const valid = validateNetwork({ topology: 'series', elements: [{ kind: 'resistance', value: 10 }] })
+    const leafR = { form: 'rect' as const, re: 10, im: 0, kind: 'resistance' as const }
+    const valid = validateNetwork({ topology: 'series', elements: [leafR] })
     expect(valid).toEqual({ topology: CircuitMode.Series, elements: [{ kind: ElementKind.Resistance, value: 10 }] })
+    // leaves are complex value objects of kind resistance|inductance|capacitance
+    expect(validateNetwork({ form: 'polar', mag: 20, ang: 0, kind: 'resistance' })).toEqual({
+      kind: ElementKind.Resistance,
+      value: 20,
+    })
     expect(() => validateNetwork(null)).toThrow(/network must be an object/)
-    expect(() => validateNetwork({ kind: 'capacitor', value: 1 })).toThrow(/unknown element kind/)
-    expect(() => validateNetwork({ kind: 'resistance', value: -5 })).toThrow(/non-negative/)
+    expect(() => validateNetwork({ form: 'rect', re: 1, im: 0, kind: 'capacitor' })).toThrow(/unknown element kind/)
+    // the old bare-number DSL {kind, value} is not a value object — rejected as such
+    expect(() => validateNetwork({ kind: 'resistance', value: 5 })).toThrow(/non-negative real resistance value/)
+    expect(() => validateNetwork({ form: 'rect', re: -5, im: 0, kind: 'resistance' })).toThrow(/non-negative/)
+    expect(() => validateNetwork({ form: 'rect', re: 1, im: 1, kind: 'resistance' })).toThrow(/non-negative real resistance value/)
     expect(() => validateNetwork({ topology: 'series', elements: [] })).toThrow(/non-empty/)
-    expect(() => validateNetwork({ foo: 1 })).toThrow(/must be/)
+    expect(() => validateNetwork({ foo: 1 })).toThrow(/unknown element kind/)
   })
 })

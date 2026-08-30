@@ -33,9 +33,9 @@ describe('parseSkillFile', () => {
     const text = readFileSync(new URL('../skills/electro-lab-template.md', import.meta.url), 'utf8')
     const skill = parseSkillFile(text)
     expect(skill.name).toBe('electro-lab-template')
-    expect(skill.description).toContain('five-part')
+    expect(skill.description).toContain('record_question')
     expect(skill.whenToUse).toContain('electro-lab workflow')
-    expect(skill.content).toContain('## Template')
+    expect(skill.content).toContain('## Record protocol')
   })
 
   it('parses the shipped interface skill (format guard)', () => {
