@@ -244,34 +244,9 @@ const tabBarStyle: React.CSSProperties = {
 export function ElectroLabPanel(): React.JSX.Element | null {
   useAppLocale() // Re-render when the active language changes.
   const open = useSyncExternalStore(panelStore.subscribe, () => panelStore.open)
-  const [tab, setTab] = useState<'config' | 'records'>('records')
   const [backHover, setBackHover] = useState(false)
-  const [tabHover, setTabHover] = useState<'config' | 'records' | null>(null)
 
   if (!open) return null
-
-  const tabButton = (key: 'config' | 'records', label: string): React.JSX.Element => (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={tab === key}
-      onClick={() => setTab(key)}
-      onMouseEnter={() => setTabHover(key)}
-      onMouseLeave={() => setTabHover(null)}
-      style={{
-        padding: '5px 12px',
-        border: '1px solid var(--dsw-alias-border-l2)',
-        borderBottomColor: tab === key ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-border-l2)',
-        borderRadius: 6,
-        background: tabHover === key ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-        color: tab === key ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-label-primary)',
-        cursor: 'pointer',
-        fontSize: 13,
-      }}
-    >
-      {label}
-    </button>
-  )
 
   return (
     <div
@@ -303,11 +278,26 @@ export function ElectroLabPanel(): React.JSX.Element | null {
         <h2 style={{ margin: 0, fontSize: 15 }}>ElectroLab</h2>
       </div>
       <div role="tablist" style={tabBarStyle}>
-        {tabButton('config', t('tabConfig'))}
-        {tabButton('records', t('tabRecords'))}
+        <button
+          type="button"
+          role="tab"
+          aria-selected="true"
+          style={{
+            padding: '5px 12px',
+            border: '1px solid var(--dsw-alias-border-l2)',
+            borderBottomColor: 'var(--dsw-alias-state-warn-primary)',
+            borderRadius: 6,
+            background: 'none',
+            color: 'var(--dsw-alias-state-warn-primary)',
+            cursor: 'pointer',
+            fontSize: 13,
+          }}
+        >
+          {t('tabRecords')}
+        </button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
-        {tab === 'records' ? <RecordsTab /> : <div />}
+        <RecordsTab />
       </div>
     </div>
   )

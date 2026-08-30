@@ -664,9 +664,6 @@ export function RecordsTab(): React.JSX.Element {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
-        {t('headerNote')}
-      </div>
       {records.length === 0 && openRecords.length === 0 ? (
         <div style={rowStyle}>
           <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{t('emptyHint')}</span>
@@ -747,6 +744,9 @@ export function RecordsTab(): React.JSX.Element {
                     ✕
                   </span>
                 </span>
+              </div>
+              <div style={{ marginTop: 4, color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
+                {run.id}
               </div>
               {run.error !== undefined && (
                 <div style={{ marginTop: 4, color: 'var(--dsw-alias-state-error-primary)', font: '11px ui-monospace, monospace' }}>

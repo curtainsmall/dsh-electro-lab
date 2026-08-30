@@ -11,11 +11,9 @@ export const LOCALE_NS = 'dsh-electro-lab'
 
 const zh = {
   backToSession: '返回会话',
-  tabConfig: '配置',
   tabRecords: '记录',
   emptyHint: '暂无 ElectroLab 记录——让智能体做一次计算。',
   unreachable: '暂未检测到记录——记录端点未响应,面板会自动重试;若刚更新插件,宿主可能需要重启。',
-  headerNote: '所有会话的五步求解记录——存于磁盘,自动刷新。',
   inProgress: '● 进行中',
   toolCallsCount: '{count} 次工具调用',
   errorsCount: ', {count} 个错误',
@@ -47,11 +45,9 @@ const zh = {
 
 const en: Record<keyof typeof zh, string> = {
   backToSession: 'Back to session',
-  tabConfig: 'Config',
   tabRecords: 'Records',
   emptyHint: 'No ElectroLab records yet — ask the agent for a calculation.',
   unreachable: 'No records detected yet — the records endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.',
-  headerNote: 'Settled records of the five-step process across all sessions — stored on disk, refreshed automatically.',
   inProgress: '● in progress',
   toolCallsCount: '{count} tool call(s)',
   errorsCount: ', {count} error(s)',
