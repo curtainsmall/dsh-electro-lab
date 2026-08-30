@@ -69,9 +69,15 @@ const DISPLAY_MAX_RECORDS = 100
 
 const rowStyle: React.CSSProperties = {
   padding: '10px 12px',
-  background: 'var(--dsw-alias-bg-layer-2)',
+  background: 'none',
   borderRadius: 6,
-  border: '1px solid var(--dsw-alias-border-l2)',
+  border: '1px solid transparent',
+}
+
+/** Static info rows (empty / unreachable) keep a visible outline; record cards stay borderless until hovered. */
+const outlinedRowStyle: React.CSSProperties = {
+  ...rowStyle,
+  borderColor: 'var(--dsw-alias-border-l2)',
 }
 
 function formatTime(time: number): string {
@@ -506,8 +512,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               gap: 6,
               padding: '4px 8px',
               borderRadius: 6,
-              border: '1px solid var(--dsw-alias-border-l2)',
-              borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
+              border: '1px solid var(--dsw-alias-label-tertiary)',
+              borderColor: backHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
               background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
               color: 'var(--dsw-alias-label-primary)',
               cursor: 'pointer',
@@ -530,8 +536,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               gap: 6,
               padding: '4px 8px',
               borderRadius: 6,
-              border: '1px solid var(--dsw-alias-border-l2)',
-              borderColor: exportHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
+              border: '1px solid var(--dsw-alias-label-tertiary)',
+              borderColor: exportHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
               background: exportHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
               color: 'var(--dsw-alias-label-primary)',
               cursor: 'pointer',
@@ -638,7 +644,7 @@ export function RecordsTab(): React.JSX.Element {
 
   if (failed && response === null) {
     return (
-      <div style={rowStyle}>
+      <div style={outlinedRowStyle}>
         <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>
           {t('unreachable')}
         </span>
@@ -654,18 +660,17 @@ export function RecordsTab(): React.JSX.Element {
   const records = (response?.records ?? []).slice(0, DISPLAY_MAX_RECORDS)
   const openRecords = response?.open ?? []
 
-  /** Row style: the border shows on hover (the detail now opens as a dialog). */
+  /** Row style: borderless, only the border highlights on hover. label-primary is a solid full-contrast color — visible in both dark and light themes, unlike the low-alpha border tokens. */
   const rowHoverStyle = (id: string): React.CSSProperties => ({
     ...rowStyle,
     cursor: 'pointer',
-    background: hoveredId === id ? 'var(--dsw-alias-interactive-bg-hover)' : rowStyle.background,
-    borderColor: hoveredId === id ? 'var(--dsw-alias-border-l1)' : 'transparent',
+    borderColor: hoveredId === id ? 'var(--dsw-alias-label-primary)' : 'transparent',
   })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {records.length === 0 && openRecords.length === 0 ? (
-        <div style={rowStyle}>
+        <div style={outlinedRowStyle}>
           <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{t('emptyHint')}</span>
         </div>
       ) : (

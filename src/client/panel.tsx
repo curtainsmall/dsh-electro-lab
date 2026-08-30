@@ -59,6 +59,9 @@ export function mountElectroLabPanel(): () => void {
     [data-pane="conversation"], [class*="centerCol"] { position: relative; }
     [data-dsh-electrolab-view] { position: absolute; inset: 0; z-index: 40;
       background: var(--dsw-alias-bg-base, #171a21); overflow: auto; }
+    /* No custom scrollbar styling: any painted scrollbar (::-webkit-scrollbar
+       pseudo-elements or scrollbar-color) rasterizes at DPR 1 in webviews and
+       looks low-res, while the native scrollbar stays crisp. */
   `
   document.head.appendChild(style)
 
@@ -221,7 +224,7 @@ const headerStyle: React.CSSProperties = {
 
 const backButtonStyle: React.CSSProperties = {
   background: 'none',
-  border: '1px solid var(--dsw-alias-border-l2)',
+  border: '1px solid var(--dsw-alias-label-tertiary)',
   borderRadius: 6,
   color: 'var(--dsw-alias-label-primary)',
   cursor: 'pointer',
@@ -286,7 +289,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
           style={{
             ...backButtonStyle,
             background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-            borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
+            borderColor: backHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
           }}
         >
           <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
