@@ -106,6 +106,63 @@ function formatJson(text: string): string {
   }
 }
 
+/** Unit symbol per value kind, for the compact mathematical display. */
+const VALUE_UNITS: Record<string, string> = {
+  frequency: 'Hz',
+  resistance: 'Ω',
+  capacitance: 'F',
+  inductance: 'H',
+  voltage: 'V',
+  current: 'A',
+  power: 'W',
+  time: 's',
+  angle: 'rad',
+  log: 'dB',
+  none: '',
+}
+
+/** True when the value is one of the value-object shapes the tools exchange: rect/polar input or the serialized output. */
+function isValueObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const v = value as Record<string, unknown>
+  const isNum = (x: unknown): x is number => typeof x === 'number'
+  const isStr = (x: unknown): x is string => typeof x === 'string'
+  if (v.form === 'rect') return isNum(v.re) && isNum(v.im) && isStr(v.kind)
+  if (v.form === 'polar') return isNum(v.mag) && isNum(v.ang) && isStr(v.kind)
+  return isNum(v.re) && isNum(v.im) && isStr(v.kind)
+}
+
+/** Compact mathematical display of a value object, e.g. `100 Ω`, `100 + 25j Ω`, `1 ∠ 0 rad`. */
+function formatValueObject(value: Record<string, unknown>): string {
+  const kind = typeof value.kind === 'string' ? value.kind : 'none'
+  const unit = VALUE_UNITS[kind] ?? ''
+  const withUnit = (body: string): string => (unit.length > 0 ? `${body} ${unit}` : body)
+  const show = (x: unknown): string => String(x)
+  if (value.form !== 'polar' && typeof value.re === 'number' && typeof value.im === 'number') {
+    const re = value.re
+    const im = value.im
+    let body: string
+    if (im === 0) body = show(re)
+    else if (re === 0) body = `${show(im)}j`
+    else body = im < 0 ? `${show(re)} - ${show(-im)}j` : `${show(re)} + ${show(im)}j`
+    return withUnit(body)
+  }
+  if (typeof value.mag === 'number' && typeof value.ang === 'number') {
+    return withUnit(`${show(value.mag)} ∠ ${show(value.ang)} rad`)
+  }
+  return JSON.stringify(value)
+}
+
+/** A value object as one compact line in mathematical notation — no expansion. */
+function ValueNode({ name, value, depth }: { name: string; value: Record<string, unknown>; depth: number }): React.JSX.Element {
+  return (
+    <div style={{ paddingLeft: depth * 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{name.length > 0 ? `${name}: ` : ''}</span>
+      <span style={{ color: 'var(--dsw-alias-label-primary)' }}>{formatValueObject(value)}</span>
+    </div>
+  )
+}
+
 /** One JSON value as a collapsible tree node; objects and arrays fold, scalars render inline. */
 function JsonNode({ name, value, depth }: { name: string; value: unknown; depth: number }): React.JSX.Element {
   const [open, setOpen] = useState(true)
@@ -121,6 +178,9 @@ function JsonNode({ name, value, depth }: { name: string; value: unknown; depth:
     } catch {
       // Not JSON after all — fall through to the scalar leaf.
     }
+  }
+  if (isValueObject(value)) {
+    return <ValueNode name={name} value={value} depth={depth} />
   }
   if (value === null || typeof value !== 'object') {
     return (
