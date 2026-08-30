@@ -109,6 +109,19 @@ function formatJson(text: string): string {
 /** One JSON value as a collapsible tree node; objects and arrays fold, scalars render inline. */
 function JsonNode({ name, value, depth }: { name: string; value: unknown; depth: number }): React.JSX.Element {
   const [open, setOpen] = useState(true)
+  // A string that embeds JSON (e.g. a value object recorded verbatim as a JSON
+  // string inside the arguments) renders as its parsed tree instead of a raw
+  // text leaf, so every object in a call's parameters/result shows as a tree.
+  if (typeof value === 'string' && (value.trimStart().startsWith('{') || value.trimStart().startsWith('['))) {
+    try {
+      const parsed: unknown = JSON.parse(value)
+      if (parsed !== null && typeof parsed === 'object') {
+        return <JsonNode name={name} value={parsed} depth={depth} />
+      }
+    } catch {
+      // Not JSON after all — fall through to the scalar leaf.
+    }
+  }
   if (value === null || typeof value !== 'object') {
     return (
       <div style={{ paddingLeft: depth * 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
@@ -143,15 +156,23 @@ function JsonNode({ name, value, depth }: { name: string; value: unknown; depth:
   )
 }
 
-/** One tool call as a collapsible panel: the header shows the name, the body the arguments as a JSON tree. */
-function CallPanel({ call }: { call: Call }): React.JSX.Element {
+/** One tool call merged with its result in a single collapsible panel: name, parameters, then result, in order. */
+function CallResultPanel({ call, result }: { call: Call; result: Result | undefined }): React.JSX.Element {
   const [open, setOpen] = useState(true)
-  let parsed: unknown = call.arguments
+  let parsedArgs: unknown = call.arguments
   if (call.arguments.length > 0) {
     try {
-      parsed = JSON.parse(call.arguments)
+      parsedArgs = JSON.parse(call.arguments)
     } catch {
-      parsed = call.arguments
+      parsedArgs = call.arguments
+    }
+  }
+  let parsedResult: unknown = result?.content ?? ''
+  if (result !== undefined && result.content.length > 0) {
+    try {
+      parsedResult = JSON.parse(result.content)
+    } catch {
+      parsedResult = result.content
     }
   }
   return (
@@ -162,71 +183,34 @@ function CallPanel({ call }: { call: Call }): React.JSX.Element {
       >
         <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
         <span style={{ fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>{call.name}</span>
-        {!open && <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{call.arguments.length > 0 ? formatJson(call.arguments) : ''}</span>}
       </div>
       {open && (
         <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
-          {typeof parsed === 'string'
-            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsed}</div>
-            : <JsonNode name="" value={parsed} depth={0} />}
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 }}>{t('params')}</div>
+          {typeof parsedArgs === 'string'
+            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsedArgs}</div>
+            : <JsonNode name="" value={parsedArgs} depth={0} />}
+          {result !== undefined && (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', marginTop: 8, marginBottom: 4 }}>{t('resultItem')}</div>
+              {typeof parsedResult === 'string'
+                ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsedResult}</div>
+                : <JsonNode name="" value={parsedResult} depth={0} />}
+            </>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-/** The tool calls: one collapsible panel per call, all expanded by default. */
-function plainCalls(calls: Call[]): React.JSX.Element {
+/** The tool calls merged with their results: one collapsible panel per call. */
+function mergedCalls(calls: Call[], results: Result[]): React.JSX.Element {
+  const resultOf = (callId: string): Result | undefined => results.find((r) => r.callId === callId)
   return (
     <div>
       {calls.map((call) => (
-        <CallPanel key={call.callId} call={call} />
-      ))}
-    </div>
-  )
-}
-
-/** One tool result as a collapsible panel: the header shows the tool name (resolved by callId), the body the output as a JSON tree or plain text — the output is recorded verbatim, even when it is an error message. */
-function ResultPanel({ result, name }: { result: Result; name: string }): React.JSX.Element {
-  const [open, setOpen] = useState(true)
-  let parsed: unknown = result.content
-  if (result.content.length > 0) {
-    try {
-      parsed = JSON.parse(result.content)
-    } catch {
-      parsed = result.content
-    }
-  }
-  return (
-    <div style={{ border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, marginBottom: 8, overflow: 'hidden' }}>
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer', background: 'var(--dsw-alias-bg-base)', userSelect: 'none' }}
-        onClick={() => setOpen(!open)}
-      >
-        <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
-        <span style={{ fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>{name}</span>
-      </div>
-      {open && (
-        <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
-          {typeof parsed === 'string'
-            ? <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parsed}</div>
-            : <JsonNode name="" value={parsed} depth={0} />}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** The tool results: one collapsible panel per result, named after the matching call. */
-function plainResults(results: Result[], calls: Call[]): React.JSX.Element {
-  const nameOf = (result: Result, index: number): string => {
-    const call = calls.find((c) => c.callId === result.callId)
-    return call?.name ?? `${t('resultItem')} ${index + 1}`
-  }
-  return (
-    <div>
-      {results.map((result, index) => (
-        <ResultPanel key={result.callId} result={result} name={nameOf(result, index)} />
+        <CallResultPanel key={call.callId} call={call} result={resultOf(call.callId)} />
       ))}
     </div>
   )
@@ -331,21 +315,19 @@ function buildRecordMarkdown(record: DetailRecord): string {
   for (const call of record.calls) {
     lines.push(`### ${call.name}`, '')
     if (call.arguments.length > 0) lines.push('```json', formatJson(call.arguments), '```', '')
-  }
-  lines.push(`## ${t('stepResults')}`, '')
-  record.results.forEach((result, index) => {
-    // JSON outputs render as fenced code blocks; other tool output stays plain text.
-    const trimmed = result.content.trim()
-    lines.push(`### ${nameOf(result.callId, index)}`, '')
-    if (trimmed.length > 0) {
-      try {
-        JSON.parse(trimmed)
-        lines.push('```json', result.content, '```', '')
-      } catch {
-        lines.push(result.content, '')
+    const result = record.results.find((r) => r.callId === call.callId)
+    if (result !== undefined) {
+      const trimmed = result.content.trim()
+      if (trimmed.length > 0) {
+        try {
+          JSON.parse(trimmed)
+          lines.push('```json', result.content, '```', '')
+        } catch {
+          lines.push(result.content, '')
+        }
       }
     }
-  })
+  }
   lines.push(`## ${t('stepAnswer')}`, '', record.answer ?? '', '')
   return lines.join('\n')
 }
@@ -396,8 +378,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const sections: DetailSection[] = [
     { key: 'question', label: t('sectionQuestion'), content: record.question },
     { key: 'analyse', label: t('sectionAnalyse'), content: record.analyse },
-    { key: 'calls', label: t('sectionCalls'), content: record.calls.length === 0 ? '' : plainCalls(record.calls) },
-    { key: 'results', label: t('sectionResults'), content: record.results.length === 0 ? '' : plainResults(record.results, record.calls) },
+    { key: 'calls', label: t('sectionCalls'), content: record.calls.length === 0 ? '' : mergedCalls(record.calls, record.results) },
     { key: 'answer', label: t('sectionAnswer'), content: record.answer ?? '' },
   ]
 
