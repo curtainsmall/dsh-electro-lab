@@ -97,10 +97,37 @@ function plainText(text: string): React.JSX.Element {
   )
 }
 
-/** Pretty-print a JSON arguments string (collapsed-panel summary); falls back to the raw text. */
+/** Serialize a parsed JSON value with value objects replaced by their compact math form (e.g. `"resistance": 100 Ω`). */
+function jsonWithMath(value: unknown, indent = 0): string {
+  const pad = (n: number): string => '  '.repeat(n)
+  if (isValueObject(value)) return formatValueObject(value)
+  if (value === null) return 'null'
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]'
+    return `[\n${value.map((item) => `${pad(indent + 1)}${jsonWithMath(item, indent + 1)}`).join(',\n')}\n${pad(indent)}]`
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) return '{}'
+    return `{\n${entries.map(([key, item]) => `${pad(indent + 1)}${JSON.stringify(key)}: ${jsonWithMath(item, indent + 1)}`).join(',\n')}\n${pad(indent)}}`
+  }
+  return JSON.stringify(value)
+}
+
+/** Like jsonWithMath, but the outermost object renders without braces — its entries become a plain list. */
+function jsonTop(value: unknown): string {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value) && !isValueObject(value)) {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) return ''
+    return entries.map(([key, item]) => `${JSON.stringify(key)}: ${jsonWithMath(item, 1)}`).join('\n')
+  }
+  return jsonWithMath(value)
+}
+
+/** Pretty-print an arguments string with value objects as math lines; falls back to the raw text. */
 function formatJson(text: string): string {
   try {
-    return JSON.stringify(JSON.parse(text), null, 2)
+    return jsonTop(JSON.parse(text))
   } catch {
     return text
   }
@@ -374,14 +401,17 @@ function buildRecordMarkdown(record: DetailRecord): string {
   lines.push(`## ${t('stepCalls')}`, '')
   for (const call of record.calls) {
     lines.push(`### ${call.name}`, '')
-    if (call.arguments.length > 0) lines.push('```json', formatJson(call.arguments), '```', '')
+    if (call.arguments.length > 0) {
+      lines.push(`#### ${t('params')}`, '', '```text', formatJson(call.arguments), '```', '')
+    }
     const result = record.results.find((r) => r.callId === call.callId)
     if (result !== undefined) {
       const trimmed = result.content.trim()
       if (trimmed.length > 0) {
+        lines.push(`#### ${t('resultItem')}`, '')
         try {
-          JSON.parse(trimmed)
-          lines.push('```json', result.content, '```', '')
+          const parsed: unknown = JSON.parse(trimmed)
+          lines.push('```text', jsonTop(parsed), '```', '')
         } catch {
           lines.push(result.content, '')
         }
