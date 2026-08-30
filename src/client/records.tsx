@@ -567,7 +567,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
       </div>
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* Table of contents: fixed, jumps to the section headings. */}
-        <nav style={{ width: 150, flex: 'none', borderRight: '1px solid var(--dsw-alias-border-l2)', overflowY: 'auto', padding: '8px 0', transform: 'translateZ(0)', willChange: 'scroll-position' }}>
+        <nav style={{ width: 150, flex: 'none', borderRight: '1px solid var(--dsw-alias-border-l2)', overflowY: 'auto', padding: '8px 0' }}>
           {sections.map((section) => (
             <div
               key={section.key}
@@ -590,7 +590,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           ))}
         </nav>
         {/* The ONE scroll area; its headings stick to the top. */}
-        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', transform: 'translateZ(0)', willChange: 'scroll-position' }}>
+        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
           {sections.map((section) => sectionBlock(section))}
         </div>
       </div>

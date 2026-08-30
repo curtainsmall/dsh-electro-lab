@@ -58,19 +58,16 @@ export function mountElectroLabPanel(): () => void {
   style.textContent = `
     [data-pane="conversation"], [class*="centerCol"] { position: relative; }
     [data-dsh-electrolab-view] { position: absolute; inset: 0; z-index: 40;
-      background: var(--dsw-alias-bg-base, #171a21); overflow: auto;
-      /* GPU compositing keeps painted scrollbars crisp in webviews (DPR 1):
-         without a layer, the styled scrollbar rasterizes low-res. */
-      transform: translate3d(0, 0, 0);
-      will-change: scroll-position;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility; }
+      background: var(--dsw-alias-bg-base, #171a21); overflow: auto; }
+    /* Visible scrollbars in both themes: the shell's scrollbar-bg-l2 is
+       near-white in light themes, so label-tertiary is used — a solid color
+       on dark and light backgrounds. Safe since the extension now scales the
+       iframe with CSS zoom (relayout), not transform:scale (post-raster
+       scaling that blurred everything). */
     [data-dsh-electrolab-view]::-webkit-scrollbar,
     [data-dsh-electrolab-view] ::-webkit-scrollbar { width: 10px; height: 10px; }
     [data-dsh-electrolab-view]::-webkit-scrollbar-track,
     [data-dsh-electrolab-view] ::-webkit-scrollbar-track { background: transparent; }
-    /* The transparent border + background-clip: padding-box keeps the rounded
-       thumb crisp instead of rasterizing jagged at DPR 1. */
     [data-dsh-electrolab-view]::-webkit-scrollbar-thumb,
     [data-dsh-electrolab-view] ::-webkit-scrollbar-thumb {
       background: var(--dsw-alias-label-tertiary);
@@ -329,7 +326,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
           {t('tabRecords')}
         </button>
       </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: 14, transform: 'translateZ(0)', willChange: 'scroll-position' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
         <RecordsTab />
       </div>
     </div>
