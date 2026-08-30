@@ -310,6 +310,81 @@ function sectionBlock(section: DetailSection): React.JSX.Element {
 }
 
 /**
+ * Build the exported markdown: an H1 `DeepSeek Harness ElectroLab Exported`
+ * (localized), the id/timestamps as body text, then five H2 sections (no
+ * index numbers) with the step contents as body text.
+ */
+function buildRecordMarkdown(record: DetailRecord): string {
+  const lines: string[] = []
+  lines.push(`# DeepSeek Harness ElectroLab ${t('exported')}`, '')
+  // Blank lines between the metadata rows: markdown renders adjacent lines as one paragraph.
+  lines.push(`id: ${record.id}`, '')
+  lines.push(`${t('startedAt')}: ${formatFull(record.startedAt)}`, '')
+  if (record.settledAt !== undefined) lines.push(`${t('settledAt')}: ${formatFull(record.settledAt)}`, '')
+  lines.push(`## ${t('stepQuestion')}`, '', record.question, '')
+  lines.push(`## ${t('stepAnalyse')}`, '', record.analyse, '')
+  const nameOf = (callId: string, index: number): string => {
+    const call = record.calls.find((c) => c.callId === callId)
+    return call?.name ?? `${t('resultItem')} ${index + 1}`
+  }
+  lines.push(`## ${t('stepCalls')}`, '')
+  for (const call of record.calls) {
+    lines.push(`### ${call.name}`, '')
+    if (call.arguments.length > 0) lines.push('```json', formatJson(call.arguments), '```', '')
+  }
+  lines.push(`## ${t('stepResults')}`, '')
+  record.results.forEach((result, index) => {
+    // JSON outputs render as fenced code blocks; other tool output stays plain text.
+    const trimmed = result.content.trim()
+    lines.push(`### ${nameOf(result.callId, index)}`, '')
+    if (trimmed.length > 0) {
+      try {
+        JSON.parse(trimmed)
+        lines.push('```json', result.content, '```', '')
+      } catch {
+        lines.push(result.content, '')
+      }
+    }
+  })
+  lines.push(`## ${t('stepAnswer')}`, '', record.answer ?? '', '')
+  return lines.join('\n')
+}
+
+/** Save the record as a markdown file: a save-file picker when available, a download fallback otherwise. */
+async function exportRecordFile(record: DetailRecord): Promise<void> {
+  const markdown = buildRecordMarkdown(record)
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+  const suggestedName = `electro-lab-${record.id.slice(0, 8)}.md`
+  const picker = (window as unknown as {
+    showSaveFilePicker?: (options: {
+      suggestedName: string
+      types: Array<{ description: string; accept: Record<string, string[]> }>
+    }) => Promise<{ createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }> }>
+  }).showSaveFilePicker
+  if (picker !== undefined) {
+    try {
+      const handle = await picker({
+        suggestedName,
+        types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+      })
+      const writable = await handle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+      return
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return // user cancelled
+      // Fall through to the download fallback on any other failure.
+    }
+  }
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = suggestedName
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+/**
  * The record detail as a PAGE covering the records tab: a back header, a
  * left table of contents (click to jump to a section heading) and ONE
  * shared scroll area on the right whose section headings stick to the top
@@ -317,6 +392,7 @@ function sectionBlock(section: DetailSection): React.JSX.Element {
  */
 function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
   const [backHover, setBackHover] = useState(false)
+  const [exportHover, setExportHover] = useState(false)
   const sections: DetailSection[] = [
     { key: 'question', label: t('sectionQuestion'), content: record.question },
     { key: 'analyse', label: t('sectionAnalyse'), content: record.analyse },
@@ -333,30 +409,55 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, fontSize: 'var(--dsw-font-markdown-base-font-size)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--dsw-alias-border-l2)' }}>
-        <button
-          type="button"
-          aria-label="返回记录"
-          onClick={onBack}
-          onMouseEnter={() => setBackHover(true)}
-          onMouseLeave={() => setBackHover(false)}
-          style={{
-            alignSelf: 'flex-start',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 8px',
-            borderRadius: 6,
-            border: '1px solid var(--dsw-alias-border-l2)',
-            borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
-            background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-            color: 'var(--dsw-alias-label-primary)',
-            cursor: 'pointer',
-            fontSize: 13,
-          }}
-        >
-          <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
-          <span style={{ lineHeight: 1 }}>{t('backToRecords')}</span>
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            aria-label={t('backToRecords')}
+            onClick={onBack}
+            onMouseEnter={() => setBackHover(true)}
+            onMouseLeave={() => setBackHover(false)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--dsw-alias-border-l2)',
+              borderColor: backHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
+              background: backHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+              color: 'var(--dsw-alias-label-primary)',
+              cursor: 'pointer',
+              fontSize: 13,
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
+            <span style={{ lineHeight: 1 }}>{t('backToRecords')}</span>
+          </button>
+          <button
+            type="button"
+            aria-label={t('exportRecord')}
+            title={t('exportRecord')}
+            onClick={() => void exportRecordFile(record)}
+            onMouseEnter={() => setExportHover(true)}
+            onMouseLeave={() => setExportHover(false)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--dsw-alias-border-l2)',
+              borderColor: exportHover ? 'var(--dsw-alias-border-l1)' : 'var(--dsw-alias-border-l2)',
+              background: exportHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+              color: 'var(--dsw-alias-label-primary)',
+              cursor: 'pointer',
+              fontSize: 13,
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>↓</span>
+            <span style={{ lineHeight: 1 }}>{t('exportRecord')}</span>
+          </button>
+        </div>
         <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {record.question || `record ${record.id}`}
         </div>
