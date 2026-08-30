@@ -159,12 +159,25 @@ function isValueObject(value: unknown): value is Record<string, unknown> {
   return isNum(v.re) && isNum(v.im) && isStr(v.kind)
 }
 
+/** Format a number in standard mathematical notation: up to 6 significant digits, scientific for very small/large magnitudes. */
+function fmtNum(x: number): string {
+  if (Object.is(x, -0)) x = 0
+  const abs = Math.abs(x)
+  if (abs !== 0 && (abs >= 1e7 || abs < 1e-4)) {
+    const [mant, exp] = x.toExponential(5).split('e')
+    const m = String(Number(mant))
+    const e = String(Number(exp))
+    return `${m}e${e}`
+  }
+  return String(Number(x.toPrecision(6)))
+}
+
 /** Compact mathematical display of a value object, e.g. `100 Ω`, `100 + 25j Ω`, `1 ∠ 0 rad`. */
 function formatValueObject(value: Record<string, unknown>): string {
   const kind = typeof value.kind === 'string' ? value.kind : 'none'
   const unit = VALUE_UNITS[kind] ?? ''
   const withUnit = (body: string): string => (unit.length > 0 ? `${body} ${unit}` : body)
-  const show = (x: unknown): string => String(x)
+  const show = (x: unknown): string => (typeof x === 'number' ? fmtNum(x) : String(x))
   if (value.form !== 'polar' && typeof value.re === 'number' && typeof value.im === 'number') {
     const re = value.re
     const im = value.im
