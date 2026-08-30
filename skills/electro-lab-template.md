@@ -13,8 +13,8 @@ The structured five-step content (question, analysis, tool calls, results, answe
 A record is bracketed by the marker tools — only what happens between them is recorded:
 
 - Call `record_question` FIRST, before any calculation tool, passing the consolidated question (verbatim) as `text` — merge every user input, including follow-ups, into one full question that needs no further context.
-- Call `record_analyse` once between the tool calls, passing the analysis as `text`: the knowns with their units, the target quantity, the approach with formulas. No computed numbers yet.
-- Call `record_answer` LAST, after the tool calls, passing the final answer as `text` — it settles the record immediately. Reason only from the tool results.
+- Call `record_analyse` BEFORE the first calculation tool (right after `record_question`), passing the analysis as `text`. It holds the BASIC IDEA of solving only: the knowns with their units (the conditions the user gave), the target quantity, and the approach with formulas. No computed numbers, no tool outputs, no verification talk — every calculated value belongs in the answer.
+- Call `record_answer` LAST, after the tool calls, passing the final answer as `text` — it settles the record immediately. Reason only from the tool results; this is where all numbers go.
 
 The submitted texts contain the CONTENT ONLY — no part titles such as `1. 问题（Question）` or `2. 分析（Analysis）`, no tables, no headings: the record renders the structure itself.
 
