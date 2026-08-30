@@ -80,6 +80,17 @@ const outlinedRowStyle: React.CSSProperties = {
   borderColor: 'var(--dsw-alias-border-l2)',
 }
 
+/** Small ghost button for the records-page header (select / cancel). */
+const headerButtonStyle: React.CSSProperties = {
+  padding: '4px 10px',
+  fontSize: 13,
+  color: 'var(--dsw-alias-label-primary)',
+  background: 'none',
+  border: '1px solid var(--dsw-alias-label-tertiary)',
+  borderRadius: 6,
+  cursor: 'pointer',
+}
+
 function formatTime(time: number): string {
   return new Date(time).toLocaleString(undefined, {
     month: '2-digit',
@@ -609,6 +620,8 @@ export function RecordsTab(): React.JSX.Element {
   const [delHoverId, setDelHoverId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let alive = true
@@ -660,15 +673,50 @@ export function RecordsTab(): React.JSX.Element {
   const records = (response?.records ?? []).slice(0, DISPLAY_MAX_RECORDS)
   const openRecords = response?.open ?? []
 
-  /** Row style: borderless, only the border highlights on hover. label-primary is a solid full-contrast color — visible in both dark and light themes, unlike the low-alpha border tokens. */
-  const rowHoverStyle = (id: string): React.CSSProperties => ({
-    ...rowStyle,
-    cursor: 'pointer',
-    borderColor: hoveredId === id ? 'var(--dsw-alias-label-primary)' : 'transparent',
-  })
+  /** Toggle one record in the selection (select mode). */
+  const toggleSelect = (id: string): void => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  /** Leave select mode and drop the selection. */
+  const exitSelectMode = (): void => {
+    setSelectMode(false)
+    setSelected(new Set())
+  }
+
+  /** Row style: borderless, only the border highlights on hover; a selected card gets the accent border + tint — heavier than hover. */
+  const rowHoverStyle = (id: string): React.CSSProperties => {
+    const isSelected = selectMode && selected.has(id)
+    return {
+      ...rowStyle,
+      cursor: 'pointer',
+      borderColor: isSelected
+        ? 'var(--dsw-alias-state-business-primary)'
+        : hoveredId === id
+          ? 'var(--dsw-alias-label-primary)'
+          : 'transparent',
+      background: isSelected ? 'var(--dsw-alias-interactive-bg-active)' : 'none',
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 8 }}>
+        {selectMode ? (
+          <button type="button" style={headerButtonStyle} onClick={exitSelectMode}>
+            {t('cancelSelect')}
+          </button>
+        ) : (
+          <button type="button" style={headerButtonStyle} onClick={() => setSelectMode(true)}>
+            {t('select')}
+          </button>
+        )}
+      </div>
       {records.length === 0 && openRecords.length === 0 ? (
         <div style={outlinedRowStyle}>
           <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{t('emptyHint')}</span>
@@ -679,7 +727,7 @@ export function RecordsTab(): React.JSX.Element {
             <div
               key={`open:${run.id}`}
               style={rowHoverStyle(`open:${run.id}`)}
-              onClick={() => setDialogRecord({ ...run, answer: '' })}
+              onClick={() => { if (!selectMode) setDialogRecord({ ...run, answer: '' }) }}
               onMouseEnter={() => setHoveredId(`open:${run.id}`)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -699,7 +747,7 @@ export function RecordsTab(): React.JSX.Element {
             <div
               key={run.id}
               style={rowHoverStyle(run.id)}
-              onClick={() => setDialogRecord(run)}
+              onClick={() => { if (selectMode) toggleSelect(run.id); else setDialogRecord(run) }}
               onMouseEnter={() => setHoveredId(run.id)}
               onMouseLeave={() => setHoveredId(null)}
             >

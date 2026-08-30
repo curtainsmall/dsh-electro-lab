@@ -12,6 +12,7 @@ export const LOCALE_NS = 'dsh-electro-lab'
 const zh = {
   backToSession: '返回会话',
   tabRecords: '记录',
+  select: '选择',
   emptyHint: '暂无 ElectroLab 记录——让智能体做一次计算。',
   unreachable: '暂未检测到记录——记录端点未响应,面板会自动重试;若刚更新插件,宿主可能需要重启。',
   inProgress: '● 进行中',
@@ -33,6 +34,7 @@ const zh = {
   deleteTitle: '删除这条记录?',
   irreversible: '此操作不可恢复。',
   cancel: '取消',
+  cancelSelect: '取消选择',
   delete: '删除',
   deleteRecord: '删除这条记录',
   confirmDeleteAgain: '再次点击确认删除',
@@ -46,6 +48,7 @@ const zh = {
 const en: Record<keyof typeof zh, string> = {
   backToSession: 'Back to session',
   tabRecords: 'Records',
+  select: 'Select',
   emptyHint: 'No ElectroLab records yet — ask the agent for a calculation.',
   unreachable: 'No records detected yet — the records endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.',
   inProgress: '● in progress',
@@ -67,6 +70,7 @@ const en: Record<keyof typeof zh, string> = {
   deleteTitle: 'Delete this record?',
   irreversible: 'This cannot be undone.',
   cancel: 'Cancel',
+  cancelSelect: 'Cancel select',
   delete: 'Delete',
   deleteRecord: 'Delete this record',
   confirmDeleteAgain: 'Click again to confirm',
