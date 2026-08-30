@@ -617,8 +617,7 @@ export function RecordsTab(): React.JSX.Element {
   const [failed, setFailed] = useState(false)
   const [dialogRecord, setDialogRecord] = useState<DetailRecord | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [delHoverId, setDelHoverId] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<{ ids: string[]; heading: string; detail: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ ids: string[]; heading: string } | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -723,7 +722,6 @@ export function RecordsTab(): React.JSX.Element {
             onClick={() => setDeleteTarget({
               ids: [...selected],
               heading: t('deleteSelectedTitle', { count: selected.size }),
-              detail: '',
             })}
             style={{
               ...headerButtonStyle,
@@ -788,34 +786,6 @@ export function RecordsTab(): React.JSX.Element {
                   <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>
                     {formatTime(run.startedAt)}
                   </span>
-                  <span
-                    role="button"
-                    title={t('deleteRecord')}
-                    style={{
-                      width: 22,
-                      height: 22,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                      border: '1px solid transparent',
-                      borderRadius: 4,
-                      color: delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)',
-                      borderColor: delHoverId === run.id ? 'var(--dsw-alias-state-error-primary)' : 'transparent',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      lineHeight: 1,
-                      transition: 'color 0.12s, border-color 0.12s',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDeleteTarget({ ids: [run.id], heading: t('deleteTitle'), detail: run.question || `record ${run.id}` })
-                    }}
-                    onMouseEnter={() => setDelHoverId(run.id)}
-                    onMouseLeave={() => setDelHoverId(null)}
-                  >
-                    ✕
-                  </span>
                 </span>
               </div>
               <div style={{ marginTop: 4, color: 'var(--dsw-alias-label-secondary)', font: '11px ui-monospace, monospace', wordBreak: 'break-all' }}>
@@ -854,7 +824,7 @@ export function RecordsTab(): React.JSX.Element {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={t('deleteTitle')}
+            aria-label={deleteTarget.heading}
             style={{
               width: 320,
               maxWidth: 'calc(100vw - 32px)',
@@ -868,11 +838,6 @@ export function RecordsTab(): React.JSX.Element {
           >
             <div style={{ fontWeight: 600, fontSize: 14 }}>{deleteTarget.heading}</div>
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{t('irreversible')}</div>
-            {deleteTarget.detail.length > 0 && (
-              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {deleteTarget.detail}
-              </div>
-            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <button
                 type="button"
