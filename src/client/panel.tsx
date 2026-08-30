@@ -58,10 +58,28 @@ export function mountElectroLabPanel(): () => void {
   style.textContent = `
     [data-pane="conversation"], [class*="centerCol"] { position: relative; }
     [data-dsh-electrolab-view] { position: absolute; inset: 0; z-index: 40;
-      background: var(--dsw-alias-bg-base, #171a21); overflow: auto; }
-    /* No custom scrollbar styling: any painted scrollbar (::-webkit-scrollbar
-       pseudo-elements or scrollbar-color) rasterizes at DPR 1 in webviews and
-       looks low-res, while the native scrollbar stays crisp. */
+      background: var(--dsw-alias-bg-base, #171a21); overflow: auto;
+      /* GPU compositing keeps painted scrollbars crisp in webviews (DPR 1):
+         without a layer, the styled scrollbar rasterizes low-res. */
+      transform: translate3d(0, 0, 0);
+      will-change: scroll-position;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility; }
+    [data-dsh-electrolab-view]::-webkit-scrollbar,
+    [data-dsh-electrolab-view] ::-webkit-scrollbar { width: 10px; height: 10px; }
+    [data-dsh-electrolab-view]::-webkit-scrollbar-track,
+    [data-dsh-electrolab-view] ::-webkit-scrollbar-track { background: transparent; }
+    /* The transparent border + background-clip: padding-box keeps the rounded
+       thumb crisp instead of rasterizing jagged at DPR 1. */
+    [data-dsh-electrolab-view]::-webkit-scrollbar-thumb,
+    [data-dsh-electrolab-view] ::-webkit-scrollbar-thumb {
+      background: var(--dsw-alias-label-tertiary);
+      border: 2px solid transparent;
+      border-radius: 5px;
+      background-clip: padding-box; }
+    [data-dsh-electrolab-view]::-webkit-scrollbar-thumb:hover,
+    [data-dsh-electrolab-view] ::-webkit-scrollbar-thumb:hover {
+      background: var(--dsw-alias-label-primary); }
   `
   document.head.appendChild(style)
 
@@ -311,7 +329,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
           {t('tabRecords')}
         </button>
       </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: 14, transform: 'translateZ(0)', willChange: 'scroll-position' }}>
         <RecordsTab />
       </div>
     </div>
