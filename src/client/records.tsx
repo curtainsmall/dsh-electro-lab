@@ -618,7 +618,7 @@ export function RecordsTab(): React.JSX.Element {
   const [dialogRecord, setDialogRecord] = useState<DetailRecord | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [delHoverId, setDelHoverId] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ ids: string[]; heading: string; detail: string } | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -706,7 +706,7 @@ export function RecordsTab(): React.JSX.Element {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         {selectMode ? (
           <button type="button" style={headerButtonStyle} onClick={exitSelectMode}>
             {t('cancelSelect')}
@@ -714,6 +714,26 @@ export function RecordsTab(): React.JSX.Element {
         ) : (
           <button type="button" style={headerButtonStyle} onClick={() => setSelectMode(true)}>
             {t('select')}
+          </button>
+        )}
+        {selectMode && (
+          <button
+            type="button"
+            disabled={selected.size === 0}
+            onClick={() => setDeleteTarget({
+              ids: [...selected],
+              heading: t('deleteSelectedTitle', { count: selected.size }),
+              detail: '',
+            })}
+            style={{
+              ...headerButtonStyle,
+              color: 'var(--dsw-alias-state-error-primary)',
+              borderColor: 'var(--dsw-alias-state-error-primary)',
+              opacity: selected.size === 0 ? 0.45 : 1,
+              cursor: selected.size === 0 ? 'default' : 'pointer',
+            }}
+          >
+            {t('delete')}
           </button>
         )}
       </div>
@@ -789,7 +809,7 @@ export function RecordsTab(): React.JSX.Element {
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
-                      setDeleteTarget({ id: run.id, title: run.question || `record ${run.id}` })
+                      setDeleteTarget({ ids: [run.id], heading: t('deleteTitle'), detail: run.question || `record ${run.id}` })
                     }}
                     onMouseEnter={() => setDelHoverId(run.id)}
                     onMouseLeave={() => setDelHoverId(null)}
@@ -846,11 +866,13 @@ export function RecordsTab(): React.JSX.Element {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('deleteTitle')}</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{deleteTarget.heading}</div>
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{t('irreversible')}</div>
-            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {deleteTarget.title}
-            </div>
+            {deleteTarget.detail.length > 0 && (
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {deleteTarget.detail}
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <button
                 type="button"
@@ -882,7 +904,8 @@ export function RecordsTab(): React.JSX.Element {
                 onClick={() => {
                   const target = deleteTarget
                   setDeleteTarget(null)
-                  void removeRecord(target.id)
+                  for (const id of target.ids) void removeRecord(id)
+                  if (target.ids.length > 1) exitSelectMode()
                 }}
               >
                 {t('delete')}
