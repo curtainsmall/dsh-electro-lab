@@ -131,7 +131,7 @@ describe('record manager (record_question opens, record_answer settles)', () => 
       'Z ≈ 50 Ω。',
     ].join('\n')
     const settled = manager.feed(answerCall(4, 1300, merged))
-    // The merged template fills the missing analyse; the part titles and the
+    // The merged template fills the missing analyse; the title lines and the
     // tables are stripped from the record texts.
     expect(settled!.analyse).toContain('Z = 1/(1/R')
     expect(settled!.analyse).not.toContain('分析（Analysis）')

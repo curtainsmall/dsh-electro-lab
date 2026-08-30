@@ -111,6 +111,6 @@ DeepSeek Harness ElectroLab 插件的全部工具,按领域分组。所有工具
 
 | 工具 | 用途 |
 |---|---|
-| `record_question` | 开启一条记录并提交合并后的问题（模板第 1 部分）;重复开启会把当前记录结算为 duplicate-start 错误记录 |
-| `record_analyse` | 向当前记录提交分析文本（模板第 2 部分） |
-| `record_answer` | 提交答案文本（模板第 5 部分）并立即结算;若文本是合并的完整模板会自动拆分 |
+| `record_question` | 开启一条记录并提交合并后的问题;重复开启会把当前记录结算为 duplicate-start 错误记录 |
+| `record_analyse` | 向当前记录提交分析文本 |
+| `record_answer` | 提交答案文本并立即结算;若文本是合并的完整模板会自动拆分 |

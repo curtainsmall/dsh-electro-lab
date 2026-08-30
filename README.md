@@ -8,7 +8,7 @@ An electrical & electronics calculation plugin for the DeepSeek Harness: circuit
 
 - **ElectroLab Mode** — the **ElectroLab Mode** agent preset isolates the session to the plugin's calculation tools: no shell, no file system, no network.
 - **Calculations you can trust** — every number comes from a tool call result, never from memory or hand arithmetic.
-- **Records for inspection** — every five-step solve is settled to disk and browsable in the client panel.
+- **Records for inspection** — every solve is settled to disk and browsable in the client panel.
 
 All tools are listed in [tools.md](docs/tools.md).
 

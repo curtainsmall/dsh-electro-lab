@@ -126,11 +126,11 @@ export interface Record {
   id: string
   startedAt: number
   settledAt: number
-  /** One paragraph — the consolidated full question (template part 1). */
+  /** One paragraph — the consolidated full question. */
   question: string
-  /** One paragraph — the approach with formulas (template part 2). */
+  /** One paragraph — the approach with formulas. */
   analyse: string
-  /** One paragraph — the final answer (template part 5). */
+  /** One paragraph — the final answer. */
   answer: string
   /** Structured tool calls, in execution order (marker calls excluded). */
   calls: RecordCall[]
