@@ -234,10 +234,26 @@ const backButtonStyle: React.CSSProperties = {
 
 const tabBarStyle: React.CSSProperties = {
   display: 'flex',
-  gap: 4,
+  gap: 2,
+  flex: 'none',
   padding: '8px 14px 0',
-  borderBottom: '1px solid var(--dsw-alias-border-l2)',
-  background: 'var(--dsw-specific-sidebar-fill, #171a21)',
+  borderBottom: '1px solid var(--dsw-alias-border-l1)',
+}
+
+/** Active tab button, styled exactly like the dsh-ssh panel tabs (panel.module.css .tab + .tab[data-active]). */
+function tabButtonStyle(hovered: boolean): React.CSSProperties {
+  return {
+    padding: '7px 14px',
+    fontSize: 13,
+    color: 'var(--dsw-alias-label-primary)',
+    fontWeight: 600,
+    background: hovered ? 'var(--dsw-alias-interactive-bg-hover)' : 'transparent',
+    border: 'none',
+    borderBottom: '2px solid var(--dsw-alias-state-business-primary)',
+    borderRadius: '6px 6px 0 0',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  }
 }
 
 /** The panel body: title bar with a back-to-session button, tabs, content. */
@@ -245,6 +261,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
   useAppLocale() // Re-render when the active language changes.
   const open = useSyncExternalStore(panelStore.subscribe, () => panelStore.open)
   const [backHover, setBackHover] = useState(false)
+  const [tabHover, setTabHover] = useState(false)
 
   if (!open) return null
 
@@ -277,21 +294,16 @@ export function ElectroLabPanel(): React.JSX.Element | null {
         </button>
         <h2 style={{ margin: 0, fontSize: 15 }}>ElectroLab</h2>
       </div>
-      <div role="tablist" style={tabBarStyle}>
+      <div role="tablist" style={tabBarStyle} data-dsh-part="tab-bar">
         <button
           type="button"
           role="tab"
           aria-selected="true"
-          style={{
-            padding: '5px 12px',
-            border: '1px solid var(--dsw-alias-border-l2)',
-            borderBottomColor: 'var(--dsw-alias-state-warn-primary)',
-            borderRadius: 6,
-            background: 'none',
-            color: 'var(--dsw-alias-state-warn-primary)',
-            cursor: 'pointer',
-            fontSize: 13,
-          }}
+          data-active=""
+          data-dsh-part="tab"
+          onMouseEnter={() => setTabHover(true)}
+          onMouseLeave={() => setTabHover(false)}
+          style={tabButtonStyle(tabHover)}
         >
           {t('tabRecords')}
         </button>
