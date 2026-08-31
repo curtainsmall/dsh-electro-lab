@@ -721,26 +721,26 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ fontWeight: 600, fontSize: 14 }}>{t('generateSetup')}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' }}>{t('format')}</span>
-                <select
-                  value="markdown"
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    fontSize: 13,
-                    color: 'var(--dsw-alias-label-primary)',
-                    background: 'var(--dsw-specific-input-major)',
-                    border: '1px solid var(--dsw-alias-border-l2)',
-                    borderRadius: 6,
-                  }}
-                >
-                  <option value="markdown">Markdown</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' }}>{t('directory')}</span>
+            {/* Two-column grid: the label column auto-sizes to the longest label (max-content),
+                so keys right-align and values left-align regardless of text length or locale. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '12px 10px', alignItems: 'center', marginTop: 12 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('format')}</span>
+              <select
+                value="markdown"
+                style={{
+                  flex: 1,
+                  padding: '6px 8px',
+                  fontSize: 13,
+                  color: 'var(--dsw-alias-label-primary)',
+                  background: 'var(--dsw-specific-input-major)',
+                  border: '1px solid var(--dsw-alias-border-l2)',
+                  borderRadius: 6,
+                }}
+              >
+                <option value="markdown">Markdown</option>
+              </select>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('directory')}</span>
+              <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
                 <input
                   type="text"
                   value={genDir}
@@ -778,16 +778,14 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' }}>{t('fileName')}</span>
-                <input
-                  type="text"
-                  value={genFile}
-                  onChange={(e) => setGenFile(e.target.value)}
-                  placeholder={defaultFileName}
-                  style={{ ...genInputStyle }}
-                />
-              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('fileName')}</span>
+              <input
+                type="text"
+                value={genFile}
+                onChange={(e) => setGenFile(e.target.value)}
+                placeholder={defaultFileName}
+                style={{ ...genInputStyle }}
+              />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button
