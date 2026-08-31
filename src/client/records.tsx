@@ -495,6 +495,30 @@ async function exportRecordFile(record: DetailRecord): Promise<void> {
 function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
   const [backHover, setBackHover] = useState(false)
   const [exportHover, setExportHover] = useState(false)
+  const [genHover, setGenHover] = useState(false)
+  const [browseHover, setBrowseHover] = useState(false)
+  const [genOpen, setGenOpen] = useState(false)
+  const [genPath, setGenPath] = useState('')
+
+  /** Open the OS save-file picker and show the chosen file name in the path bar. */
+  const pickOutputFile = async (): Promise<void> => {
+    const picker = (window as unknown as {
+      showSaveFilePicker?: (options: {
+        suggestedName: string
+        types: Array<{ description: string; accept: Record<string, string[]> }>
+      }) => Promise<{ name: string }>
+    }).showSaveFilePicker
+    if (picker === undefined) return
+    try {
+      const handle = await picker({
+        suggestedName: `electro-lab-${record.id.slice(0, 8)}.md`,
+        types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+      })
+      setGenPath(handle.name)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return // user cancelled
+    }
+  }
   const sections: DetailSection[] = [
     { key: 'question', label: t('sectionQuestion'), content: record.question },
     { key: 'analyse', label: t('sectionAnalyse'), content: record.analyse },
@@ -534,30 +558,56 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
             <span style={{ lineHeight: 1 }}>{t('backToRecords')}</span>
           </button>
-          <button
-            type="button"
-            aria-label={t('exportRecord')}
-            title={t('exportRecord')}
-            onClick={() => void exportRecordFile(record)}
-            onMouseEnter={() => setExportHover(true)}
-            onMouseLeave={() => setExportHover(false)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 8px',
-              borderRadius: 6,
-              border: '1px solid var(--dsw-alias-label-tertiary)',
-              borderColor: exportHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
-              background: exportHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-              color: 'var(--dsw-alias-label-primary)',
-              cursor: 'pointer',
-              fontSize: 13,
-            }}
-          >
-            <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>↓</span>
-            <span style={{ lineHeight: 1 }}>{t('exportRecord')}</span>
-          </button>
+          <span style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              aria-label={t('exportRecord')}
+              title={t('exportRecord')}
+              onClick={() => void exportRecordFile(record)}
+              onMouseEnter={() => setExportHover(true)}
+              onMouseLeave={() => setExportHover(false)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--dsw-alias-label-tertiary)',
+                borderColor: exportHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
+                background: exportHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+                color: 'var(--dsw-alias-label-primary)',
+                cursor: 'pointer',
+                fontSize: 13,
+              }}
+            >
+              <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>↓</span>
+              <span style={{ lineHeight: 1 }}>{t('exportRecord')}</span>
+            </button>
+            <button
+              type="button"
+              aria-label={t('generate')}
+              title={t('generate')}
+              onClick={() => setGenOpen(true)}
+              onMouseEnter={() => setGenHover(true)}
+              onMouseLeave={() => setGenHover(false)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--dsw-alias-label-tertiary)',
+                borderColor: genHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
+                background: genHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+                color: 'var(--dsw-alias-label-primary)',
+                cursor: 'pointer',
+                fontSize: 13,
+              }}
+            >
+              <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>▶</span>
+              <span style={{ lineHeight: 1 }}>{t('generate')}</span>
+            </button>
+          </span>
         </div>
         <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {record.question || `record ${record.id}`}
@@ -605,6 +655,129 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           {sections.map((section) => sectionBlock(section))}
         </div>
       </div>
+      {genOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--dsw-alias-bg-mask-1)',
+          }}
+          onClick={() => setGenOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('generateSetup')}
+            style={{
+              width: 420,
+              maxWidth: 'calc(100vw - 32px)',
+              background: 'var(--dsw-alias-bg-layer-2)',
+              border: '1px solid var(--dsw-alias-border-l2)',
+              borderRadius: 10,
+              padding: 16,
+              boxShadow: 'var(--dsw-shadow-lv3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('generateSetup')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' }}>{t('format')}</span>
+                <select
+                  value="markdown"
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    fontSize: 13,
+                    color: 'var(--dsw-alias-label-primary)',
+                    background: 'var(--dsw-specific-input-major)',
+                    border: '1px solid var(--dsw-alias-border-l2)',
+                    borderRadius: 6,
+                  }}
+                >
+                  <option value="markdown">Markdown</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' }}>{t('outputFile')}</span>
+                <input
+                  type="text"
+                  value={genPath}
+                  onChange={(e) => setGenPath(e.target.value)}
+                  placeholder={`electro-lab-${record.id.slice(0, 8)}.md`}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: '6px 8px',
+                    fontSize: 13,
+                    color: 'var(--dsw-alias-label-primary)',
+                    background: 'var(--dsw-specific-input-major)',
+                    border: '1px solid var(--dsw-alias-border-l2)',
+                    borderRadius: 6,
+                    outline: 'none',
+                    fontFamily: 'ui-monospace, monospace',
+                  }}
+                />
+                <button
+                  type="button"
+                  onMouseEnter={() => setBrowseHover(true)}
+                  onMouseLeave={() => setBrowseHover(false)}
+                  onClick={() => void pickOutputFile()}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--dsw-alias-label-tertiary)',
+                    borderColor: browseHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
+                    background: browseHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+                    color: 'var(--dsw-alias-label-primary)',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                  }}
+                >
+                  {t('browse')}
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button
+                type="button"
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--dsw-alias-border-l2)',
+                  background: 'none',
+                  color: 'var(--dsw-alias-label-primary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+                onClick={() => setGenOpen(false)}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--dsw-alias-state-business-primary)',
+                  background: 'none',
+                  color: 'var(--dsw-alias-state-business-primary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+                onClick={() => setGenOpen(false)}
+              >
+                {t('generate')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
