@@ -691,6 +691,40 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     }
   }
 
+  /** Navigate the browser up one level: select the parent and reveal its listing. */
+  const goUpLevel = async (): Promise<void> => {
+    const current = dirSelected.trim()
+    if (current.length === 0) return
+    let parent: string
+    try {
+      parent = (await loadDirListing(current)).parent
+    } catch {
+      return
+    }
+    if (parent === current) return // already at a drive root
+    const parentNode = findEntry(dirEntries, parent)
+    if (parentNode === undefined) return // parent not part of the loaded tree
+    if (parentNode.children === undefined) {
+      try {
+        const { entries, files } = await loadDirListing(parent)
+        const base = parent.replace(/[\\/]+$/, '')
+        const children: DirEntry[] = [
+          ...entries.map((name) => ({ name, type: 'directory' as const, absolutePath: `${base}/${name}` })),
+          ...files.map((name) => ({ name, type: 'file' as const, absolutePath: `${base}/${name}` })),
+        ]
+        setDirEntries((prev) => attachChildren(prev, parent, children))
+      } catch {
+        return
+      }
+    }
+    setDirExpanded((prev) => new Set(prev).add(parent))
+    setDirSelected(parent)
+    setGenDir(parent)
+    setTimeout(() => {
+      treeListRef.current?.querySelector(`[data-path="${CSS.escape(parent)}"]`)?.scrollIntoView({ block: 'start' })
+    }, 0)
+  }
+
   /** Immutably attach lazily loaded children to one node in the tree. */
   const attachChildren = (nodes: DirEntry[], path: string, children: DirEntry[]): DirEntry[] =>
     nodes.map((node) => {
@@ -1084,8 +1118,28 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ fontWeight: 600, fontSize: 14 }}>{t('browseDirectory')}</div>
-            <div style={{ marginTop: 10, font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all', flex: 'none' }}>
-              {dirSelected}
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+              <button
+                type="button"
+                title={t('upLevel')}
+                onClick={() => void goUpLevel()}
+                style={{
+                  padding: '2px 6px',
+                  borderRadius: 6,
+                  border: '1px solid var(--dsw-alias-label-tertiary)',
+                  background: 'none',
+                  color: 'var(--dsw-alias-label-primary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  flex: 'none',
+                  lineHeight: 1,
+                }}
+              >
+                ↑
+              </button>
+              <div style={{ font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {dirSelected}
+              </div>
             </div>
             <div ref={treeListRef} style={{ marginTop: 8, flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, padding: '4px 0' }}>
               {dirLoading && (
