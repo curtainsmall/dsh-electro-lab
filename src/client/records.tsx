@@ -527,7 +527,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [genDir, setGenDir] = useState('')
   const [genFile, setGenFile] = useState('')
   const [genBusy, setGenBusy] = useState(false)
-  const [genProgress, setGenProgress] = useState<{ percent: number; phase: string } | null>(null)
+  const [genProgress, setGenProgress] = useState<{ percent: number; phase: string; status: 'running' | 'done' | 'error'; path?: string; error?: string } | null>(null)
+  const progressRef = useRef(0)
   const [dirBrowserOpen, setDirBrowserOpen] = useState(false)
   const [dirEntries, setDirEntries] = useState<DirEntry[]>([])
   const [dirExpanded, setDirExpanded] = useState<Set<string>>(new Set())
@@ -562,17 +563,13 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     setGenOpen(false)
   }
 
-  /** Ask the host to generate the article (LLM) and write it to disk; a progress dialog polls the job. */
+  /** Ask the host to generate the article (LLM) and write it to disk; the progress dialog stays open until confirmed. */
   const runGenerate = async (): Promise<void> => {
     const dir = genDir.trim()
     if (dir.length === 0) return
     setGenBusy(true)
-    setGenProgress({ percent: 0, phase: 'prepare' })
-    const fail = (message: string): void => {
-      setGenProgress(null)
-      setGenBusy(false)
-      window.alert(`Generation failed: ${message}`)
-    }
+    progressRef.current = 0
+    setGenProgress({ percent: 0, phase: 'prepare', status: 'running' })
     try {
       const res = await fetch(
         `${GENERATE_ENDPOINT}?recordId=${encodeURIComponent(record.id)}&format=markdown&directory=${encodeURIComponent(dir)}&fileName=${encodeURIComponent(genFile.trim())}`,
@@ -587,24 +584,37 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
         const pr = await fetch(`${GENERATE_PROGRESS_ENDPOINT}?jobId=${encodeURIComponent(body.jobId)}`)
         if (!pr.ok) throw new Error(`progress returned ${pr.status}`)
         const job = (await pr.json()) as { status?: string; percent?: number; phase?: string; path?: string; error?: string }
-        if (job.percent !== undefined && job.phase !== undefined) {
-          setGenProgress({ percent: job.percent, phase: job.phase })
-        }
         if (job.status === 'done') {
           saveGenDir()
           setGenOpen(false)
-          setGenProgress(null)
           setGenBusy(false)
-          window.alert(`Generated: ${job.path ?? ''}`)
+          // Ramp smoothly to 100% from the last shown value instead of jumping.
+          const start = Math.min(progressRef.current, 100)
+          setGenProgress({ percent: start, phase: job.phase ?? 'write', status: 'done', path: job.path })
+          let current = start
+          const timer = setInterval(() => {
+            current = Math.min(100, current + 5)
+            progressRef.current = current
+            setGenProgress((prev) => (prev === null ? prev : { ...prev, percent: current }))
+            if (current >= 100) clearInterval(timer)
+          }, 80)
           return
         }
         if (job.status === 'error') {
-          fail(job.error ?? 'unknown error')
+          setGenBusy(false)
+          setGenProgress({ percent: Math.max(progressRef.current, job.percent ?? 0), phase: job.phase ?? 'prepare', status: 'error', error: job.error ?? 'unknown error' })
           return
+        }
+        if (job.percent !== undefined && job.phase !== undefined) {
+          // The bar only ever climbs: never let a polled value go backwards.
+          const next = Math.max(progressRef.current, job.percent)
+          progressRef.current = next
+          setGenProgress({ percent: next, phase: job.phase, status: 'running' })
         }
       }
     } catch (error) {
-      fail(error instanceof Error ? error.message : String(error))
+      setGenBusy(false)
+      setGenProgress({ percent: 0, phase: 'prepare', status: 'error', error: error instanceof Error ? error.message : String(error) })
     }
   }
 
@@ -1198,9 +1208,9 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={t('generating')}
+            aria-label={genProgress.status === 'done' ? t('generateDone') : genProgress.status === 'error' ? t('generateFailed') : t('generating')}
             style={{
-              width: 360,
+              width: 380,
               maxWidth: 'calc(100vw - 32px)',
               background: 'var(--dsw-alias-bg-layer-2)',
               border: '1px solid var(--dsw-alias-border-l2)',
@@ -1209,21 +1219,86 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               boxShadow: 'var(--dsw-shadow-lv3)',
             }}
           >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('generating')}</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>
+              {genProgress.status === 'done' ? t('generateDone') : genProgress.status === 'error' ? t('generateFailed') : t('generating')}
+            </div>
             <div style={{ height: 8, borderRadius: 999, background: 'var(--dsw-alias-interactive-bg-hover)', overflow: 'hidden', marginTop: 14 }}>
               <div
                 style={{
                   height: '100%',
                   width: `${genProgress.percent}%`,
-                  background: 'var(--dsw-alias-state-business-primary)',
+                  background: genProgress.status === 'error' ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-state-business-primary)',
                   transition: 'width 0.3s linear',
                 }}
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
-              <span>{t(genPhaseKey(genProgress.phase))}</span>
-              <span>{Math.round(genProgress.percent)}%</span>
-            </div>
+            {genProgress.status === 'running' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
+                <span>{t(genPhaseKey(genProgress.phase))}</span>
+                <span>{Math.round(genProgress.percent)}%</span>
+              </div>
+            )}
+            {genProgress.status === 'done' && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
+                  <span>{t(genPhaseKey(genProgress.phase))}</span>
+                  <span>{Math.round(genProgress.percent)}%</span>
+                </div>
+                {genProgress.path !== undefined && (
+                  <div style={{ marginTop: 8, font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
+                    {genProgress.path}
+                  </div>
+                )}
+              </>
+            )}
+            {genProgress.status === 'error' && (
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {genProgress.error ?? 'unknown error'}
+              </div>
+            )}
+            {genProgress.status !== 'running' && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                <button
+                  type="button"
+                  disabled={genProgress.percent < 100}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 6,
+                    border: '1px solid var(--dsw-alias-state-business-primary)',
+                    background: 'none',
+                    color: 'var(--dsw-alias-state-business-primary)',
+                    cursor: genProgress.percent < 100 ? 'default' : 'pointer',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    opacity: genProgress.percent < 100 ? 0.45 : 1,
+                  }}
+                  onClick={() => setGenProgress(null)}
+                >
+                  {t('confirm')}
+                </button>
+              </div>
+            )}
+            {genProgress.status === 'running' && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                <button
+                  type="button"
+                  disabled
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 6,
+                    border: '1px solid var(--dsw-alias-state-business-primary)',
+                    background: 'none',
+                    color: 'var(--dsw-alias-state-business-primary)',
+                    cursor: 'default',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    opacity: 0.45,
+                  }}
+                >
+                  {t('confirm')}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
