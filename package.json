@@ -28,6 +28,7 @@
   },
   "files": [
     "lib",
+    "assets",
     "skills",
     "presets",
     "cordis.patch.yml",

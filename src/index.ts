@@ -87,7 +87,7 @@ const LIST_DIRS_PATH = '/api/dsh-electro-lab/list-dirs'
 /** Tree roots for the directory browser: drive roots on Windows, the home otherwise. */
 const LIST_ROOTS_PATH = '/api/dsh-electro-lab/list-roots'
 
-/** The directory-tree component's precompiled stylesheet, served for the client to inject. */
+/** The vendored directory-tree stylesheet (assets/directory-tree.css), served for the client to inject. */
 const DIRECTORY_TREE_CSS_PATH = '/api/dsh-electro-lab/directory-tree.css'
 
 /** Remembered generation output directory (GET) and its persistence (PUT ?dir=). */
@@ -177,6 +177,15 @@ function listDirectories(inputPath: string): { path: string; parent: string; ent
   const files = names.filter((entry) => entry.isFile()).map((entry) => entry.name).sort((a, b) => a.localeCompare(b))
   const parent = join(resolved, '..')
   return { path: resolved, parent, entries, files, roots: parent === resolved ? listDriveRoots() : [] }
+}
+
+/** The vendored directory-tree stylesheet (MIT, from @aiquants/directory-tree's standalone build). */
+function readDirectoryTreeCss(): string {
+  try {
+    return readFileSync(new URL('../assets/directory-tree.css', import.meta.url), 'utf8')
+  } catch {
+    return ''
+  }
 }
 
 /** Generate the solution article for one record through the host LLM. */
@@ -396,6 +405,23 @@ export function apply(ctx: Context): void {
         const drives = listDriveRoots()
         res.setHeader('content-type', 'application/json')
         res.end(JSON.stringify({ roots: drives.length > 0 ? drives : [homedir()] }))
+      },
+    }))
+
+    // The directory-tree stylesheet: the client fetches it once and injects
+    // it, so the bundle never has to inline the CSS.
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: DIRECTORY_TREE_CSS_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        if ((request.method ?? 'GET') !== 'GET') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        res.setHeader('content-type', 'text/css')
+        res.end(readDirectoryTreeCss())
       },
     }))
 

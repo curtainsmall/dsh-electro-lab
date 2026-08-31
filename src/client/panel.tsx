@@ -79,6 +79,14 @@ export function mountElectroLabPanel(): () => void {
       background: var(--dsw-alias-label-primary); }
   `
   document.head.appendChild(style)
+  // The vendored directory-tree stylesheet, served by the host (injected on
+  // arrival so the bundle never has to inline the CSS).
+  void fetch('/api/dsh-electro-lab/directory-tree.css')
+    .then((res) => (res.ok ? res.text() : ''))
+    .then((css) => {
+      if (css.length > 0) style.textContent += `\n${css}`
+    })
+    .catch(() => {})
 
   let root: ReturnType<typeof createRoot> | undefined
   const tryPlace = (): void => {
