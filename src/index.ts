@@ -3,6 +3,7 @@
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import type { Context } from 'cordis'
 import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
@@ -53,6 +54,17 @@ interface RequestLike {
 /** The records page endpoint (same origin as the web app; the client polls it). */
 const RECORDS_PATH = '/api/dsh-electro-lab/records'
 
+/** Remembered generation output directory (GET) and its persistence (PUT ?dir=). */
+const GENERATE_DIR_PATH = '/api/dsh-electro-lab/generate-dir'
+
+/**
+ * Non-config serialized state lives in one JSON file under the records home;
+ * config.json is reserved for future configuration and is never touched here.
+ */
+const STATE_FILE = 'state.json'
+/** Legacy plain-text location of the remembered directory (migrated on read). */
+const LEGACY_GENERATE_DIR_FILE = 'generate-dir.txt'
+
 // Module-level record state, shared by EVERY mount of the plugin (the global
 // bundle row AND a session preset row can both apply it): one manager per
 // session, one disk archive, one snapshot file. Records live under the
@@ -73,6 +85,34 @@ function getOrCreateManager(sessionId: string): RecordManager {
     managers.set(sessionId, manager)
   }
   return manager
+}
+
+/** The remembered generation output directory, or '' when none was saved. */
+function readGenerateDir(): string {
+  try {
+    const parsed = JSON.parse(readFileSync(join(recordsHome, STATE_FILE), 'utf8')) as { generateDir?: unknown }
+    if (typeof parsed.generateDir === 'string') return parsed.generateDir.trim()
+  } catch {
+    // fall through to the legacy file
+  }
+  try {
+    const legacy = readFileSync(join(recordsHome, LEGACY_GENERATE_DIR_FILE), 'utf8').trim()
+    if (legacy.length > 0) writeGenerateDir(legacy) // one-time migration
+    return legacy
+  } catch {
+    return ''
+  }
+}
+
+/** Persist the generation output directory so the next dialog auto-fills it. */
+function writeGenerateDir(directory: string): void {
+  mkdirSync(recordsHome, { recursive: true })
+  writeFileSync(join(recordsHome, STATE_FILE), JSON.stringify({ generateDir: directory }), 'utf8')
+  try {
+    rmSync(join(recordsHome, LEGACY_GENERATE_DIR_FILE), { force: true })
+  } catch {
+    // best effort: the legacy file may not exist
+  }
 }
 
 export function apply(ctx: Context): void {
@@ -127,6 +167,31 @@ export function apply(ctx: Context): void {
           records: [...readRecordArchive(join(recordsHome, 'records.jsonl'))].reverse(),
           open,
         }))
+      },
+    }))
+
+    // The remembered generation directory: GET reads it back, PUT ?dir= saves
+    // it (query param, so no body parsing is needed on the request).
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: GENERATE_DIR_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        const method = request.method ?? 'GET'
+        if (method === 'PUT') {
+          const dir = request.url === undefined ? '' : new URL(request.url, 'http://dsh.local').searchParams.get('dir') ?? ''
+          writeGenerateDir(dir)
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ saved: true }))
+          return
+        }
+        if (method !== 'GET') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ directory: readGenerateDir() }))
       },
     }))
 
