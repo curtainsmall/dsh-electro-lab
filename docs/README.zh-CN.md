@@ -1,6 +1,6 @@
 # DeepSeek Harness ElectroLab
 
-面向 DeepSeek Harness 的电气电子计算插件:电路分析、瞬态、滤波器、信号质量、噪声与单位换算——所有数值均为 SI 基本单位的自描述复数值对象。
+面向 DeepSeek Harness 的电气电子计算插件。
 
 [English](../README.md) | [简体中文](README.zh-CN.md)
 
