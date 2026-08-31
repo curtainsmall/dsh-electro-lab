@@ -8,7 +8,8 @@ import type { Context } from 'cordis'
 import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
-import { RecordManager, readRecordArchive, deleteRecordFromArchive, type RecordEvent } from './records.ts'
+import { RecordManager, readRecordArchive, deleteRecordFromArchive, type Record, type RecordEvent } from './records.ts'
+import { buildArticlePrompt } from './generate.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -24,6 +25,21 @@ declare module 'cordis' {
   interface Context {
     /** The web server the records endpoint registers on (same pattern as dsh-remote-web-ui). */
     webServer: WebServerLike
+    /** The host LLM runtime (dsh-llm), optional — generation needs it. */
+    llm?: {
+      stream(options: {
+        provider: string
+        model: string
+        messages: Array<{ role: string; content: Array<{ type: string; text: string }> }>
+        system?: string
+        maxTokens?: number
+        signal?: AbortSignal
+      }): AsyncIterable<unknown>
+    }
+    /** The deployment's default model selection (dsh-agent-default-model), optional. */
+    agentDefaultModel?: {
+      currentSelection(): { provider: string; model: string; reasoningEffort?: string }
+    }
   }
 }
 
@@ -53,6 +69,9 @@ interface RequestLike {
 
 /** The records page endpoint (same origin as the web app; the client polls it). */
 const RECORDS_PATH = '/api/dsh-electro-lab/records'
+
+/** Article generation: POST ?recordId=&format=&directory=&fileName= writes the article to disk. */
+const GENERATE_PATH = '/api/dsh-electro-lab/generate'
 
 /** Remembered generation output directory (GET) and its persistence (PUT ?dir=). */
 const GENERATE_DIR_PATH = '/api/dsh-electro-lab/generate-dir'
@@ -115,6 +134,61 @@ function writeGenerateDir(directory: string): void {
   }
 }
 
+/** Generate the solution article for one record through the host LLM. */
+async function generateArticle(ctx: Context, record: Record, signal: AbortSignal): Promise<string> {
+  const llm = ctx.get('llm')
+  if (llm === undefined) throw new Error('the LLM service is unavailable in this deployment')
+  const defaults = ctx.get('agentDefaultModel')
+  const route = defaults?.currentSelection()
+  if (route === undefined || route.provider === undefined || route.model === undefined) {
+    throw new Error('no default model is configured — pick one in Settings first')
+  }
+  const { system, user } = buildArticlePrompt(record)
+  let text = ''
+  for await (const raw of llm.stream({
+    provider: route.provider,
+    model: route.model,
+    messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
+    system,
+    maxTokens: 4096,
+    signal,
+  })) {
+    const chunk = raw as { type?: string; text?: string; reason?: string }
+    if (chunk.type === 'text-delta') {
+      text += chunk.text ?? ''
+    } else if (chunk.type === 'tool-call-delta') {
+      throw new Error('the generation model unexpectedly requested a tool')
+    } else if (chunk.type === 'finish' && chunk.reason === 'aborted') {
+      throw new Error('article generation was aborted')
+    }
+  }
+  const trimmed = text.trim()
+  if (trimmed.length === 0) throw new Error('the model produced no article text')
+  return trimmed
+}
+
+/** Article generation endpoint: read the record, ask the model, write the file. */
+async function handleGenerate(ctx: Context, url: string): Promise<{ path: string }> {
+  const params = new URL(url, 'http://dsh.local').searchParams
+  const recordId = params.get('recordId') ?? ''
+  const format = params.get('format') ?? 'markdown'
+  if (format !== 'markdown') throw new Error(`unsupported format "${format}"`)
+  const directory = (params.get('directory') ?? '').trim()
+  if (directory.length === 0) throw new Error('output directory is required')
+  const record = readRecordArchive(join(recordsHome, 'records.jsonl')).find((item) => item.id === recordId)
+  if (record === undefined) throw new Error(`record "${recordId}" not found`)
+
+  let fileName = (params.get('fileName') ?? '').trim()
+  if (fileName.length === 0) fileName = `electro-lab-${record.id.slice(0, 8)}.md`
+  if (!fileName.endsWith('.md')) fileName += '.md'
+
+  const article = await generateArticle(ctx, record, AbortSignal.timeout(120_000))
+  mkdirSync(directory, { recursive: true })
+  const target = join(directory, fileName)
+  writeFileSync(target, article, 'utf8')
+  return { path: target }
+}
+
 export function apply(ctx: Context): void {
   ctx.effect(() => registerTools(ctx), 'dsh-electro-lab: tools')
   ctx.effect(() => registerSkills(ctx), 'dsh-electro-lab: skills')
@@ -167,6 +241,34 @@ export function apply(ctx: Context): void {
           records: [...readRecordArchive(join(recordsHome, 'records.jsonl'))].reverse(),
           open,
         }))
+      },
+    }))
+
+    // Article generation: the client submits the record id, format, directory
+    // and file name; the article is produced by the host LLM and written to
+    // disk. Errors surface as a 400 with the message text.
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: GENERATE_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        if ((request.method ?? 'GET') !== 'POST') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        const url = request.url ?? ''
+        void handleGenerate(ctx, url).then(
+          ({ path }) => {
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ path }))
+          },
+          (error: unknown) => {
+            res.statusCode = 400
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
+          },
+        )
       },
     }))
 

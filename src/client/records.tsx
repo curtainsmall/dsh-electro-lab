@@ -63,6 +63,7 @@ interface RecordsResponse {
 
 const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
 const GENERATE_DIR_ENDPOINT = '/api/dsh-electro-lab/generate-dir'
+const GENERATE_ENDPOINT = '/api/dsh-electro-lab/generate'
 const POLL_MS = 5000
 const DISPLAY_MAX_RECORDS = 100
 
@@ -514,6 +515,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [genOpen, setGenOpen] = useState(false)
   const [genDir, setGenDir] = useState('')
   const [genFile, setGenFile] = useState('')
+  const [genBusy, setGenBusy] = useState(false)
   const dirInputRef = useRef<HTMLInputElement>(null)
   const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
 
@@ -540,6 +542,28 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const closeGenDialog = (): void => {
     saveGenDir()
     setGenOpen(false)
+  }
+
+  /** Ask the host to generate the article (LLM) and write it to disk. */
+  const runGenerate = async (): Promise<void> => {
+    const dir = genDir.trim()
+    if (dir.length === 0) return
+    setGenBusy(true)
+    try {
+      const res = await fetch(
+        `${GENERATE_ENDPOINT}?recordId=${encodeURIComponent(record.id)}&format=markdown&directory=${encodeURIComponent(dir)}&fileName=${encodeURIComponent(genFile.trim())}`,
+        { method: 'POST' },
+      )
+      const body = (await res.json()) as { path?: string; error?: string }
+      if (!res.ok) throw new Error(body.error ?? `generate returned ${res.status}`)
+      saveGenDir()
+      setGenOpen(false)
+      window.alert(`Generated: ${body.path ?? ''}`)
+    } catch (error) {
+      window.alert(`Generation failed: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setGenBusy(false)
+    }
   }
 
   /** Open a directory selector: showDirectoryPicker in real browsers, a hidden webkitdirectory input elsewhere. */
@@ -805,17 +829,19 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               </button>
               <button
                 type="button"
+                disabled={genBusy}
+                onClick={() => void runGenerate()}
                 style={{
                   padding: '4px 12px',
                   borderRadius: 6,
                   border: '1px solid var(--dsw-alias-state-business-primary)',
                   background: 'none',
                   color: 'var(--dsw-alias-state-business-primary)',
-                  cursor: 'pointer',
+                  cursor: genBusy ? 'default' : 'pointer',
                   fontSize: 13,
                   fontWeight: 600,
+                  opacity: genBusy ? 0.5 : 1,
                 }}
-                onClick={() => closeGenDialog()}
               >
                 {t('generate')}
               </button>
