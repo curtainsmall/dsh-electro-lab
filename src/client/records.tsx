@@ -62,6 +62,7 @@ interface RecordsResponse {
 }
 
 const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
+const GENERATE_DIR_ENDPOINT = '/api/dsh-electro-lab/generate-dir'
 const POLL_MS = 5000
 const DISPLAY_MAX_RECORDS = 100
 
@@ -89,6 +90,20 @@ const headerButtonStyle: React.CSSProperties = {
   border: '1px solid var(--dsw-alias-label-tertiary)',
   borderRadius: 6,
   cursor: 'pointer',
+}
+
+/** Text input inside the generation setup dialog. */
+const genInputStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  padding: '6px 8px',
+  fontSize: 13,
+  color: 'var(--dsw-alias-label-primary)',
+  background: 'var(--dsw-specific-input-major)',
+  border: '1px solid var(--dsw-alias-border-l2)',
+  borderRadius: 6,
+  outline: 'none',
+  fontFamily: 'ui-monospace, monospace',
 }
 
 function formatTime(time: number): string {
@@ -496,34 +511,50 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [backHover, setBackHover] = useState(false)
   const [exportHover, setExportHover] = useState(false)
   const [genHover, setGenHover] = useState(false)
-  const [browseHover, setBrowseHover] = useState(false)
   const [genOpen, setGenOpen] = useState(false)
-  const [genPath, setGenPath] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [genDir, setGenDir] = useState('')
+  const [genFile, setGenFile] = useState('')
+  const dirInputRef = useRef<HTMLInputElement>(null)
+  const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
 
-  /** Open the OS file selector: the File System Access picker in real browsers, a hidden file input in webviews where showSaveFilePicker is unavailable. */
-  const pickOutputFile = async (): Promise<void> => {
-    const picker = (window as unknown as {
-      showSaveFilePicker?: (options: {
-        suggestedName: string
-        types: Array<{ description: string; accept: Record<string, string[]> }>
-      }) => Promise<{ name: string }>
-    }).showSaveFilePicker
+  // Auto-fill the remembered output directory whenever the dialog opens.
+  useEffect(() => {
+    if (!genOpen) return
+    let alive = true
+    fetch(GENERATE_DIR_ENDPOINT)
+      .then((r) => r.json() as Promise<{ directory?: string }>)
+      .then((body) => {
+        if (alive && body.directory !== undefined && body.directory !== '') setGenDir(body.directory)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [genOpen])
+
+  /** Persist the directory so the next generation dialog auto-fills it. */
+  const saveGenDir = (): void => {
+    const dir = genDir.trim()
+    if (dir.length === 0) return
+    void fetch(`${GENERATE_DIR_ENDPOINT}?dir=${encodeURIComponent(dir)}`, { method: 'PUT' }).catch(() => {})
+  }
+
+  const closeGenDialog = (): void => {
+    saveGenDir()
+    setGenOpen(false)
+  }
+
+  /** Open a directory selector: showDirectoryPicker in real browsers, a hidden webkitdirectory input elsewhere. */
+  const pickOutputDir = async (): Promise<void> => {
+    const picker = (window as unknown as { showDirectoryPicker?: () => Promise<{ name: string }> }).showDirectoryPicker
     if (picker !== undefined) {
       try {
-        const handle = await picker({
-          suggestedName: `electro-lab-${record.id.slice(0, 8)}.md`,
-          types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
-        })
-        setGenPath(handle.name)
+        const handle = await picker()
+        setGenDir(handle.name)
         return
       } catch (error) {
-        // Only a user cancel stops here; any other failure (e.g. SecurityError
-        // in a cross-origin iframe/webview) falls through to the file input.
         if (error instanceof DOMException && error.name === 'AbortError') return
       }
     }
-    fileInputRef.current?.click()
+    dirInputRef.current?.click()
   }
   const sections: DetailSection[] = [
     { key: 'question', label: t('sectionQuestion'), content: record.question },
@@ -672,7 +703,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             justifyContent: 'center',
             background: 'var(--dsw-alias-bg-mask-1)',
           }}
-          onClick={() => setGenOpen(false)}
+          onClick={() => closeGenDialog()}
         >
           <div
             role="dialog"
@@ -709,36 +740,22 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                 </select>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' }}>{t('outputFile')}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' }}>{t('directory')}</span>
                 <input
                   type="text"
-                  value={genPath}
-                  onChange={(e) => setGenPath(e.target.value)}
-                  placeholder={`electro-lab-${record.id.slice(0, 8)}.md`}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    padding: '6px 8px',
-                    fontSize: 13,
-                    color: 'var(--dsw-alias-label-primary)',
-                    background: 'var(--dsw-specific-input-major)',
-                    border: '1px solid var(--dsw-alias-border-l2)',
-                    borderRadius: 6,
-                    outline: 'none',
-                    fontFamily: 'ui-monospace, monospace',
-                  }}
+                  value={genDir}
+                  onChange={(e) => setGenDir(e.target.value)}
+                  placeholder="/path/to/output"
+                  style={{ ...genInputStyle }}
                 />
                 <button
                   type="button"
-                  onMouseEnter={() => setBrowseHover(true)}
-                  onMouseLeave={() => setBrowseHover(false)}
-                  onClick={() => void pickOutputFile()}
+                  onClick={() => void pickOutputDir()}
                   style={{
                     padding: '4px 10px',
                     borderRadius: 6,
                     border: '1px solid var(--dsw-alias-label-tertiary)',
-                    borderColor: browseHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
-                    background: browseHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+                    background: 'none',
                     color: 'var(--dsw-alias-label-primary)',
                     cursor: 'pointer',
                     fontSize: 13,
@@ -747,14 +764,28 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                   {t('browse')}
                 </button>
                 <input
-                  ref={fileInputRef}
+                  ref={dirInputRef}
                   type="file"
                   style={{ display: 'none' }}
+                  {...{ webkitdirectory: '' }}
                   onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file !== undefined) setGenPath(file.name)
+                    const first = e.target.files?.[0]
+                    if (first !== undefined) {
+                      const rel = (first as File & { webkitRelativePath?: string }).webkitRelativePath ?? ''
+                      setGenDir(rel.split('/')[0] ?? first.name)
+                    }
                     e.target.value = ''
                   }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' }}>{t('fileName')}</span>
+                <input
+                  type="text"
+                  value={genFile}
+                  onChange={(e) => setGenFile(e.target.value)}
+                  placeholder={defaultFileName}
+                  style={{ ...genInputStyle }}
                 />
               </div>
             </div>
@@ -770,7 +801,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                   cursor: 'pointer',
                   fontSize: 13,
                 }}
-                onClick={() => setGenOpen(false)}
+                onClick={() => closeGenDialog()}
               >
                 {t('cancel')}
               </button>
@@ -786,7 +817,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                   fontSize: 13,
                   fontWeight: 600,
                 }}
-                onClick={() => setGenOpen(false)}
+                onClick={() => closeGenDialog()}
               >
                 {t('generate')}
               </button>
