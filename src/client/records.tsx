@@ -7,6 +7,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
 
+/** Map a generation phase code to its translated label; unknown phases show no text. */
+function genPhaseKey(phase: string): LocaleKey | string {
+  if (phase === 'prepare') return 'phasePrepare'
+  if (phase === 'generate') return 'phaseGenerate'
+  if (phase === 'write') return 'phaseWrite'
+  return ''
+}
+
 /** Map a stored error type to its translated message key (codes stay raw; unknown types show no message). */
 function errorMessageKey(type: string): LocaleKey | string {
   if (type === 'duplicate-start') return 'errorDuplicateStartMsg'
@@ -64,6 +72,7 @@ interface RecordsResponse {
 const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
 const GENERATE_DIR_ENDPOINT = '/api/dsh-electro-lab/generate-dir'
 const GENERATE_ENDPOINT = '/api/dsh-electro-lab/generate'
+const GENERATE_PROGRESS_ENDPOINT = '/api/dsh-electro-lab/generate-progress'
 const POLL_MS = 5000
 const DISPLAY_MAX_RECORDS = 100
 
@@ -516,6 +525,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [genDir, setGenDir] = useState('')
   const [genFile, setGenFile] = useState('')
   const [genBusy, setGenBusy] = useState(false)
+  const [genProgress, setGenProgress] = useState<{ percent: number; phase: string } | null>(null)
   const dirInputRef = useRef<HTMLInputElement>(null)
   const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
 
@@ -544,25 +554,49 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     setGenOpen(false)
   }
 
-  /** Ask the host to generate the article (LLM) and write it to disk. */
+  /** Ask the host to generate the article (LLM) and write it to disk; a progress dialog polls the job. */
   const runGenerate = async (): Promise<void> => {
     const dir = genDir.trim()
     if (dir.length === 0) return
     setGenBusy(true)
+    setGenProgress({ percent: 0, phase: 'prepare' })
+    const fail = (message: string): void => {
+      setGenProgress(null)
+      setGenBusy(false)
+      window.alert(`Generation failed: ${message}`)
+    }
     try {
       const res = await fetch(
         `${GENERATE_ENDPOINT}?recordId=${encodeURIComponent(record.id)}&format=markdown&directory=${encodeURIComponent(dir)}&fileName=${encodeURIComponent(genFile.trim())}`,
         { method: 'POST' },
       )
-      const body = (await res.json()) as { path?: string; error?: string }
+      const body = (await res.json()) as { jobId?: string; error?: string }
       if (!res.ok) throw new Error(body.error ?? `generate returned ${res.status}`)
-      saveGenDir()
-      setGenOpen(false)
-      window.alert(`Generated: ${body.path ?? ''}`)
+      if (body.jobId === undefined) throw new Error('no job id returned')
+      // Poll the job until it settles.
+      for (;;) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        const pr = await fetch(`${GENERATE_PROGRESS_ENDPOINT}?jobId=${encodeURIComponent(body.jobId)}`)
+        if (!pr.ok) throw new Error(`progress returned ${pr.status}`)
+        const job = (await pr.json()) as { status?: string; percent?: number; phase?: string; path?: string; error?: string }
+        if (job.percent !== undefined && job.phase !== undefined) {
+          setGenProgress({ percent: job.percent, phase: job.phase })
+        }
+        if (job.status === 'done') {
+          saveGenDir()
+          setGenOpen(false)
+          setGenProgress(null)
+          setGenBusy(false)
+          window.alert(`Generated: ${job.path ?? ''}`)
+          return
+        }
+        if (job.status === 'error') {
+          fail(job.error ?? 'unknown error')
+          return
+        }
+      }
     } catch (error) {
-      window.alert(`Generation failed: ${error instanceof Error ? error.message : String(error)}`)
-    } finally {
-      setGenBusy(false)
+      fail(error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -716,7 +750,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           {sections.map((section) => sectionBlock(section))}
         </div>
       </div>
-      {genOpen && (
+      {genOpen && !genBusy && (
         <div
           style={{
             position: 'fixed',
@@ -845,6 +879,50 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               >
                 {t('generate')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {genProgress !== null && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--dsw-alias-bg-mask-1)',
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('generating')}
+            style={{
+              width: 360,
+              maxWidth: 'calc(100vw - 32px)',
+              background: 'var(--dsw-alias-bg-layer-2)',
+              border: '1px solid var(--dsw-alias-border-l2)',
+              borderRadius: 10,
+              padding: 16,
+              boxShadow: 'var(--dsw-shadow-lv3)',
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('generating')}</div>
+            <div style={{ height: 8, borderRadius: 999, background: 'var(--dsw-alias-interactive-bg-hover)', overflow: 'hidden', marginTop: 14 }}>
+              <div
+                style={{
+                  height: '100%',
+                  width: `${genProgress.percent}%`,
+                  background: 'var(--dsw-alias-state-business-primary)',
+                  transition: 'width 0.3s linear',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
+              <span>{t(genPhaseKey(genProgress.phase))}</span>
+              <span>{Math.round(genProgress.percent)}%</span>
             </div>
           </div>
         </div>

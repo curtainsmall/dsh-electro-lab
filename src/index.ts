@@ -3,6 +3,7 @@
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import type { Context } from 'cordis'
 import { registerTools } from './tools/index.ts'
@@ -70,8 +71,11 @@ interface RequestLike {
 /** The records page endpoint (same origin as the web app; the client polls it). */
 const RECORDS_PATH = '/api/dsh-electro-lab/records'
 
-/** Article generation: POST ?recordId=&format=&directory=&fileName= writes the article to disk. */
+/** Article generation: POST ?recordId=&format=&directory=&fileName= starts a job and returns its id. */
 const GENERATE_PATH = '/api/dsh-electro-lab/generate'
+
+/** Article generation progress: GET ?jobId= returns the job snapshot. */
+const GENERATE_PROGRESS_PATH = '/api/dsh-electro-lab/generate-progress'
 
 /** Remembered generation output directory (GET) and its persistence (PUT ?dir=). */
 const GENERATE_DIR_PATH = '/api/dsh-electro-lab/generate-dir'
@@ -135,7 +139,7 @@ function writeGenerateDir(directory: string): void {
 }
 
 /** Generate the solution article for one record through the host LLM. */
-async function generateArticle(ctx: Context, record: Record, signal: AbortSignal): Promise<string> {
+async function generateArticle(ctx: Context, record: Record, signal: AbortSignal, onProgress?: (percent: number) => void): Promise<string> {
   const llm = ctx.get('llm')
   if (llm === undefined) throw new Error('the LLM service is unavailable in this deployment')
   const defaults = ctx.get('agentDefaultModel')
@@ -144,6 +148,7 @@ async function generateArticle(ctx: Context, record: Record, signal: AbortSignal
     throw new Error('no default model is configured — pick one in Settings first')
   }
   const { system, user } = buildArticlePrompt(record)
+  const startedAt = Date.now()
   let text = ''
   for await (const raw of llm.stream({
     provider: route.provider,
@@ -161,14 +166,58 @@ async function generateArticle(ctx: Context, record: Record, signal: AbortSignal
     } else if (chunk.type === 'finish' && chunk.reason === 'aborted') {
       throw new Error('article generation was aborted')
     }
+    // Progress within the model phase: ramp from 10% toward 90% by elapsed time.
+    if (onProgress !== undefined) {
+      onProgress(Math.min(90, 10 + ((Date.now() - startedAt) / 30_000) * 80))
+    }
   }
   const trimmed = text.trim()
   if (trimmed.length === 0) throw new Error('the model produced no article text')
   return trimmed
 }
 
-/** Article generation endpoint: read the record, ask the model, write the file. */
-async function handleGenerate(ctx: Context, url: string): Promise<{ path: string }> {
+/** One in-memory generation job (never persisted — no generation log). */
+interface GenerateJob {
+  status: 'running' | 'done' | 'error'
+  percent: number
+  phase: 'prepare' | 'generate' | 'write'
+  path?: string
+  error?: string
+}
+
+const generateJobs = new Map<string, GenerateJob>()
+
+/** Start a background generation job and return its id; progress is polled via GET /generate-progress. */
+function startGenerateJob(ctx: Context, record: Record, directory: string, fileName: string): string {
+  const jobId = randomUUID()
+  const job: GenerateJob = { status: 'running', percent: 5, phase: 'prepare' }
+  generateJobs.set(jobId, job)
+  void (async () => {
+    try {
+      job.percent = 10
+      job.phase = 'generate'
+      const article = await generateArticle(ctx, record, AbortSignal.timeout(120_000), (percent) => { job.percent = percent })
+      job.phase = 'write'
+      job.percent = 95
+      mkdirSync(directory, { recursive: true })
+      const target = join(directory, fileName)
+      writeFileSync(target, article, 'utf8')
+      job.status = 'done'
+      job.percent = 100
+      job.path = target
+    } catch (error) {
+      job.status = 'error'
+      job.error = error instanceof Error ? error.message : String(error)
+    } finally {
+      // The job is only kept long enough for the client to poll it.
+      setTimeout(() => { generateJobs.delete(jobId) }, 60_000)
+    }
+  })()
+  return jobId
+}
+
+/** Validate the generation request and start the job; throws on bad input. */
+function beginGenerate(ctx: Context, url: string): { jobId: string } {
   const params = new URL(url, 'http://dsh.local').searchParams
   const recordId = params.get('recordId') ?? ''
   const format = params.get('format') ?? 'markdown'
@@ -182,11 +231,7 @@ async function handleGenerate(ctx: Context, url: string): Promise<{ path: string
   if (fileName.length === 0) fileName = `electro-lab-${record.id.slice(0, 8)}.md`
   if (!fileName.endsWith('.md')) fileName += '.md'
 
-  const article = await generateArticle(ctx, record, AbortSignal.timeout(120_000))
-  mkdirSync(directory, { recursive: true })
-  const target = join(directory, fileName)
-  writeFileSync(target, article, 'utf8')
-  return { path: target }
+  return { jobId: startGenerateJob(ctx, record, directory, fileName) }
 }
 
 export function apply(ctx: Context): void {
@@ -245,8 +290,9 @@ export function apply(ctx: Context): void {
     }))
 
     // Article generation: the client submits the record id, format, directory
-    // and file name; the article is produced by the host LLM and written to
-    // disk. Errors surface as a 400 with the message text.
+    // and file name; a background job produces the article through the host
+    // LLM and writes it to disk. The POST answers immediately with the job id;
+    // progress is polled through /generate-progress.
     disposers.push(ctx.webServer.register({
       kind: 'exact',
       path: GENERATE_PATH,
@@ -257,18 +303,45 @@ export function apply(ctx: Context): void {
           res.end('method not allowed')
           return
         }
-        const url = request.url ?? ''
-        void handleGenerate(ctx, url).then(
-          ({ path }) => {
-            res.setHeader('content-type', 'application/json')
-            res.end(JSON.stringify({ path }))
-          },
-          (error: unknown) => {
-            res.statusCode = 400
-            res.setHeader('content-type', 'application/json')
-            res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
-          },
-        )
+        try {
+          const { jobId } = beginGenerate(ctx, request.url ?? '')
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ jobId }))
+        } catch (error) {
+          res.statusCode = 400
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
+        }
+      },
+    }))
+
+    // Generation progress: the client polls this while the job runs.
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: GENERATE_PROGRESS_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        if ((request.method ?? 'GET') !== 'GET') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        const jobId = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('jobId')
+        const job = jobId === null ? undefined : generateJobs.get(jobId)
+        if (job === undefined) {
+          res.statusCode = 404
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: 'generation job not found' }))
+          return
+        }
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({
+          status: job.status,
+          percent: job.percent,
+          phase: job.phase,
+          ...(job.path === undefined ? {} : { path: job.path }),
+          ...(job.error === undefined ? {} : { error: job.error }),
+        }))
       },
     }))
 
