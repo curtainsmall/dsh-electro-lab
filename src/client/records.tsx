@@ -4,7 +4,7 @@
  * `/api/dsh-electro-lab/records` endpoint and polled while the panel is open.
  * Records are plugin-owned: they survive session deletion and restarts.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
 
 /** Map a generation phase code to its translated label; unknown phases show no text. */
@@ -534,6 +534,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [dirSelected, setDirSelected] = useState('')
   const [dirLoading, setDirLoading] = useState(false)
   const [dirSnapshot, setDirSnapshot] = useState<{ dir: string; file: string } | null>(null)
+  const treeListRef = useRef<HTMLDivElement>(null)
   const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
 
   // Auto-fill the remembered output directory whenever the dialog opens.
@@ -616,14 +617,14 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   }
 
   /** Load one directory's subdirectories AND files through the host (pure HTTP — remote-safe). */
-  const loadDirListing = async (path: string): Promise<{ entries: string[]; files: string[] }> => {
+  const loadDirListing = async (path: string): Promise<{ path: string; entries: string[]; files: string[]; parent: string }> => {
     const res = await fetch(`${LIST_DIRS_ENDPOINT}?path=${encodeURIComponent(path)}`)
     if (!res.ok) throw new Error(`list-dirs returned ${res.status}`)
-    const body = (await res.json()) as { entries?: string[]; files?: string[] }
-    return { entries: body.entries ?? [], files: body.files ?? [] }
+    const body = (await res.json()) as { path?: string; entries?: string[]; files?: string[]; parent?: string }
+    return { path: body.path ?? path, entries: body.entries ?? [], files: body.files ?? [], parent: body.parent ?? '' }
   }
 
-  /** Open the directory browser: fetch the roots (drives on Windows, home otherwise). */
+  /** Open the directory browser at the current output directory: roots shown, the path to the current dir pre-expanded and selected. */
   const openDirBrowser = async (): Promise<void> => {
     try {
       const res = await fetch(LIST_ROOTS_ENDPOINT)
@@ -631,12 +632,60 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
       const body = (await res.json()) as { roots?: string[] }
       const roots = body.roots ?? []
       if (roots.length === 0) return
-      setDirEntries(roots.map((root) => ({ name: root, type: 'directory', absolutePath: root })))
-      setDirSelected(roots[0]!)
-      setDirExpanded(new Set())
-      setDirLoading(false)
+      let tree: DirEntry[] = roots.map((root) => ({ name: root, type: 'directory', absolutePath: root }))
+      const expanded = new Set<string>()
+      setDirSelected('')
       setDirSnapshot({ dir: genDir, file: genFile })
       setDirBrowserOpen(true)
+
+      // Walk UP from the current directory using the host's parent values until
+      // a drive root is reached, then expand the chain top-down so the current
+      // directory is visible and selected.
+      const current = genDir.trim()
+      if (current.length > 0) {
+        const chain: Array<{ path: string; parent: string }> = []
+        let probe = current
+        try {
+          for (;;) {
+            const snap = await loadDirListing(probe)
+            chain.push({ path: snap.path, parent: snap.parent })
+            if (snap.parent === snap.path) break // reached a drive root
+            probe = snap.parent
+          }
+        } catch {
+          // The current path is not reachable from the roots — show the roots only.
+          chain.length = 0
+        }
+        // Expand the chain top-down, attaching each parent's FULL listing so
+        // the siblings of the current directory are visible too.
+        for (const item of [...chain].reverse()) {
+          if (item.parent === item.path) continue // the item is already a root
+          try {
+            const { entries, files } = await loadDirListing(item.parent)
+            const base = item.parent.replace(/[\\/]+$/, '')
+            const children: DirEntry[] = [
+              ...entries.map((name) => ({ name, type: 'directory' as const, absolutePath: `${base}/${name}` })),
+              ...files.map((name) => ({ name, type: 'file' as const, absolutePath: `${base}/${name}` })),
+            ]
+            tree = attachChildren(tree, item.parent, children)
+            expanded.add(item.parent)
+          } catch {
+            // skip this level — the chain stays unexpanded from here up
+          }
+        }
+        setDirSelected(current)
+      }
+
+      setDirEntries(tree)
+      setDirExpanded(expanded)
+      setDirSelected(current)
+      setDirLoading(false)
+      // Scroll the current directory row to the TOP of the visible area once the tree rendered.
+      if (current.length > 0) {
+        setTimeout(() => {
+          treeListRef.current?.querySelector(`[data-path="${CSS.escape(current)}"]`)?.scrollIntoView({ block: 'start' })
+        }, 0)
+      }
     } catch (error) {
       window.alert(`Cannot browse directories: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -696,32 +745,42 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     })
   }
 
-  /** Recursive tree node renderer (flat state: entries tree + expanded set). */
+  /** Recursive tree node renderer (flat state: entries tree + expanded set), styled with the vendored directory-tree utilities. */
   const renderDirNode = (node: DirEntry, depth: number): React.JSX.Element => {
     const expanded = dirExpanded.has(node.absolutePath)
     const isSelected = dirSelected === node.absolutePath
     const isDir = node.type === 'directory'
     return (
-      <div key={node.absolutePath}>
+      <div key={node.absolutePath} data-path={node.absolutePath}>
         <div
           role="button"
+          className="directory-tree-entry flex items-center cursor-pointer relative select-none text-xs leading-tight w-full"
           style={{
-            padding: '4px 8px',
             paddingLeft: 8 + depth * 14,
-            fontSize: 13,
-            cursor: 'pointer',
+            paddingRight: 8,
+            height: 26,
+            gap: 4,
+            color: 'var(--dsw-alias-label-primary)',
+            background: isSelected ? 'var(--dsw-alias-interactive-bg-active)' : 'none',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            color: 'var(--dsw-alias-label-primary)',
-            background: isSelected ? 'var(--dsw-alias-interactive-bg-active)' : 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
           }}
           onClick={() => void onDirClick(node)}
           onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--dsw-alias-interactive-bg-hover)' }}
           onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'none' }}
         >
-          <span style={{ color: 'var(--dsw-alias-label-secondary)', marginRight: 4 }}>{isDir ? (expanded ? '▾' : '▸') : ''}</span>
-          <span>{isDir ? '📁 ' : '📄 '}{node.name}</span>
+          <span className="directory-tree-expand-icon w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center" style={{ color: 'var(--dsw-alias-label-secondary)' }}>
+            {isDir ? (expanded ? '▾' : '▸') : ''}
+          </span>
+          <span className="directory-tree-type-icon w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center" style={{ fontSize: 12 }}>
+            {isDir ? '📁' : '📄'}
+          </span>
+          <span className={isDir ? 'directory-tree-name--directory font-medium flex-1 min-w-0' : 'flex-1 min-w-0'} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {node.name}
+          </span>
         </div>
         {isDir && expanded && node.children !== undefined && node.children.map((child) => renderDirNode(child, depth + 1))}
       </div>
@@ -1010,8 +1069,12 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             aria-modal="true"
             aria-label={t('browseDirectory')}
             style={{
-              width: 420,
+              width: 440,
+              height: 400,
               maxWidth: 'calc(100vw - 32px)',
+              maxHeight: 'calc(100vh - 48px)',
+              display: 'flex',
+              flexDirection: 'column',
               background: 'var(--dsw-alias-bg-layer-2)',
               border: '1px solid var(--dsw-alias-border-l2)',
               borderRadius: 10,
@@ -1021,16 +1084,16 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ fontWeight: 600, fontSize: 14 }}>{t('browseDirectory')}</div>
-            <div style={{ marginTop: 10, font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all' }}>
+            <div style={{ marginTop: 10, font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all', flex: 'none' }}>
               {dirSelected}
             </div>
-            <div style={{ marginTop: 8, maxHeight: 280, overflowY: 'auto', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, padding: '4px 0' }}>
+            <div ref={treeListRef} style={{ marginTop: 8, flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, padding: '4px 0' }}>
               {dirLoading && (
                 <div style={{ padding: '4px 8px', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>…</div>
               )}
               {dirEntries.map((node) => renderDirNode(node, 0))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flex: 'none' }}>
               <button
                 type="button"
                 style={{
