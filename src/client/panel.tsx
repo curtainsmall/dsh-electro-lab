@@ -106,13 +106,40 @@ export function mountElectroLabPanel(): () => void {
     // and swallow every click even though the React tree renders nothing.
     container.style.display = panelStore.open ? 'block' : 'none'
     if (panelStore.open) {
+      // Single-occupant center column: the sibling panels (ssh / task board)
+      // only evict EACH OTHER — they don't know this plugin. Remove their html
+      // attributes (hides their views) and dispatch their activation names so
+      // their controllers close too (otherwise their sidebar entries stay
+      // highlighted); the activate event covers any panel that listens.
+      evicting = true
+      try {
+        // Generic view eviction: any center-column panel marks <html> with a
+        // data-dsh-*-active attribute; remove all of them (unknown future
+        // panels included) before claiming the column.
+        for (const attr of Array.from(document.documentElement.attributes)) {
+          if (attr.name.startsWith('data-dsh-') && attr.name.endsWith('-active') && attr.name !== ACTIVE_ATTR) {
+            document.documentElement.removeAttribute(attr.name)
+          }
+        }
+        // Controller eviction for the known sibling panels: their controllers
+        // only close when they see each other's activation name.
+        document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: 'taskboard' }))
+        document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: 'ssh' }))
+      } finally {
+        evicting = false
+      }
       document.documentElement.setAttribute(ACTIVE_ATTR, '')
       document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: PANEL_NAME }))
     } else {
       document.documentElement.removeAttribute(ACTIVE_ATTR)
     }
   }
+  // While evicting the sibling panels we dispatch their own activation names
+  // (the only event each of them reacts to); our own listener must ignore
+  // those dispatches or it would close this panel the moment it opens.
+  let evicting = false
   const onOtherActivate = (event: Event): void => {
+    if (evicting) return
     if ((event as CustomEvent<string>).detail !== PANEL_NAME && panelStore.open) panelStore.toggle()
   }
   const onClickSidebarRow = (event: MouseEvent): void => {
