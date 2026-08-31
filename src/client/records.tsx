@@ -4,7 +4,7 @@
  * `/api/dsh-electro-lab/records` endpoint and polled while the panel is open.
  * Records are plugin-owned: they survive session deletion and restarts.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
 
 /** Map a stored error type to its translated message key (codes stay raw; unknown types show no message). */
@@ -499,8 +499,9 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [browseHover, setBrowseHover] = useState(false)
   const [genOpen, setGenOpen] = useState(false)
   const [genPath, setGenPath] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  /** Open the OS save-file picker and show the chosen file name in the path bar. */
+  /** Open the OS file selector: the File System Access picker in real browsers, a hidden file input in webviews where showSaveFilePicker is unavailable. */
   const pickOutputFile = async (): Promise<void> => {
     const picker = (window as unknown as {
       showSaveFilePicker?: (options: {
@@ -508,16 +509,21 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
         types: Array<{ description: string; accept: Record<string, string[]> }>
       }) => Promise<{ name: string }>
     }).showSaveFilePicker
-    if (picker === undefined) return
-    try {
-      const handle = await picker({
-        suggestedName: `electro-lab-${record.id.slice(0, 8)}.md`,
-        types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
-      })
-      setGenPath(handle.name)
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return // user cancelled
+    if (picker !== undefined) {
+      try {
+        const handle = await picker({
+          suggestedName: `electro-lab-${record.id.slice(0, 8)}.md`,
+          types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+        })
+        setGenPath(handle.name)
+        return
+      } catch (error) {
+        // Only a user cancel stops here; any other failure (e.g. SecurityError
+        // in a cross-origin iframe/webview) falls through to the file input.
+        if (error instanceof DOMException && error.name === 'AbortError') return
+      }
     }
+    fileInputRef.current?.click()
   }
   const sections: DetailSection[] = [
     { key: 'question', label: t('sectionQuestion'), content: record.question },
@@ -740,6 +746,16 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                 >
                   {t('browse')}
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file !== undefined) setGenPath(file.name)
+                    e.target.value = ''
+                  }}
+                />
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
