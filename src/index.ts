@@ -4,7 +4,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import type { Context } from 'cordis'
 import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
@@ -77,6 +77,19 @@ const GENERATE_PATH = '/api/dsh-electro-lab/generate'
 /** Article generation progress: GET ?jobId= returns the job snapshot. */
 const GENERATE_PROGRESS_PATH = '/api/dsh-electro-lab/generate-progress'
 
+/**
+ * Host-driven directory browsing: GET ?path= lists the directory's
+ * subdirectories plus its parent. Pure HTTP — works locally and remotely
+ * (no OS dialog), and every path returned is absolute.
+ */
+const LIST_DIRS_PATH = '/api/dsh-electro-lab/list-dirs'
+
+/** Tree roots for the directory browser: drive roots on Windows, the home otherwise. */
+const LIST_ROOTS_PATH = '/api/dsh-electro-lab/list-roots'
+
+/** The directory-tree component's precompiled stylesheet, served for the client to inject. */
+const DIRECTORY_TREE_CSS_PATH = '/api/dsh-electro-lab/directory-tree.css'
+
 /** Remembered generation output directory (GET) and its persistence (PUT ?dir=). */
 const GENERATE_DIR_PATH = '/api/dsh-electro-lab/generate-dir'
 
@@ -136,6 +149,34 @@ function writeGenerateDir(directory: string): void {
   } catch {
     // best effort: the legacy file may not exist
   }
+}
+
+/** Existing drive roots on Windows (empty elsewhere) — the way out of one drive. */
+function listDriveRoots(): string[] {
+  if (process.platform !== 'win32') return []
+  const roots: string[] = []
+  for (let code = 65; code <= 90; code++) {
+    const root = `${String.fromCharCode(code)}:\\`
+    try {
+      if (existsSync(root)) roots.push(root)
+    } catch {
+      // skip unreadable drives
+    }
+  }
+  return roots
+}
+
+/** List one directory: its absolute path, parent, sorted subdirectory names, file names, and drive roots. */
+function listDirectories(inputPath: string): { path: string; parent: string; entries: string[]; files: string[]; roots: string[] } {
+  const requested = inputPath.trim()
+  const resolved = requested.length > 0 && existsSync(requested) && statSync(requested).isDirectory()
+    ? requested
+    : homedir()
+  const names = readdirSync(resolved, { withFileTypes: true })
+  const entries = names.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort((a, b) => a.localeCompare(b))
+  const files = names.filter((entry) => entry.isFile()).map((entry) => entry.name).sort((a, b) => a.localeCompare(b))
+  const parent = join(resolved, '..')
+  return { path: resolved, parent, entries, files, roots: parent === resolved ? listDriveRoots() : [] }
 }
 
 /** Generate the solution article for one record through the host LLM. */
@@ -312,6 +353,49 @@ export function apply(ctx: Context): void {
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
         }
+      },
+    }))
+
+    // Host-driven directory browsing: the client navigates the filesystem
+    // through this endpoint, so the picked directory is a true absolute path
+    // and works identically for local and remote deployments.
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: LIST_DIRS_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        if ((request.method ?? 'GET') !== 'GET') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        const path = request.url === undefined ? '' : new URL(request.url, 'http://dsh.local').searchParams.get('path') ?? ''
+        try {
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify(listDirectories(path)))
+        } catch (error) {
+          res.statusCode = 400
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
+        }
+      },
+    }))
+
+    // Tree roots for the directory browser: the client expands directories
+    // lazily through list-dirs.
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: LIST_ROOTS_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        if ((request.method ?? 'GET') !== 'GET') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        const drives = listDriveRoots()
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ roots: drives.length > 0 ? drives : [homedir()] }))
       },
     }))
 

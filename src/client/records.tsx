@@ -4,7 +4,7 @@
  * `/api/dsh-electro-lab/records` endpoint and polled while the panel is open.
  * Records are plugin-owned: they survive session deletion and restarts.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
 
 /** Map a generation phase code to its translated label; unknown phases show no text. */
@@ -73,6 +73,8 @@ const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
 const GENERATE_DIR_ENDPOINT = '/api/dsh-electro-lab/generate-dir'
 const GENERATE_ENDPOINT = '/api/dsh-electro-lab/generate'
 const GENERATE_PROGRESS_ENDPOINT = '/api/dsh-electro-lab/generate-progress'
+const LIST_DIRS_ENDPOINT = '/api/dsh-electro-lab/list-dirs'
+const LIST_ROOTS_ENDPOINT = '/api/dsh-electro-lab/list-roots'
 const POLL_MS = 5000
 const DISPLAY_MAX_RECORDS = 100
 
@@ -526,7 +528,12 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [genFile, setGenFile] = useState('')
   const [genBusy, setGenBusy] = useState(false)
   const [genProgress, setGenProgress] = useState<{ percent: number; phase: string } | null>(null)
-  const dirInputRef = useRef<HTMLInputElement>(null)
+  const [dirBrowserOpen, setDirBrowserOpen] = useState(false)
+  const [dirEntries, setDirEntries] = useState<DirEntry[]>([])
+  const [dirExpanded, setDirExpanded] = useState<Set<string>>(new Set())
+  const [dirSelected, setDirSelected] = useState('')
+  const [dirLoading, setDirLoading] = useState(false)
+  const [dirSnapshot, setDirSnapshot] = useState<{ dir: string; file: string } | null>(null)
   const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
 
   // Auto-fill the remembered output directory whenever the dialog opens.
@@ -600,20 +607,136 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     }
   }
 
-  /** Open a directory selector: showDirectoryPicker in real browsers, a hidden webkitdirectory input elsewhere. */
-  const pickOutputDir = async (): Promise<void> => {
-    const picker = (window as unknown as { showDirectoryPicker?: () => Promise<{ name: string }> }).showDirectoryPicker
-    if (picker !== undefined) {
-      try {
-        const handle = await picker()
-        setGenDir(handle.name)
-        return
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return
+  /** One node of the host-driven directory tree (hand-rolled: the React-19-only packages are incompatible with this React 18 host). */
+  interface DirEntry {
+    name: string
+    type: 'directory' | 'file'
+    absolutePath: string
+    children?: DirEntry[]
+  }
+
+  /** Load one directory's subdirectories AND files through the host (pure HTTP — remote-safe). */
+  const loadDirListing = async (path: string): Promise<{ entries: string[]; files: string[] }> => {
+    const res = await fetch(`${LIST_DIRS_ENDPOINT}?path=${encodeURIComponent(path)}`)
+    if (!res.ok) throw new Error(`list-dirs returned ${res.status}`)
+    const body = (await res.json()) as { entries?: string[]; files?: string[] }
+    return { entries: body.entries ?? [], files: body.files ?? [] }
+  }
+
+  /** Open the directory browser: fetch the roots (drives on Windows, home otherwise). */
+  const openDirBrowser = async (): Promise<void> => {
+    try {
+      const res = await fetch(LIST_ROOTS_ENDPOINT)
+      if (!res.ok) throw new Error(`list-roots returned ${res.status}`)
+      const body = (await res.json()) as { roots?: string[] }
+      const roots = body.roots ?? []
+      if (roots.length === 0) return
+      setDirEntries(roots.map((root) => ({ name: root, type: 'directory', absolutePath: root })))
+      setDirSelected(roots[0]!)
+      setDirExpanded(new Set())
+      setDirLoading(false)
+      setDirSnapshot({ dir: genDir, file: genFile })
+      setDirBrowserOpen(true)
+    } catch (error) {
+      window.alert(`Cannot browse directories: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  /** Immutably attach lazily loaded children to one node in the tree. */
+  const attachChildren = (nodes: DirEntry[], path: string, children: DirEntry[]): DirEntry[] =>
+    nodes.map((node) => {
+      if (node.absolutePath === path) return { ...node, children }
+      if (node.children !== undefined) return { ...node, children: attachChildren(node.children, path, children) }
+      return node
+    })
+
+  /** Find one entry by absolute path (depth-first over the loaded tree). */
+  const findEntry = (nodes: DirEntry[], path: string): DirEntry | undefined => {
+    for (const node of nodes) {
+      if (node.absolutePath === path) return node
+      if (node.children !== undefined) {
+        const found = findEntry(node.children, path)
+        if (found !== undefined) return found
       }
     }
-    dirInputRef.current?.click()
+    return undefined
   }
+
+  /** Click a tree row: directories lazily load + toggle expand and fill the directory; files fill the name + its directory. */
+  const onDirClick = async (node: DirEntry): Promise<void> => {
+    setDirSelected(node.absolutePath)
+    if (node.type === 'file') {
+      const parent = node.absolutePath.slice(0, node.absolutePath.lastIndexOf('/') + 1) || node.absolutePath
+      setGenDir(parent)
+      setGenFile(node.name)
+      return
+    }
+    setGenDir(node.absolutePath)
+    if (node.children === undefined) {
+      setDirLoading(true)
+      try {
+        const { entries, files } = await loadDirListing(node.absolutePath)
+        const children: DirEntry[] = [
+          ...entries.map((name) => ({ name, type: 'directory' as const, absolutePath: `${node.absolutePath.replace(/[\\/]+$/, '')}/${name}` })),
+          ...files.map((name) => ({ name, type: 'file' as const, absolutePath: `${node.absolutePath.replace(/[\\/]+$/, '')}/${name}` })),
+        ]
+        setDirEntries((prev) => attachChildren(prev, node.absolutePath, children))
+      } catch (error) {
+        window.alert(`Cannot browse directories: ${error instanceof Error ? error.message : String(error)}`)
+        setDirLoading(false)
+        return
+      }
+      setDirLoading(false)
+    }
+    setDirExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(node.absolutePath)) next.delete(node.absolutePath)
+      else next.add(node.absolutePath)
+      return next
+    })
+  }
+
+  /** Recursive tree node renderer (flat state: entries tree + expanded set). */
+  const renderDirNode = (node: DirEntry, depth: number): React.JSX.Element => {
+    const expanded = dirExpanded.has(node.absolutePath)
+    const isSelected = dirSelected === node.absolutePath
+    const isDir = node.type === 'directory'
+    return (
+      <div key={node.absolutePath}>
+        <div
+          role="button"
+          style={{
+            padding: '4px 8px',
+            paddingLeft: 8 + depth * 14,
+            fontSize: 13,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            color: 'var(--dsw-alias-label-primary)',
+            background: isSelected ? 'var(--dsw-alias-interactive-bg-active)' : 'none',
+          }}
+          onClick={() => void onDirClick(node)}
+          onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--dsw-alias-interactive-bg-hover)' }}
+          onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'none' }}
+        >
+          <span style={{ color: 'var(--dsw-alias-label-secondary)', marginRight: 4 }}>{isDir ? (expanded ? '▾' : '▸') : ''}</span>
+          <span>{isDir ? '📁 ' : '📄 '}{node.name}</span>
+        </div>
+        {isDir && expanded && node.children !== undefined && node.children.map((child) => renderDirNode(child, depth + 1))}
+      </div>
+    )
+  }
+
+  /** Cancel the browse: revert the setup fields to their pre-browse values and close. */
+  const closeDirBrowser = (): void => {
+    if (dirSnapshot !== null) {
+      setGenDir(dirSnapshot.dir)
+      setGenFile(dirSnapshot.file)
+    }
+    setDirBrowserOpen(false)
+  }
+
   const sections: DetailSection[] = [
     { key: 'question', label: t('sectionQuestion'), content: record.question },
     { key: 'analyse', label: t('sectionAnalyse'), content: record.analyse },
@@ -808,7 +931,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                 />
                 <button
                   type="button"
-                  onClick={() => void pickOutputDir()}
+                  onClick={() => void openDirBrowser()}
                   style={{
                     padding: '4px 10px',
                     borderRadius: 6,
@@ -821,20 +944,6 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                 >
                   {t('browse')}
                 </button>
-                <input
-                  ref={dirInputRef}
-                  type="file"
-                  style={{ display: 'none' }}
-                  {...{ webkitdirectory: '' }}
-                  onChange={(e) => {
-                    const first = e.target.files?.[0]
-                    if (first !== undefined) {
-                      const rel = (first as File & { webkitRelativePath?: string }).webkitRelativePath ?? ''
-                      setGenDir(rel.split('/')[0] ?? first.name)
-                    }
-                    e.target.value = ''
-                  }}
-                />
               </div>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('fileName')}</span>
               <input
@@ -878,6 +987,80 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
                 }}
               >
                 {t('generate')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {dirBrowserOpen && !genBusy && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--dsw-alias-bg-mask-1)',
+          }}
+          onClick={closeDirBrowser}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('browseDirectory')}
+            style={{
+              width: 420,
+              maxWidth: 'calc(100vw - 32px)',
+              background: 'var(--dsw-alias-bg-layer-2)',
+              border: '1px solid var(--dsw-alias-border-l2)',
+              borderRadius: 10,
+              padding: 16,
+              boxShadow: 'var(--dsw-shadow-lv3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('browseDirectory')}</div>
+            <div style={{ marginTop: 10, font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all' }}>
+              {dirSelected}
+            </div>
+            <div style={{ marginTop: 8, maxHeight: 280, overflowY: 'auto', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, padding: '4px 0' }}>
+              {dirLoading && (
+                <div style={{ padding: '4px 8px', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>…</div>
+              )}
+              {dirEntries.map((node) => renderDirNode(node, 0))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button
+                type="button"
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--dsw-alias-border-l2)',
+                  background: 'none',
+                  color: 'var(--dsw-alias-label-primary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+                onClick={closeDirBrowser}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--dsw-alias-state-business-primary)',
+                  background: 'none',
+                  color: 'var(--dsw-alias-state-business-primary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+                onClick={() => setDirBrowserOpen(false)}
+              >
+                {t('confirm')}
               </button>
             </div>
           </div>
