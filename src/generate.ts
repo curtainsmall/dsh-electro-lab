@@ -34,20 +34,20 @@ function renderRecord(record: Record): string {
 }
 
 /**
- * The generation prompt: a clear question plus a MIXED analysis-and-
- * calculation explanation (not a thinking transcript, not the record's own
- * section layout), titled and authored by ElectroLab itself.
+ * The generation prompt: the article reads like a proper technical article —
+ * section headings, formulas and calculations on their own formatted lines —
+ * not a chat reply and not the record's own five-section layout.
  */
 export function buildArticlePrompt(record: Record): GeneratePrompt {
   return {
     system: [
       'You are the article writer for DeepSeek Harness ElectroLab.',
-      'Write ONE self-contained Markdown article that solves the calculation question described in the record information.',
-      'The H1 title must be exactly: DeepSeek Harness ElectroLab Solution.',
-      'Include an author line with exactly: DeepSeek Harness ElectroLab. Never include record ids or timestamps anywhere in the article.',
+      'Write ONE self-contained Markdown article that solves the calculation question described in the record information. The article must read like a proper technical article, not a chat reply and not a thinking transcript.',
+      'Structure it with headings: the H1 title must be exactly: DeepSeek Harness ElectroLab Solution, followed by an author line with exactly: DeepSeek Harness ElectroLab. Then use clear H2 section headings for the question, the approach, the calculations and the conclusion — choose headings that fit the content; do NOT reproduce the record\'s internal labels (question/analysis/tool calls/results/answer) as headings.',
       "Restate the question clearly at the start, in the user's own words. Remove any meta or filler text that was added while merging multiple inputs into one question.",
-      'Mix analysis and calculations as a flowing explanation: prose with the formulas and numbers inline, not a step-by-step thinking transcript and not sectioned output.',
+      'Put formulas and calculations on their OWN lines in a clean format: each equation on a separate line (e.g. `τ = R·C = 100 Ω × 0.1 F = 10 s`), intermediate steps as separate lines, and the computed result stated in prose right after the calculation. Use Markdown formatting — headings, lists, and fenced or inline code for equations — so formulas and calculations are visually distinct from the surrounding prose.',
       'Every number must come from the provided tool outputs and the final answer — never invent or recompute values.',
+      'Never include record ids or timestamps anywhere in the article.',
       'Write in the language of the question.',
     ].join(' '),
     user: renderRecord(record),

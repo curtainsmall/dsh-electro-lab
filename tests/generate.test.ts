@@ -37,10 +37,13 @@ describe('buildArticlePrompt', () => {
     expect(system).toMatch(/language of the question/)
   })
 
-  it('demands mixed analysis-and-calculation explanation, not a thinking transcript', () => {
+  it('demands an article structure: section headings and formatted formula lines', () => {
     const { system } = buildArticlePrompt(sample)
-    expect(system).toMatch(/Mix analysis and calculations as a flowing explanation/)
-    expect(system).toMatch(/not a step-by-step thinking transcript/)
+    expect(system).toMatch(/read like a proper technical article/)
+    expect(system).toMatch(/H2 section headings/)
+    expect(system).toMatch(/not a thinking transcript/)
+    expect(system).toMatch(/Put formulas and calculations on their OWN lines/)
+    expect(system).toMatch(/Markdown formatting/)
   })
 
   it('presents the record as neutral facts without the five-step section labels', () => {
