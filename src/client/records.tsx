@@ -6,15 +6,18 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
-import { IconChevronLeft, IconDownload, IconPlay, IconArrowUp, IconFolder, IconFile } from './icons.tsx'
+import { useGenState, startGenerate, cancelGenerate, clearProgress, setMinimized } from './generation.ts'
+import { IconChevronLeft, IconDownload, IconPlay, IconArrowUp, IconFolder, IconFile, IconMinus } from './icons.tsx'
 
 /* ── Shared dialog shell + button language (A + B) ─────────────────────────── */
 
 /** Shared modal shell: fixed overlay, themed panel, title (with optional right-side content), body, footer. */
-function Dialog({ open, title, width = 400, dismissible = true, headerRight, footer, children, onClose }: {
+function Dialog({ open, title, width = 400, height, dismissible = true, headerRight, footer, children, onClose }: {
   open: boolean
   title: string
   width?: number
+  /** Fixed panel height: the dialog keeps this size across state changes (long content scrolls in the body). */
+  height?: number
   dismissible?: boolean
   headerRight?: ReactNode
   footer?: ReactNode
@@ -32,6 +35,8 @@ function Dialog({ open, title, width = 400, dismissible = true, headerRight, foo
         alignItems: 'center',
         justifyContent: 'center',
         background: 'var(--dsw-alias-bg-mask-1)',
+        // The overlay lives in a pointer-events-none wrapper root; the dialog itself must stay interactive.
+        pointerEvents: 'auto',
       }}
       onClick={dismissible ? onClose : undefined}
     >
@@ -43,6 +48,7 @@ function Dialog({ open, title, width = 400, dismissible = true, headerRight, foo
           width,
           maxWidth: 'calc(100vw - 32px)',
           maxHeight: 'calc(100vh - 48px)',
+          ...(height === undefined ? {} : { height }),
           display: 'flex',
           flexDirection: 'column',
           background: 'var(--dsw-alias-bg-layer-2)',
@@ -57,7 +63,7 @@ function Dialog({ open, title, width = 400, dismissible = true, headerRight, foo
           <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
           {headerRight}
         </div>
-        <div style={{ marginTop: 12, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{children}</div>
+        <div style={{ marginTop: 12, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>{children}</div>
         {footer !== undefined && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flex: 'none' }}>{footer}</div>
         )}
@@ -215,9 +221,6 @@ interface RecordsResponse {
 
 const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
 const GENERATE_DIR_ENDPOINT = '/api/dsh-electro-lab/generate-dir'
-const GENERATE_ENDPOINT = '/api/dsh-electro-lab/generate'
-const GENERATE_PROGRESS_ENDPOINT = '/api/dsh-electro-lab/generate-progress'
-const GENERATE_CANCEL_ENDPOINT = '/api/dsh-electro-lab/generate-cancel'
 const REVEAL_ENDPOINT = '/api/dsh-electro-lab/reveal'
 const LIST_DIRS_ENDPOINT = '/api/dsh-electro-lab/list-dirs'
 const LIST_ROOTS_ENDPOINT = '/api/dsh-electro-lab/list-roots'
@@ -684,10 +687,12 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [genDir, setGenDir] = useState('')
   const [genLanguage, setGenLanguage] = useState('auto')
   const [genFile, setGenFile] = useState('')
-  const [genBusy, setGenBusy] = useState(false)
-  const [genProgress, setGenProgress] = useState<{ percent: number; phase: string; status: 'running' | 'done' | 'error'; path?: string; error?: string } | null>(null)
-  const [genElapsed, setGenElapsed] = useState(0)
-  const genJobIdRef = useRef<string | null>(null)
+  const [genSetupError, setGenSetupError] = useState<string | null>(null)
+  // The job itself lives in the module-level generation store (survives page
+  // navigation); this page only drives the setup dialog. `genRunning` gates
+  // the Generate button while a job is in flight.
+  const { progress: genProgress } = useGenState()
+  const genRunning = genProgress?.status === 'running'
   const [dirBrowserOpen, setDirBrowserOpen] = useState(false)
   const [dirEntries, setDirEntries] = useState<DirEntry[]>([])
   const [dirExpanded, setDirExpanded] = useState<Set<string>>(new Set())
@@ -696,13 +701,6 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [dirSnapshot, setDirSnapshot] = useState<{ dir: string; file: string } | null>(null)
   const treeListRef = useRef<HTMLDivElement>(null)
 
-  // Elapsed-time counter for the generation dialog: ticks only while running,
-  // freezes at the final value once the generation finishes or fails.
-  useEffect(() => {
-    if (genProgress === null || genProgress.status !== 'running') return
-    const timer = setInterval(() => setGenElapsed((seconds) => seconds + 1), 1000)
-    return () => clearInterval(timer)
-  }, [genProgress === null ? null : genProgress.status])
   const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
 
   // Auto-fill the remembered output directory and article language whenever the dialog opens.
@@ -734,85 +732,23 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     setGenOpen(false)
   }
 
-  /** Ask the host to generate the article (LLM) and write it to disk; the progress dialog stays open until confirmed. */
-  const runGenerate = async (): Promise<void> => {
+  /** Ask the host to generate the article (LLM) and write it to disk; the module-level store runs and polls the job. */
+  const runGenerate = (): void => {
     const dir = genDir.trim()
-    if (dir.length === 0) return
-    setGenBusy(true)
-    setGenElapsed(0)
-    setGenProgress({ percent: 0, phase: 'prepare', status: 'running' })
-    try {
-      const res = await fetch(
-        `${GENERATE_ENDPOINT}?recordId=${encodeURIComponent(record.id)}&format=markdown&language=${encodeURIComponent(genLanguage)}&directory=${encodeURIComponent(dir)}&fileName=${encodeURIComponent(genFile.trim())}`,
-        { method: 'POST' },
-      )
-      const body = (await res.json()) as { jobId?: string; error?: string }
-      if (!res.ok) throw new Error(body.error ?? `generate returned ${res.status}`)
-      if (body.jobId === undefined) throw new Error('no job id returned')
-      genJobIdRef.current = body.jobId
-      // Poll the job until it settles.
-      for (;;) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        const pr = await fetch(`${GENERATE_PROGRESS_ENDPOINT}?jobId=${encodeURIComponent(body.jobId)}`)
-        if (!pr.ok) throw new Error(`progress returned ${pr.status}`)
-        const job = (await pr.json()) as { status?: string; percent?: number; phase?: string; path?: string; error?: string }
-        if (job.status === 'done') {
-          genJobIdRef.current = null
-          saveGenState()
-          setGenOpen(false)
-          setGenBusy(false)
-          setGenProgress({ percent: 100, phase: job.phase ?? 'write', status: 'done', path: job.path })
-          return
-        }
-        if (job.status === 'error') {
-          genJobIdRef.current = null
-          setGenBusy(false)
-          setGenProgress({ percent: job.percent ?? 0, phase: job.phase ?? 'prepare', status: 'error', error: job.error ?? 'unknown error' })
-          return
-        }
-        if (job.percent !== undefined && job.phase !== undefined) {
-          setGenProgress({ percent: job.percent, phase: job.phase, status: 'running' })
-        }
-      }
-    } catch (error) {
-      setGenBusy(false)
-      setGenProgress({ percent: 0, phase: 'prepare', status: 'error', error: error instanceof Error ? error.message : String(error) })
+    if (dir.length === 0) {
+      setGenSetupError(t('directoryRequired'))
+      return
     }
-  }
-
-  /** Cancel the running generation: abort the host job and close the dialog. */
-  const cancelGenerate = (): void => {
-    const jobId = genJobIdRef.current
-    genJobIdRef.current = null
-    if (jobId !== null) {
-      void fetch(`${GENERATE_CANCEL_ENDPOINT}?jobId=${encodeURIComponent(jobId)}`, { method: 'POST' }).catch(() => {})
-    }
-    setGenBusy(false)
-    setGenProgress(null)
-  }
-
-  /** Reveal a generated file in the OS file manager (select it), or open it with its default application. */
-  const revealPath = async (path: string, action: 'open' | 'reveal' = 'reveal'): Promise<void> => {
-    try {
-      const res = await fetch(`${REVEAL_ENDPOINT}?path=${encodeURIComponent(path)}&action=${action}`, { method: 'POST' })
-      const body = (await res.json()) as { result?: string }
-      if (!res.ok || body.result !== 'ok') throw new Error(body.result ?? `reveal returned ${res.status}`)
-    } catch (error) {
-      window.alert(`Cannot open: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-
-  /** Open a generated file with its default application. */
-  const openFile = (path: string): void => {
-    void revealPath(path, 'open')
-  }
-
-  /** Reveal the generated file's directory in the OS file manager. */
-  const revealDir = (path: string): void => {
-    // The host returns Windows-style paths (backslashes) — cut at the last separator of either kind.
-    const sep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-    const dir = sep === -1 ? path : path.slice(0, sep + 1)
-    void revealPath(dir)
+    setGenSetupError(null)
+    saveGenState()
+    setGenOpen(false)
+    startGenerate({
+      recordId: record.id,
+      format: 'markdown',
+      language: genLanguage,
+      directory: dir,
+      fileName: genFile.trim(),
+    })
   }
 
   /** One node of the host-driven directory tree (hand-rolled: the React-19-only packages are incompatible with this React 18 host). */
@@ -1150,10 +1086,10 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           <IconPlay size={14} />
         </button>
       </div>
-      <Dialog open={genOpen && !genBusy} title={t('generateSetup')} width={420} onClose={closeGenDialog}
+      <Dialog open={genOpen} title={t('generateSetup')} width={420} onClose={closeGenDialog}
         footer={[
           <GhostButton key="cancel" onClick={closeGenDialog}>{t('cancel')}</GhostButton>,
-          <PrimaryButton key="generate" onClick={() => void runGenerate()}>{t('generate')}</PrimaryButton>,
+          <PrimaryButton key="generate" disabled={genRunning} onClick={runGenerate}>{t('generate')}</PrimaryButton>,
         ]}
       >
         {/* Two-column grid: the label column auto-sizes to the longest label (max-content),
@@ -1181,7 +1117,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             <input
               type="text"
               value={genDir}
-              onChange={(e) => setGenDir(e.target.value)}
+              onChange={(e) => { setGenDir(e.target.value); if (genSetupError !== null) setGenSetupError(null) }}
               placeholder="/path/to/output"
               style={{ ...genInputStyle }}
             />
@@ -1196,8 +1132,11 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             style={{ ...genInputStyle }}
           />
         </div>
+        {genSetupError !== null && (
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)' }}>{genSetupError}</div>
+        )}
       </Dialog>
-      <Dialog open={dirBrowserOpen && !genBusy} title={t('browseDirectory')} width={440} onClose={closeDirBrowser}
+      <Dialog open={dirBrowserOpen} title={t('browseDirectory')} width={440} onClose={closeDirBrowser}
         footer={[
           <GhostButton key="cancel" onClick={closeDirBrowser}>{t('cancel')}</GhostButton>,
           <PrimaryButton key="confirm" onClick={() => setDirBrowserOpen(false)}>{t('confirm')}</PrimaryButton>,
@@ -1223,50 +1162,161 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           {dirEntries.map((node) => renderDirNode(node, 0))}
         </div>
       </Dialog>
-      {genProgress !== null && (
+    </div>
+  )
+}
+
+/** Reveal a generated file in the OS file manager (select it), or open it with its default application. */
+async function revealPath(path: string, action: 'open' | 'reveal' = 'reveal'): Promise<void> {
+  try {
+    const res = await fetch(`${REVEAL_ENDPOINT}?path=${encodeURIComponent(path)}&action=${action}`, { method: 'POST' })
+    const body = (await res.json()) as { result?: string }
+    if (!res.ok || body.result !== 'ok') throw new Error(body.result ?? `reveal returned ${res.status}`)
+  } catch (error) {
+    window.alert(`Cannot open: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+/** Open a generated file with its default application. */
+function openFile(path: string): void {
+  void revealPath(path, 'open')
+}
+
+/** Reveal the generated file's directory in the OS file manager. */
+function revealDir(path: string): void {
+  // The host returns Windows-style paths (backslashes) — cut at the last separator of either kind.
+  const sep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  const dir = sep === -1 ? path : path.slice(0, sep + 1)
+  void revealPath(dir)
+}
+
+/**
+ * Global generation overlay: the progress dialog and the minimized status
+ * pill, rendered in a body-level React root (panel.tsx) and driven by the
+ * module-level generation store — so a running job survives navigation to the
+ * records list, the session chat, or anywhere else in the app.
+ */
+export function GenerationOverlay(): React.JSX.Element | null {
+  useAppLocale() // Re-render when the active language changes.
+  const { progress, minimized, elapsed } = useGenState()
+  if (progress === null) return null
+  return (
+    <div
+      style={{
+        // Theming: the shell defines the --dsw-alias-* tokens on <body>, so a
+        // body-level root inherits them; the font is re-declared explicitly.
+        font: '13px/1.5 var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif)',
+        color: 'var(--dsw-alias-label-primary)',
+      }}
+    >
+      {!minimized && (
         <Dialog
           open
-          title={genProgress.status === 'done' ? t('generateDone') : genProgress.status === 'error' ? t('generateFailed') : t('generating')}
+          title={progress.status === 'done' ? t('generateDone') : progress.status === 'error' ? t('generateFailed') : t('generating')}
           width={380}
+          height={190}
           dismissible={false}
-          onClose={() => setGenProgress(null)}
+          onClose={() => {}}
           footer={[
-            genProgress.status === 'running' && (
+            progress.status === 'running' && (
               <GhostButton key="cancel" onClick={cancelGenerate}>{t('cancel')}</GhostButton>
             ),
-            genProgress.status === 'done' && genProgress.path !== undefined && (
+            progress.status === 'done' && progress.path !== undefined && (
               <>
-                <GhostButton key="openfile" onClick={() => openFile(genProgress.path!)}>{t('openFile')}</GhostButton>
-                <GhostButton key="opendir" onClick={() => revealDir(genProgress.path!)}>{t('openDirectory')}</GhostButton>
+                <GhostButton key="openfile" onClick={() => openFile(progress.path!)}>{t('openFile')}</GhostButton>
+                <GhostButton key="opendir" onClick={() => revealDir(progress.path!)}>{t('openDirectory')}</GhostButton>
               </>
             ),
             <PrimaryButton
               key="confirm"
-              disabled={genProgress.status === 'running'}
-              onClick={() => setGenProgress(null)}
+              disabled={progress.status === 'running'}
+              onClick={clearProgress}
             >
               {t('confirm')}
             </PrimaryButton>,
           ].filter(Boolean)}
-          headerRight={<div style={{ fontSize: 13, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', flex: 'none' }}>{formatElapsed(genElapsed)}</div>}
+          headerRight={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatElapsed(elapsed)}</div>
+              {progress.status === 'running' && (
+                <button
+                  type="button"
+                  title={t('minimize')}
+                  aria-label={t('minimize')}
+                  onClick={() => setMinimized(true)}
+                  style={iconButtonStyle(false)}
+                >
+                  <IconMinus size={13} />
+                </button>
+              )}
+            </div>
+          }
         >
-        {/* Current stage, or the generated location on success. */}
-        {genProgress.status === 'running' && (
-          <div style={{ marginTop: 14, textAlign: 'center', fontSize: 13, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 }}>
-            {t(genPhaseKey(genProgress.phase))}
+        {/* Current stage, or the generated location on success — centered both ways in the fixed-size dialog (margin:auto keeps long content fully scrollable). */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          <div style={{ margin: 'auto', width: '100%', textAlign: 'center' }}>
+            {progress.status === 'running' && (
+              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 }}>
+                {t(genPhaseKey(progress.phase))}
+              </div>
+            )}
+            {progress.status === 'done' && (
+              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
+                {t('generatedAt')} {progress.path ?? ''}
+              </div>
+            )}
+            {progress.status === 'error' && (
+              <div style={{ fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {progress.error ?? 'unknown error'}
+              </div>
+            )}
           </div>
-        )}
-        {genProgress.status === 'done' && (
-          <div style={{ marginTop: 14, textAlign: 'center', fontSize: 13, color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
-            {t('generatedAt')} {genProgress.path ?? ''}
-          </div>
-        )}
-        {genProgress.status === 'error' && (
-          <div style={{ marginTop: 14, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-            {genProgress.error ?? 'unknown error'}
-          </div>
-        )}
+        </div>
         </Dialog>
+      )}
+      {/* Minimized generation: a status pill in the corner; the job keeps running in the background, click to restore. */}
+      {minimized && (
+        <button
+          type="button"
+          onClick={() => setMinimized(false)}
+          title={progress.status === 'running' ? t('generating') : progress.status === 'error' ? t('generateFailed') : t('generateDone')}
+          style={{
+            position: 'fixed',
+            right: 16,
+            bottom: 16,
+            zIndex: 90,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 14px',
+            borderRadius: 8,
+            background: 'var(--dsw-alias-bg-layer-2)',
+            border: '1px solid var(--dsw-alias-border-l2)',
+            boxShadow: 'var(--dsw-shadow-lv3)',
+            fontSize: 13,
+            color: 'var(--dsw-alias-label-primary)',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+          }}
+        >
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            flex: 'none',
+            background: progress.status === 'error'
+              ? 'var(--dsw-alias-state-error-primary)'
+              : progress.status === 'done'
+                ? 'var(--dsw-alias-state-success-primary)'
+                : 'var(--dsw-alias-label-secondary)',
+          }} />
+          <span>
+            {progress.status === 'done' ? t('generateDone') : progress.status === 'error' ? t('generateFailed') : t('generating')}
+          </span>
+          {progress.status === 'running' && (
+            <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--dsw-alias-label-secondary)' }}>{formatElapsed(elapsed)}</span>
+          )}
+        </button>
       )}
     </div>
   )

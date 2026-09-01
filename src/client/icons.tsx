@@ -61,3 +61,8 @@ export function IconFile({ size = 14 }: IconProps): React.JSX.Element {
     </svg>
   )
 }
+
+/** — minimize / collapse. */
+export function IconMinus({ size = 13 }: IconProps): React.JSX.Element {
+  return <svg {...svgProps(size)}><path d="M3.5 8h9" /></svg>
+}
