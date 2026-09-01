@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-02
+
+### Added
+
+- Article generation through the host LLM: the record detail page gains a Generate action; the setup dialog picks the output directory through a host-driven lazy directory browser (pure HTTP — works locally and remotely), the file name (default `electro-lab-<record-id>.md`) and the article language; the host writes a proper technical article (exact H1/author line, H2 section headings, formulas and calculations on their own lines, numbers only from tool outputs) to disk.
+- Explicit article language in the generation setup: follow the question (default), Simplified Chinese, or English — a forced language is pinned in both the system and the user prompt; the choice is remembered together with the output directory (state.json, migrated from the legacy plain-text file).
+- Progress dialog with stage text and an elapsed timer, cancel while running, and Open file (default application) / Open directory (Explorer reveal) actions on completion.
+- Minimizable generation progress: the dialog collapses into a corner status pill (running / done / error) that survives any navigation — the records list, the session chat, even closing the panel. Generation state lives in a module-level client store rendered in a body-level overlay root, so the job keeps polling and stays visible anywhere.
+- Fixed-size (380×190) progress dialog with both-axis centered content; generation errors display in the same dialog; the setup dialog shows inline validation for an empty output directory.
+- Unified dialog shell and button language across the records page: a right action rail starting at the title row, an inline SVG icon set (no emoji or system glyphs), and reusable ghost/primary button components.
+- Cross-panel center-column eviction: opening ElectroLab closes the SSH and task-board views and their controllers (and vice versa).
+
 ## [0.7.0] - 2026-08-30
 
 ### Added
@@ -140,6 +152,7 @@ oiseFigureDb`, `gainDb`, `magnitudeDb`, `returnLossDb`…) — dB is a log scale
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.8.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.8.0
 [0.7.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.7.0
 [0.6.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.6.0
 [0.5.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.1

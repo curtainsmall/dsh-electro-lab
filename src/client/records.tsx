@@ -4,8 +4,166 @@
  * `/api/dsh-electro-lab/records` endpoint and polled while the panel is open.
  * Records are plugin-owned: they survive session deletion and restarts.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
+import { useGenState, startGenerate, cancelGenerate, clearProgress, setMinimized } from './generation.ts'
+import { IconChevronLeft, IconDownload, IconPlay, IconArrowUp, IconFolder, IconFile, IconMinus } from './icons.tsx'
+
+/* ── Shared dialog shell + button language (A + B) ─────────────────────────── */
+
+/** Shared modal shell: fixed overlay, themed panel, title (with optional right-side content), body, footer. */
+function Dialog({ open, title, width = 400, height, dismissible = true, headerRight, footer, children, onClose }: {
+  open: boolean
+  title: string
+  width?: number
+  /** Fixed panel height: the dialog keeps this size across state changes (long content scrolls in the body). */
+  height?: number
+  dismissible?: boolean
+  headerRight?: ReactNode
+  footer?: ReactNode
+  children: ReactNode
+  onClose: () => void
+}): React.JSX.Element | null {
+  if (!open) return null
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--dsw-alias-bg-mask-1)',
+        // The overlay lives in a pointer-events-none wrapper root; the dialog itself must stay interactive.
+        pointerEvents: 'auto',
+      }}
+      onClick={dismissible ? onClose : undefined}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{
+          width,
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 48px)',
+          ...(height === undefined ? {} : { height }),
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--dsw-alias-bg-layer-2)',
+          border: '1px solid var(--dsw-alias-border-l2)',
+          borderRadius: 10,
+          padding: 16,
+          boxShadow: 'var(--dsw-shadow-lv3)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
+          {headerRight}
+        </div>
+        <div style={{ marginTop: 12, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>{children}</div>
+        {footer !== undefined && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flex: 'none' }}>{footer}</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Ghost button (secondary action): outline that deepens on hover. */
+function ghostButtonStyle(hovered: boolean): React.CSSProperties {
+  return {
+    padding: '4px 12px',
+    borderRadius: 6,
+    border: '1px solid var(--dsw-alias-label-tertiary)',
+    borderColor: hovered ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
+    background: hovered ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+    color: 'var(--dsw-alias-label-primary)',
+    cursor: 'pointer',
+    fontSize: 13,
+  }
+}
+
+/** Primary button (main action): the shell's filled info button. */
+function primaryButtonStyle(hovered: boolean, disabled = false): React.CSSProperties {
+  return {
+    padding: '4px 12px',
+    borderRadius: 6,
+    border: '1px solid var(--dsw-alias-button-info-fill)',
+    background: hovered && !disabled ? 'var(--dsw-alias-button-info-hover)' : 'var(--dsw-alias-button-info-fill)',
+    color: 'var(--dsw-alias-label-primary-foreground)',
+    cursor: disabled ? 'default' : 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    opacity: disabled ? 0.45 : 1,
+  }
+}
+
+/** Ghost button with self-managed hover state. */
+function GhostButton({ children, onClick, style }: { children: ReactNode; onClick: () => void; style?: React.CSSProperties }): React.JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      type="button"
+      style={{ ...ghostButtonStyle(hovered), ...style }}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Primary button with self-managed hover state. */
+function PrimaryButton({ children, onClick, disabled = false }: { children: ReactNode; onClick: () => void; disabled?: boolean }): React.JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      type="button"
+      style={primaryButtonStyle(hovered, disabled)}
+      disabled={disabled}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Icon button for the detail-page action bar / inline actions. */
+function iconButtonStyle(hovered: boolean): React.CSSProperties {
+  return {
+    width: 30,
+    height: 30,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+    border: 'none',
+    background: hovered ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+    color: hovered ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)',
+    cursor: 'pointer',
+  }
+}
+
+/** Map a generation phase code to its translated label; unknown phases show no text. */
+function genPhaseKey(phase: string): LocaleKey | string {
+  if (phase === 'prepare') return 'phasePrepare'
+  if (phase === 'generate') return 'phaseGenerate'
+  if (phase === 'write') return 'phaseWrite'
+  return ''
+}
+
+/** mm:ss elapsed-time display. */
+function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
 
 /** Map a stored error type to its translated message key (codes stay raw; unknown types show no message). */
 function errorMessageKey(type: string): LocaleKey | string {
@@ -62,6 +220,10 @@ interface RecordsResponse {
 }
 
 const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
+const GENERATE_DIR_ENDPOINT = '/api/dsh-electro-lab/generate-dir'
+const REVEAL_ENDPOINT = '/api/dsh-electro-lab/reveal'
+const LIST_DIRS_ENDPOINT = '/api/dsh-electro-lab/list-dirs'
+const LIST_ROOTS_ENDPOINT = '/api/dsh-electro-lab/list-roots'
 const POLL_MS = 5000
 const DISPLAY_MAX_RECORDS = 100
 
@@ -89,6 +251,31 @@ const headerButtonStyle: React.CSSProperties = {
   border: '1px solid var(--dsw-alias-label-tertiary)',
   borderRadius: 6,
   cursor: 'pointer',
+}
+
+/** Text input inside the generation setup dialog. */
+const genInputStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  padding: '6px 8px',
+  fontSize: 13,
+  color: 'var(--dsw-alias-label-primary)',
+  background: 'var(--dsw-specific-input-major)',
+  border: '1px solid var(--dsw-alias-border-l2)',
+  borderRadius: 6,
+  outline: 'none',
+  fontFamily: 'ui-monospace, monospace',
+}
+
+/** Dropdown inside the generation setup dialog (format, language). */
+const genSelectStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '6px 8px',
+  fontSize: 13,
+  color: 'var(--dsw-alias-label-primary)',
+  background: 'var(--dsw-specific-input-major)',
+  border: '1px solid var(--dsw-alias-border-l2)',
+  borderRadius: 6,
 }
 
 function formatTime(time: number): string {
@@ -495,6 +682,297 @@ async function exportRecordFile(record: DetailRecord): Promise<void> {
 function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
   const [backHover, setBackHover] = useState(false)
   const [exportHover, setExportHover] = useState(false)
+  const [genHover, setGenHover] = useState(false)
+  const [genOpen, setGenOpen] = useState(false)
+  const [genDir, setGenDir] = useState('')
+  const [genLanguage, setGenLanguage] = useState('auto')
+  const [genFile, setGenFile] = useState('')
+  const [genSetupError, setGenSetupError] = useState<string | null>(null)
+  // The job itself lives in the module-level generation store (survives page
+  // navigation); this page only drives the setup dialog. `genRunning` gates
+  // the Generate button while a job is in flight.
+  const { progress: genProgress } = useGenState()
+  const genRunning = genProgress?.status === 'running'
+  const [dirBrowserOpen, setDirBrowserOpen] = useState(false)
+  const [dirEntries, setDirEntries] = useState<DirEntry[]>([])
+  const [dirExpanded, setDirExpanded] = useState<Set<string>>(new Set())
+  const [dirSelected, setDirSelected] = useState('')
+  const [dirLoading, setDirLoading] = useState(false)
+  const [dirSnapshot, setDirSnapshot] = useState<{ dir: string; file: string } | null>(null)
+  const treeListRef = useRef<HTMLDivElement>(null)
+
+  const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
+
+  // Auto-fill the remembered output directory and article language whenever the dialog opens.
+  useEffect(() => {
+    if (!genOpen) return
+    let alive = true
+    fetch(GENERATE_DIR_ENDPOINT)
+      .then((r) => r.json() as Promise<{ directory?: string; language?: string }>)
+      .then((body) => {
+        if (!alive) return
+        if (body.directory !== undefined && body.directory !== '') setGenDir(body.directory)
+        if (body.language !== undefined && body.language !== '') setGenLanguage(body.language)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [genOpen])
+
+  /** Persist the directory and language so the next generation dialog auto-fills them. */
+  const saveGenState = (): void => {
+    const dir = genDir.trim()
+    const params = new URLSearchParams()
+    if (dir.length > 0) params.set('dir', dir)
+    params.set('language', genLanguage)
+    void fetch(`${GENERATE_DIR_ENDPOINT}?${params.toString()}`, { method: 'PUT' }).catch(() => {})
+  }
+
+  const closeGenDialog = (): void => {
+    saveGenState()
+    setGenOpen(false)
+  }
+
+  /** Ask the host to generate the article (LLM) and write it to disk; the module-level store runs and polls the job. */
+  const runGenerate = (): void => {
+    const dir = genDir.trim()
+    if (dir.length === 0) {
+      setGenSetupError(t('directoryRequired'))
+      return
+    }
+    setGenSetupError(null)
+    saveGenState()
+    setGenOpen(false)
+    startGenerate({
+      recordId: record.id,
+      format: 'markdown',
+      language: genLanguage,
+      directory: dir,
+      fileName: genFile.trim(),
+    })
+  }
+
+  /** One node of the host-driven directory tree (hand-rolled: the React-19-only packages are incompatible with this React 18 host). */
+  interface DirEntry {
+    name: string
+    type: 'directory' | 'file'
+    absolutePath: string
+    children?: DirEntry[]
+  }
+
+  /** Load one directory's subdirectories AND files through the host (pure HTTP — remote-safe). */
+  const loadDirListing = async (path: string): Promise<{ path: string; entries: string[]; files: string[]; parent: string }> => {
+    const res = await fetch(`${LIST_DIRS_ENDPOINT}?path=${encodeURIComponent(path)}`)
+    if (!res.ok) throw new Error(`list-dirs returned ${res.status}`)
+    const body = (await res.json()) as { path?: string; entries?: string[]; files?: string[]; parent?: string }
+    return { path: body.path ?? path, entries: body.entries ?? [], files: body.files ?? [], parent: body.parent ?? '' }
+  }
+
+  /** Open the directory browser at the current output directory: roots shown, the path to the current dir pre-expanded and selected. */
+  const openDirBrowser = async (): Promise<void> => {
+    try {
+      const res = await fetch(LIST_ROOTS_ENDPOINT)
+      if (!res.ok) throw new Error(`list-roots returned ${res.status}`)
+      const body = (await res.json()) as { roots?: string[] }
+      const roots = body.roots ?? []
+      if (roots.length === 0) return
+      let tree: DirEntry[] = roots.map((root) => ({ name: root, type: 'directory', absolutePath: root }))
+      const expanded = new Set<string>()
+      setDirSelected('')
+      setDirSnapshot({ dir: genDir, file: genFile })
+      setDirBrowserOpen(true)
+
+      // Walk UP from the current directory using the host's parent values until
+      // a drive root is reached, then expand the chain top-down so the current
+      // directory is visible and selected.
+      const current = genDir.trim()
+      if (current.length > 0) {
+        const chain: Array<{ path: string; parent: string }> = []
+        let probe = current
+        try {
+          for (;;) {
+            const snap = await loadDirListing(probe)
+            chain.push({ path: snap.path, parent: snap.parent })
+            if (snap.parent === snap.path) break // reached a drive root
+            probe = snap.parent
+          }
+        } catch {
+          // The current path is not reachable from the roots — show the roots only.
+          chain.length = 0
+        }
+        // Expand the chain top-down, attaching each parent's FULL listing so
+        // the siblings of the current directory are visible too.
+        for (const item of [...chain].reverse()) {
+          if (item.parent === item.path) continue // the item is already a root
+          try {
+            const { entries, files } = await loadDirListing(item.parent)
+            const base = item.parent.replace(/[\\/]+$/, '')
+            const children: DirEntry[] = [
+              ...entries.map((name) => ({ name, type: 'directory' as const, absolutePath: `${base}/${name}` })),
+              ...files.map((name) => ({ name, type: 'file' as const, absolutePath: `${base}/${name}` })),
+            ]
+            tree = attachChildren(tree, item.parent, children)
+            expanded.add(item.parent)
+          } catch {
+            // skip this level — the chain stays unexpanded from here up
+          }
+        }
+        setDirSelected(current)
+      }
+
+      setDirEntries(tree)
+      setDirExpanded(expanded)
+      setDirSelected(current)
+      setDirLoading(false)
+      // Scroll the current directory row to the TOP of the visible area once the tree rendered.
+      if (current.length > 0) {
+        setTimeout(() => {
+          treeListRef.current?.querySelector(`[data-path="${CSS.escape(current)}"]`)?.scrollIntoView({ block: 'start' })
+        }, 0)
+      }
+    } catch (error) {
+      window.alert(`Cannot browse directories: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  /** Navigate the browser up one level: select the parent and reveal its listing. */
+  const goUpLevel = async (): Promise<void> => {
+    const current = dirSelected.trim()
+    if (current.length === 0) return
+    let parent: string
+    try {
+      parent = (await loadDirListing(current)).parent
+    } catch {
+      return
+    }
+    if (parent === current) return // already at a drive root
+    const parentNode = findEntry(dirEntries, parent)
+    if (parentNode === undefined) return // parent not part of the loaded tree
+    if (parentNode.children === undefined) {
+      try {
+        const { entries, files } = await loadDirListing(parent)
+        const base = parent.replace(/[\\/]+$/, '')
+        const children: DirEntry[] = [
+          ...entries.map((name) => ({ name, type: 'directory' as const, absolutePath: `${base}/${name}` })),
+          ...files.map((name) => ({ name, type: 'file' as const, absolutePath: `${base}/${name}` })),
+        ]
+        setDirEntries((prev) => attachChildren(prev, parent, children))
+      } catch {
+        return
+      }
+    }
+    setDirExpanded((prev) => new Set(prev).add(parent))
+    setDirSelected(parent)
+    setGenDir(parent)
+    setTimeout(() => {
+      treeListRef.current?.querySelector(`[data-path="${CSS.escape(parent)}"]`)?.scrollIntoView({ block: 'start' })
+    }, 0)
+  }
+
+  /** Immutably attach lazily loaded children to one node in the tree. */
+  const attachChildren = (nodes: DirEntry[], path: string, children: DirEntry[]): DirEntry[] =>
+    nodes.map((node) => {
+      if (node.absolutePath === path) return { ...node, children }
+      if (node.children !== undefined) return { ...node, children: attachChildren(node.children, path, children) }
+      return node
+    })
+
+  /** Find one entry by absolute path (depth-first over the loaded tree). */
+  const findEntry = (nodes: DirEntry[], path: string): DirEntry | undefined => {
+    for (const node of nodes) {
+      if (node.absolutePath === path) return node
+      if (node.children !== undefined) {
+        const found = findEntry(node.children, path)
+        if (found !== undefined) return found
+      }
+    }
+    return undefined
+  }
+
+  /** Click a tree row: directories lazily load + toggle expand and fill the directory; files fill the name + its directory. */
+  const onDirClick = async (node: DirEntry): Promise<void> => {
+    setDirSelected(node.absolutePath)
+    if (node.type === 'file') {
+      const parent = node.absolutePath.slice(0, node.absolutePath.lastIndexOf('/') + 1) || node.absolutePath
+      setGenDir(parent)
+      setGenFile(node.name)
+      return
+    }
+    setGenDir(node.absolutePath)
+    if (node.children === undefined) {
+      setDirLoading(true)
+      try {
+        const { entries, files } = await loadDirListing(node.absolutePath)
+        const children: DirEntry[] = [
+          ...entries.map((name) => ({ name, type: 'directory' as const, absolutePath: `${node.absolutePath.replace(/[\\/]+$/, '')}/${name}` })),
+          ...files.map((name) => ({ name, type: 'file' as const, absolutePath: `${node.absolutePath.replace(/[\\/]+$/, '')}/${name}` })),
+        ]
+        setDirEntries((prev) => attachChildren(prev, node.absolutePath, children))
+      } catch (error) {
+        window.alert(`Cannot browse directories: ${error instanceof Error ? error.message : String(error)}`)
+        setDirLoading(false)
+        return
+      }
+      setDirLoading(false)
+    }
+    setDirExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(node.absolutePath)) next.delete(node.absolutePath)
+      else next.add(node.absolutePath)
+      return next
+    })
+  }
+
+  /** Recursive tree node renderer (flat state: entries tree + expanded set), styled with the vendored directory-tree utilities. */
+  const renderDirNode = (node: DirEntry, depth: number): React.JSX.Element => {
+    const expanded = dirExpanded.has(node.absolutePath)
+    const isSelected = dirSelected === node.absolutePath
+    const isDir = node.type === 'directory'
+    return (
+      <div key={node.absolutePath} data-path={node.absolutePath}>
+        <div
+          role="button"
+          className="directory-tree-entry flex items-center cursor-pointer relative select-none text-xs leading-tight w-full"
+          style={{
+            paddingLeft: 8 + depth * 14,
+            paddingRight: 8,
+            height: 26,
+            gap: 4,
+            color: 'var(--dsw-alias-label-primary)',
+            background: isSelected ? 'var(--dsw-alias-interactive-bg-active)' : 'none',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
+          onClick={() => void onDirClick(node)}
+          onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--dsw-alias-interactive-bg-hover)' }}
+          onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'none' }}
+        >
+          <span className="directory-tree-expand-icon w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center" style={{ color: 'var(--dsw-alias-label-secondary)' }}>
+            {isDir ? (expanded ? '▾' : '▸') : ''}
+          </span>
+          <span className="directory-tree-type-icon w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center">
+            {isDir ? <IconFolder size={14} /> : <IconFile size={14} />}
+          </span>
+          <span className={isDir ? 'directory-tree-name--directory font-medium flex-1 min-w-0' : 'flex-1 min-w-0'} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {node.name}
+          </span>
+        </div>
+        {isDir && expanded && node.children !== undefined && node.children.map((child) => renderDirNode(child, depth + 1))}
+      </div>
+    )
+  }
+
+  /** Cancel the browse: revert the setup fields to their pre-browse values and close. */
+  const closeDirBrowser = (): void => {
+    if (dirSnapshot !== null) {
+      setGenDir(dirSnapshot.dir)
+      setGenFile(dirSnapshot.file)
+    }
+    setDirBrowserOpen(false)
+  }
+
   const sections: DetailSection[] = [
     { key: 'question', label: t('sectionQuestion'), content: record.question },
     { key: 'analyse', label: t('sectionAnalyse'), content: record.analyse },
@@ -508,9 +986,10 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, fontSize: 'var(--dsw-font-markdown-base-font-size)' }}>
+    <div style={{ display: 'flex', height: '100%', minHeight: 0, fontSize: 'var(--dsw-font-markdown-base-font-size)' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--dsw-alias-border-l2)' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             type="button"
             aria-label={t('backToRecords')}
@@ -531,32 +1010,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               fontSize: 13,
             }}
           >
-            <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
+            <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center' }}><IconChevronLeft size={16} /></span>
             <span style={{ lineHeight: 1 }}>{t('backToRecords')}</span>
-          </button>
-          <button
-            type="button"
-            aria-label={t('exportRecord')}
-            title={t('exportRecord')}
-            onClick={() => void exportRecordFile(record)}
-            onMouseEnter={() => setExportHover(true)}
-            onMouseLeave={() => setExportHover(false)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 8px',
-              borderRadius: 6,
-              border: '1px solid var(--dsw-alias-label-tertiary)',
-              borderColor: exportHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
-              background: exportHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-              color: 'var(--dsw-alias-label-primary)',
-              cursor: 'pointer',
-              fontSize: 13,
-            }}
-          >
-            <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>↓</span>
-            <span style={{ lineHeight: 1 }}>{t('exportRecord')}</span>
           </button>
         </div>
         <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -605,6 +1060,264 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           {sections.map((section) => sectionBlock(section))}
         </div>
       </div>
+      </div>
+      {/* Right action rail: spans the full height so it starts at the title row (C). */}
+      <div style={{ width: 44, flex: 'none', borderLeft: '1px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10 }}>
+        <button
+          type="button"
+          title={t('exportRecord')}
+          aria-label={t('exportRecord')}
+          onClick={() => void exportRecordFile(record)}
+          onMouseEnter={() => setExportHover(true)}
+          onMouseLeave={() => setExportHover(false)}
+          style={iconButtonStyle(exportHover)}
+        >
+          <IconDownload size={14} />
+        </button>
+        <button
+          type="button"
+          title={t('generate')}
+          aria-label={t('generate')}
+          onClick={() => setGenOpen(true)}
+          onMouseEnter={() => setGenHover(true)}
+          onMouseLeave={() => setGenHover(false)}
+          style={iconButtonStyle(genHover)}
+        >
+          <IconPlay size={14} />
+        </button>
+      </div>
+      <Dialog open={genOpen} title={t('generateSetup')} width={420} onClose={closeGenDialog}
+        footer={[
+          <GhostButton key="cancel" onClick={closeGenDialog}>{t('cancel')}</GhostButton>,
+          <PrimaryButton key="generate" disabled={genRunning} onClick={runGenerate}>{t('generate')}</PrimaryButton>,
+        ]}
+      >
+        {/* Two-column grid: the label column auto-sizes to the longest label (max-content),
+            so keys right-align and values left-align regardless of text length or locale. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '12px 10px', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('format')}</span>
+          <select
+            value="markdown"
+            style={{ ...genSelectStyle }}
+          >
+            <option value="markdown">Markdown</option>
+          </select>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('language')}</span>
+          <select
+            value={genLanguage}
+            onChange={(e) => setGenLanguage(e.target.value)}
+            style={{ ...genSelectStyle }}
+          >
+            <option value="auto">{t('languageAuto')}</option>
+            <option value="zh-CN">{t('languageZh')}</option>
+            <option value="en">{t('languageEn')}</option>
+          </select>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('directory')}</span>
+          <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+            <input
+              type="text"
+              value={genDir}
+              onChange={(e) => { setGenDir(e.target.value); if (genSetupError !== null) setGenSetupError(null) }}
+              placeholder="/path/to/output"
+              style={{ ...genInputStyle }}
+            />
+            <GhostButton onClick={() => void openDirBrowser()}>{t('browse')}</GhostButton>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('fileName')}</span>
+          <input
+            type="text"
+            value={genFile}
+            onChange={(e) => setGenFile(e.target.value)}
+            placeholder={defaultFileName}
+            style={{ ...genInputStyle }}
+          />
+        </div>
+        {genSetupError !== null && (
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)' }}>{genSetupError}</div>
+        )}
+      </Dialog>
+      <Dialog open={dirBrowserOpen} title={t('browseDirectory')} width={440} onClose={closeDirBrowser}
+        footer={[
+          <GhostButton key="cancel" onClick={closeDirBrowser}>{t('cancel')}</GhostButton>,
+          <PrimaryButton key="confirm" onClick={() => setDirBrowserOpen(false)}>{t('confirm')}</PrimaryButton>,
+        ]}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+          <button
+            type="button"
+            title={t('upLevel')}
+            onClick={() => void goUpLevel()}
+            style={iconButtonStyle(false)}
+          >
+            <IconArrowUp size={13} />
+          </button>
+          <div style={{ font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {dirSelected}
+          </div>
+        </div>
+        <div ref={treeListRef} style={{ marginTop: 8, flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, padding: '4px 0' }}>
+          {dirLoading && (
+            <div style={{ padding: '4px 8px', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>…</div>
+          )}
+          {dirEntries.map((node) => renderDirNode(node, 0))}
+        </div>
+      </Dialog>
+    </div>
+  )
+}
+
+/** Reveal a generated file in the OS file manager (select it), or open it with its default application. */
+async function revealPath(path: string, action: 'open' | 'reveal' = 'reveal'): Promise<void> {
+  try {
+    const res = await fetch(`${REVEAL_ENDPOINT}?path=${encodeURIComponent(path)}&action=${action}`, { method: 'POST' })
+    const body = (await res.json()) as { result?: string }
+    if (!res.ok || body.result !== 'ok') throw new Error(body.result ?? `reveal returned ${res.status}`)
+  } catch (error) {
+    window.alert(`Cannot open: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+/** Open a generated file with its default application. */
+function openFile(path: string): void {
+  void revealPath(path, 'open')
+}
+
+/** Reveal the generated file's directory in the OS file manager. */
+function revealDir(path: string): void {
+  // The host returns Windows-style paths (backslashes) — cut at the last separator of either kind.
+  const sep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  const dir = sep === -1 ? path : path.slice(0, sep + 1)
+  void revealPath(dir)
+}
+
+/**
+ * Global generation overlay: the progress dialog and the minimized status
+ * pill, rendered in a body-level React root (panel.tsx) and driven by the
+ * module-level generation store — so a running job survives navigation to the
+ * records list, the session chat, or anywhere else in the app.
+ */
+export function GenerationOverlay(): React.JSX.Element | null {
+  useAppLocale() // Re-render when the active language changes.
+  const { progress, minimized, elapsed } = useGenState()
+  if (progress === null) return null
+  return (
+    <div
+      style={{
+        // Theming: the shell defines the --dsw-alias-* tokens on <body>, so a
+        // body-level root inherits them; the font is re-declared explicitly.
+        font: '13px/1.5 var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif)',
+        color: 'var(--dsw-alias-label-primary)',
+      }}
+    >
+      {!minimized && (
+        <Dialog
+          open
+          title={progress.status === 'done' ? t('generateDone') : progress.status === 'error' ? t('generateFailed') : t('generating')}
+          width={380}
+          height={190}
+          dismissible={false}
+          onClose={() => {}}
+          footer={[
+            progress.status === 'running' && (
+              <GhostButton key="cancel" onClick={cancelGenerate}>{t('cancel')}</GhostButton>
+            ),
+            progress.status === 'done' && progress.path !== undefined && (
+              <>
+                <GhostButton key="openfile" onClick={() => openFile(progress.path!)}>{t('openFile')}</GhostButton>
+                <GhostButton key="opendir" onClick={() => revealDir(progress.path!)}>{t('openDirectory')}</GhostButton>
+              </>
+            ),
+            <PrimaryButton
+              key="confirm"
+              disabled={progress.status === 'running'}
+              onClick={clearProgress}
+            >
+              {t('confirm')}
+            </PrimaryButton>,
+          ].filter(Boolean)}
+          headerRight={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatElapsed(elapsed)}</div>
+              {progress.status === 'running' && (
+                <button
+                  type="button"
+                  title={t('minimize')}
+                  aria-label={t('minimize')}
+                  onClick={() => setMinimized(true)}
+                  style={iconButtonStyle(false)}
+                >
+                  <IconMinus size={13} />
+                </button>
+              )}
+            </div>
+          }
+        >
+        {/* Current stage, or the generated location on success — centered both ways in the fixed-size dialog (margin:auto keeps long content fully scrollable). */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          <div style={{ margin: 'auto', width: '100%', textAlign: 'center' }}>
+            {progress.status === 'running' && (
+              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 }}>
+                {t(genPhaseKey(progress.phase))}
+              </div>
+            )}
+            {progress.status === 'done' && (
+              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
+                {t('generatedAt')} {progress.path ?? ''}
+              </div>
+            )}
+            {progress.status === 'error' && (
+              <div style={{ fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {progress.error ?? 'unknown error'}
+              </div>
+            )}
+          </div>
+        </div>
+        </Dialog>
+      )}
+      {/* Minimized generation: a status pill in the corner; the job keeps running in the background, click to restore. */}
+      {minimized && (
+        <button
+          type="button"
+          onClick={() => setMinimized(false)}
+          title={progress.status === 'running' ? t('generating') : progress.status === 'error' ? t('generateFailed') : t('generateDone')}
+          style={{
+            position: 'fixed',
+            right: 16,
+            bottom: 16,
+            zIndex: 90,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 14px',
+            borderRadius: 8,
+            background: 'var(--dsw-alias-bg-layer-2)',
+            border: '1px solid var(--dsw-alias-border-l2)',
+            boxShadow: 'var(--dsw-shadow-lv3)',
+            fontSize: 13,
+            color: 'var(--dsw-alias-label-primary)',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+          }}
+        >
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            flex: 'none',
+            background: progress.status === 'error'
+              ? 'var(--dsw-alias-state-error-primary)'
+              : progress.status === 'done'
+                ? 'var(--dsw-alias-state-success-primary)'
+                : 'var(--dsw-alias-label-secondary)',
+          }} />
+          <span>
+            {progress.status === 'done' ? t('generateDone') : progress.status === 'error' ? t('generateFailed') : t('generating')}
+          </span>
+          {progress.status === 'running' && (
+            <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--dsw-alias-label-secondary)' }}>{formatElapsed(elapsed)}</span>
+          )}
+        </button>
+      )}
     </div>
   )
 }
@@ -808,77 +1521,35 @@ export function RecordsTab(): React.JSX.Element {
           ))}
         </>
       )}
-      {deleteTarget !== null && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--dsw-alias-bg-mask-1)',
-          }}
-          onClick={() => setDeleteTarget(null)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={deleteTarget.heading}
+      <Dialog open={deleteTarget !== null} title={deleteTarget?.heading ?? ''} width={320} onClose={() => setDeleteTarget(null)}
+        footer={deleteTarget === null ? undefined : [
+          <GhostButton key="cancel" onClick={() => setDeleteTarget(null)}>{t('cancel')}</GhostButton>,
+          <button
+            key="delete"
+            type="button"
             style={{
-              width: 320,
-              maxWidth: 'calc(100vw - 32px)',
-              background: 'var(--dsw-alias-bg-layer-2)',
-              border: '1px solid var(--dsw-alias-border-l2)',
-              borderRadius: 10,
-              padding: 16,
-              boxShadow: 'var(--dsw-shadow-lv3)',
+              padding: '4px 12px',
+              borderRadius: 6,
+              border: '1px solid var(--dsw-alias-state-error-primary)',
+              background: 'none',
+              color: 'var(--dsw-alias-state-error-primary)',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => {
+              const target = deleteTarget
+              setDeleteTarget(null)
+              for (const id of target.ids) void removeRecord(id)
+              if (target.ids.length > 1) exitSelectMode()
+            }}
           >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{deleteTarget.heading}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{t('irreversible')}</div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-              <button
-                type="button"
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-border-l2)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-label-primary)',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                }}
-                onClick={() => setDeleteTarget(null)}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-state-error-primary)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-state-error-primary)',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-                onClick={() => {
-                  const target = deleteTarget
-                  setDeleteTarget(null)
-                  for (const id of target.ids) void removeRecord(id)
-                  if (target.ids.length > 1) exitSelectMode()
-                }}
-              >
-                {t('delete')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            {t('delete')}
+          </button>,
+        ]}
+      >
+        <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{t('irreversible')}</div>
+      </Dialog>
     </div>
   )
 }

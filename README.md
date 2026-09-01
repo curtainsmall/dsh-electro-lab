@@ -1,6 +1,6 @@
 # DeepSeek Harness ElectroLab
 
-An electrical & electronics calculation plugin for the DeepSeek Harness: circuit analysis, transients, filters, signal quality, noise and unit conversion — every value a self-describing complex object in SI base units.
+An electrical & electronics calculation plugin for the DeepSeek Harness.
 
 [English](README.md) | [简体中文](docs/README.zh-CN.md)
 
@@ -9,6 +9,7 @@ An electrical & electronics calculation plugin for the DeepSeek Harness: circuit
 - **ElectroLab Mode** — the **ElectroLab Mode** agent preset isolates the session to the plugin's calculation tools: no shell, no file system, no network.
 - **Calculations you can trust** — every number comes from a tool call result, never from memory or hand arithmetic.
 - **Records for inspection** — every solve is settled to disk and browsable in the client panel.
+- **Solution articles** — one click turns any settled record into a full technical article through the host LLM.
 
 All tools are listed in [tools.md](docs/tools.md).
 
