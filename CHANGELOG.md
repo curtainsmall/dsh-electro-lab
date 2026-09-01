@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-09-02
 
 ### Added
 
@@ -16,11 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed-size (380×190) progress dialog with both-axis centered content; generation errors display in the same dialog; the setup dialog shows inline validation for an empty output directory.
 - Unified dialog shell and button language across the records page: a right action rail starting at the title row, an inline SVG icon set (no emoji or system glyphs), and reusable ghost/primary button components.
 - Cross-panel center-column eviction: opening ElectroLab closes the SSH and task-board views and their controllers (and vice versa).
-
-### Changed
-
-- Open file now launches the generated article with its default application instead of only selecting it in Explorer; explorer.exe spawning no longer suppresses the window (windowsHide and stdio:'ignore' were silently killing it, only detached:true is safe).
-- The generation progress dialog replaced the percentage readout with stage text plus an elapsed timer.
 
 ## [0.7.0] - 2026-08-30
 
@@ -157,6 +152,7 @@ oiseFigureDb`, `gainDb`, `magnitudeDb`, `returnLossDb`…) — dB is a log scale
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.8.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.8.0
 [0.7.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.7.0
 [0.6.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.6.0
 [0.5.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.5.1
