@@ -197,13 +197,31 @@ function readDirectoryTreeCss(): string {
 
 /** Reveal a generated file (select it) or directory in the OS file manager. */
 function revealPath(target: string): string {
+  return launchExplorer(target, 'reveal')
+}
+
+/** Open a generated file with its default application. */
+function openFilePath(target: string): string {
+  return launchExplorer(target, 'open')
+}
+
+/**
+ * ShellExecute through explorer.exe. mode 'open' opens the file with its
+ * default application; 'reveal' opens the containing folder with the file
+ * selected (or the directory itself when target is a directory). explorer.exe
+ * exits with code 1 when an Explorer instance already runs (it hands the
+ * request over) — that is success, not failure. detached + unref: never wait
+ * on it; spawn failures are logged, not fatal. windowsHide:true
+ * (CREATE_NO_WINDOW) and stdio:'ignore' each silently suppress the Explorer
+ * window on Windows (verified empirically) — only detached:true is safe.
+ */
+function launchExplorer(target: string, mode: 'open' | 'reveal'): string {
   if (process.platform !== 'win32') return 'not supported on this platform'
-  const isDir = existsSync(target) && statSync(target).isDirectory()
-  // explorer.exe exits with code 1 when an Explorer instance already runs
-  // (it hands the request over) — that is success, not failure. detached +
-  // unref: never wait on it; spawn failures are logged, not fatal.
+  const args = mode === 'open'
+    ? [target]
+    : [existsSync(target) && statSync(target).isDirectory() ? target : `/select,${target}`]
   try {
-    const child = spawn('explorer.exe', [isDir ? target : `/select,${target}`], { windowsHide: true, detached: true, stdio: 'ignore' })
+    const child = spawn('explorer.exe', args, { detached: true })
     child.on('error', () => {})
     child.unref()
     return 'ok'
@@ -483,15 +501,17 @@ export function apply(ctx: Context): void {
           res.end('method not allowed')
           return
         }
-        const target = request.url === undefined ? '' : new URL(request.url, 'http://dsh.local').searchParams.get('path') ?? ''
+        const url = new URL(request.url ?? '', 'http://dsh.local')
+        const target = url.searchParams.get('path') ?? ''
         if (target.length === 0) {
           res.statusCode = 400
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ error: 'path is required' }))
           return
         }
+        const action = url.searchParams.get('action') === 'open' ? 'open' : 'reveal'
         res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ result: revealPath(target) }))
+        res.end(JSON.stringify({ result: action === 'open' ? openFilePath(target) : revealPath(target) }))
       },
     }))
 

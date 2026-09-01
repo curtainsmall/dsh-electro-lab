@@ -95,6 +95,39 @@ function primaryButtonStyle(hovered: boolean, disabled = false): React.CSSProper
   }
 }
 
+/** Ghost button with self-managed hover state. */
+function GhostButton({ children, onClick, style }: { children: ReactNode; onClick: () => void; style?: React.CSSProperties }): React.JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      type="button"
+      style={{ ...ghostButtonStyle(hovered), ...style }}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Primary button with self-managed hover state. */
+function PrimaryButton({ children, onClick, disabled = false }: { children: ReactNode; onClick: () => void; disabled?: boolean }): React.JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      type="button"
+      style={primaryButtonStyle(hovered, disabled)}
+      disabled={disabled}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+    </button>
+  )
+}
+
 /** Icon button for the detail-page action bar / inline actions. */
 function iconButtonStyle(hovered: boolean): React.CSSProperties {
   return {
@@ -742,15 +775,20 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     setGenProgress(null)
   }
 
-  /** Reveal a generated file in the OS file manager (select it). */
-  const revealPath = async (path: string): Promise<void> => {
+  /** Reveal a generated file in the OS file manager (select it), or open it with its default application. */
+  const revealPath = async (path: string, action: 'open' | 'reveal' = 'reveal'): Promise<void> => {
     try {
-      const res = await fetch(`${REVEAL_ENDPOINT}?path=${encodeURIComponent(path)}`, { method: 'POST' })
+      const res = await fetch(`${REVEAL_ENDPOINT}?path=${encodeURIComponent(path)}&action=${action}`, { method: 'POST' })
       const body = (await res.json()) as { result?: string }
       if (!res.ok || body.result !== 'ok') throw new Error(body.result ?? `reveal returned ${res.status}`)
     } catch (error) {
       window.alert(`Cannot open: ${error instanceof Error ? error.message : String(error)}`)
     }
+  }
+
+  /** Open a generated file with its default application. */
+  const openFile = (path: string): void => {
+    void revealPath(path, 'open')
   }
 
   /** Reveal the generated file's directory in the OS file manager. */
@@ -1098,8 +1136,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
       </div>
       <Dialog open={genOpen && !genBusy} title={t('generateSetup')} width={420} onClose={closeGenDialog}
         footer={[
-          <button key="cancel" type="button" style={ghostButtonStyle(false)} onClick={closeGenDialog}>{t('cancel')}</button>,
-          <button key="generate" type="button" style={primaryButtonStyle(false)} onClick={() => void runGenerate()}>{t('generate')}</button>,
+          <GhostButton key="cancel" onClick={closeGenDialog}>{t('cancel')}</GhostButton>,
+          <PrimaryButton key="generate" onClick={() => void runGenerate()}>{t('generate')}</PrimaryButton>,
         ]}
       >
         {/* Two-column grid: the label column auto-sizes to the longest label (max-content),
@@ -1129,13 +1167,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               placeholder="/path/to/output"
               style={{ ...genInputStyle }}
             />
-            <button
-              type="button"
-              onClick={() => void openDirBrowser()}
-              style={ghostButtonStyle(false)}
-            >
-              {t('browse')}
-            </button>
+            <GhostButton onClick={() => void openDirBrowser()}>{t('browse')}</GhostButton>
           </div>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('fileName')}</span>
           <input
@@ -1149,8 +1181,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
       </Dialog>
       <Dialog open={dirBrowserOpen && !genBusy} title={t('browseDirectory')} width={440} onClose={closeDirBrowser}
         footer={[
-          <button key="cancel" type="button" style={ghostButtonStyle(false)} onClick={closeDirBrowser}>{t('cancel')}</button>,
-          <button key="confirm" type="button" style={primaryButtonStyle(false)} onClick={() => setDirBrowserOpen(false)}>{t('confirm')}</button>,
+          <GhostButton key="cancel" onClick={closeDirBrowser}>{t('cancel')}</GhostButton>,
+          <PrimaryButton key="confirm" onClick={() => setDirBrowserOpen(false)}>{t('confirm')}</PrimaryButton>,
         ]}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
@@ -1182,23 +1214,21 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           onClose={() => setGenProgress(null)}
           footer={[
             genProgress.status === 'running' && (
-              <button key="cancel" type="button" style={ghostButtonStyle(false)} onClick={cancelGenerate}>{t('cancel')}</button>
+              <GhostButton key="cancel" onClick={cancelGenerate}>{t('cancel')}</GhostButton>
             ),
             genProgress.status === 'done' && genProgress.path !== undefined && (
               <>
-                <button key="openfile" type="button" style={ghostButtonStyle(false)} onClick={() => revealPath(genProgress.path!)}>{t('openFile')}</button>
-                <button key="opendir" type="button" style={ghostButtonStyle(false)} onClick={() => revealDir(genProgress.path!)}>{t('openDirectory')}</button>
+                <GhostButton key="openfile" onClick={() => openFile(genProgress.path!)}>{t('openFile')}</GhostButton>
+                <GhostButton key="opendir" onClick={() => revealDir(genProgress.path!)}>{t('openDirectory')}</GhostButton>
               </>
             ),
-            <button
+            <PrimaryButton
               key="confirm"
-              type="button"
               disabled={genProgress.status === 'running'}
-              style={primaryButtonStyle(false, genProgress.status === 'running')}
               onClick={() => setGenProgress(null)}
             >
               {t('confirm')}
-            </button>,
+            </PrimaryButton>,
           ].filter(Boolean)}
           headerRight={<div style={{ fontSize: 13, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', flex: 'none' }}>{formatElapsed(genElapsed)}</div>}
         >
@@ -1425,7 +1455,7 @@ export function RecordsTab(): React.JSX.Element {
       )}
       <Dialog open={deleteTarget !== null} title={deleteTarget?.heading ?? ''} width={320} onClose={() => setDeleteTarget(null)}
         footer={deleteTarget === null ? undefined : [
-          <button key="cancel" type="button" style={ghostButtonStyle(false)} onClick={() => setDeleteTarget(null)}>{t('cancel')}</button>,
+          <GhostButton key="cancel" onClick={() => setDeleteTarget(null)}>{t('cancel')}</GhostButton>,
           <button
             key="delete"
             type="button"
