@@ -87,6 +87,10 @@ export function useGenState(): GenState {
 export function startGenerate(request: GenerateRequest): void {
   if (state.progress?.status === 'running') return
   jobId = null
+  // A new job always opens the progress dialog: reset the previous run's
+  // minimized flag and elapsed counter (they may still be set if the last job
+  // was dismissed from the pill without being restored).
+  state = { ...state, minimized: false, elapsed: 0 }
   setProgress({ percent: 0, phase: 'prepare', status: 'running' })
   void (async () => {
     try {
