@@ -27,8 +27,8 @@ export type ArticleLanguage = (typeof ARTICLE_LANGUAGES)[number]
 /** The system-prompt sentence that pins the article language. */
 export function articleLanguageInstruction(language: ArticleLanguage): string {
   switch (language) {
-    case 'zh-CN': return 'Write the article in Simplified Chinese (简体中文).'
-    case 'en': return 'Write the article in English.'
+    case 'zh-CN': return 'The ENTIRE article must be written in Simplified Chinese (简体中文) — every heading, sentence, and label. Never switch to another language.'
+    case 'en': return 'The ENTIRE article must be written in English — every heading, sentence, and label. Never switch to another language.'
     default: return 'Write in the language of the question.'
   }
 }
@@ -66,6 +66,9 @@ export function buildArticlePrompt(record: Record, language: ArticleLanguage = '
       'Never include record ids or timestamps anywhere in the article.',
       articleLanguageInstruction(language),
     ].join(' '),
-    user: renderRecord(record),
+    // The language directive is repeated in the user message: the question
+    // text itself may be in another language, and the last instruction the
+    // model reads before generating carries the most weight.
+    user: renderRecord(record) + (language === 'auto' ? '' : `\n\nImportant: ${articleLanguageInstruction(language)}`),
   }
 }

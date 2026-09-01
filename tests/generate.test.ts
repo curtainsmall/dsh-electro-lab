@@ -60,14 +60,16 @@ describe('buildArticlePrompt', () => {
   })
 
   it('forces Simplified Chinese when zh-CN is chosen', () => {
-    const { system } = buildArticlePrompt(sample, 'zh-CN')
+    const { system, user } = buildArticlePrompt(sample, 'zh-CN')
     expect(system).toMatch(/Simplified Chinese/)
+    expect(user).toMatch(/Simplified Chinese/)
     expect(system).not.toMatch(/language of the question/)
   })
 
-  it('forces English when en is chosen', () => {
-    const { system } = buildArticlePrompt(sample, 'en')
-    expect(system).toMatch(/Write the article in English\./)
+  it('forces English when en is chosen, in both the system and user prompt', () => {
+    const { system, user } = buildArticlePrompt(sample, 'en')
+    expect(system).toMatch(/must be written in English/)
+    expect(user).toMatch(/must be written in English/)
     expect(system).not.toMatch(/language of the question/)
   })
 })
