@@ -4,6 +4,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import type { Context } from 'cordis'
 import { registerTools } from './tools/index.ts'
@@ -79,6 +80,9 @@ const GENERATE_PROGRESS_PATH = '/api/dsh-electro-lab/generate-progress'
 
 /** Cancel a running generation: POST ?jobId= aborts the job. */
 const GENERATE_CANCEL_PATH = '/api/dsh-electro-lab/generate-cancel'
+
+/** Reveal a generated file or directory in the OS file manager: POST ?path=. */
+const REVEAL_PATH = '/api/dsh-electro-lab/reveal'
 
 /**
  * Host-driven directory browsing: GET ?path= lists the directory's
@@ -188,6 +192,23 @@ function readDirectoryTreeCss(): string {
     return readFileSync(new URL('../assets/directory-tree.css', import.meta.url), 'utf8')
   } catch {
     return ''
+  }
+}
+
+/** Reveal a generated file (select it) or directory in the OS file manager. */
+function revealPath(target: string): string {
+  if (process.platform !== 'win32') return 'not supported on this platform'
+  const isDir = existsSync(target) && statSync(target).isDirectory()
+  // explorer.exe exits with code 1 when an Explorer instance already runs
+  // (it hands the request over) — that is success, not failure. detached +
+  // unref: never wait on it; spawn failures are logged, not fatal.
+  try {
+    const child = spawn('explorer.exe', [isDir ? target : `/select,${target}`], { windowsHide: true, detached: true, stdio: 'ignore' })
+    child.on('error', () => {})
+    child.unref()
+    return 'ok'
+  } catch (error) {
+    return `failed: ${error instanceof Error ? error.message : String(error)}`
   }
 }
 
@@ -448,6 +469,29 @@ export function apply(ctx: Context): void {
         if (job !== undefined && job.status === 'running') job.abort()
         res.setHeader('content-type', 'application/json')
         res.end(JSON.stringify({ cancelled: job !== undefined && job.status === 'running' }))
+      },
+    }))
+
+    // Reveal a generated file or directory in the OS file manager.
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: REVEAL_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        if ((request.method ?? 'GET') !== 'POST') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        const target = request.url === undefined ? '' : new URL(request.url, 'http://dsh.local').searchParams.get('path') ?? ''
+        if (target.length === 0) {
+          res.statusCode = 400
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: 'path is required' }))
+          return
+        }
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ result: revealPath(target) }))
       },
     }))
 

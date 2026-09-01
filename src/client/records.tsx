@@ -4,8 +4,112 @@
  * `/api/dsh-electro-lab/records` endpoint and polled while the panel is open.
  * Records are plugin-owned: they survive session deletion and restarts.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
+import { IconChevronLeft, IconDownload, IconPlay, IconArrowUp, IconFolder, IconFile } from './icons.tsx'
+
+/* ── Shared dialog shell + button language (A + B) ─────────────────────────── */
+
+/** Shared modal shell: fixed overlay, themed panel, title (with optional right-side content), body, footer. */
+function Dialog({ open, title, width = 400, dismissible = true, headerRight, footer, children, onClose }: {
+  open: boolean
+  title: string
+  width?: number
+  dismissible?: boolean
+  headerRight?: ReactNode
+  footer?: ReactNode
+  children: ReactNode
+  onClose: () => void
+}): React.JSX.Element | null {
+  if (!open) return null
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--dsw-alias-bg-mask-1)',
+      }}
+      onClick={dismissible ? onClose : undefined}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{
+          width,
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 48px)',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--dsw-alias-bg-layer-2)',
+          border: '1px solid var(--dsw-alias-border-l2)',
+          borderRadius: 10,
+          padding: 16,
+          boxShadow: 'var(--dsw-shadow-lv3)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
+          {headerRight}
+        </div>
+        <div style={{ marginTop: 12, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{children}</div>
+        {footer !== undefined && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flex: 'none' }}>{footer}</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Ghost button (secondary action): outline that deepens on hover. */
+function ghostButtonStyle(hovered: boolean): React.CSSProperties {
+  return {
+    padding: '4px 12px',
+    borderRadius: 6,
+    border: '1px solid var(--dsw-alias-label-tertiary)',
+    borderColor: hovered ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
+    background: hovered ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+    color: 'var(--dsw-alias-label-primary)',
+    cursor: 'pointer',
+    fontSize: 13,
+  }
+}
+
+/** Primary button (main action): the shell's filled info button. */
+function primaryButtonStyle(hovered: boolean, disabled = false): React.CSSProperties {
+  return {
+    padding: '4px 12px',
+    borderRadius: 6,
+    border: '1px solid var(--dsw-alias-button-info-fill)',
+    background: hovered && !disabled ? 'var(--dsw-alias-button-info-hover)' : 'var(--dsw-alias-button-info-fill)',
+    color: 'var(--dsw-alias-label-primary-foreground)',
+    cursor: disabled ? 'default' : 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+    opacity: disabled ? 0.45 : 1,
+  }
+}
+
+/** Icon button for the detail-page action bar / inline actions. */
+function iconButtonStyle(hovered: boolean): React.CSSProperties {
+  return {
+    width: 30,
+    height: 30,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+    border: 'none',
+    background: hovered ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
+    color: hovered ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)',
+    cursor: 'pointer',
+  }
+}
 
 /** Map a generation phase code to its translated label; unknown phases show no text. */
 function genPhaseKey(phase: string): LocaleKey | string {
@@ -81,6 +185,7 @@ const GENERATE_DIR_ENDPOINT = '/api/dsh-electro-lab/generate-dir'
 const GENERATE_ENDPOINT = '/api/dsh-electro-lab/generate'
 const GENERATE_PROGRESS_ENDPOINT = '/api/dsh-electro-lab/generate-progress'
 const GENERATE_CANCEL_ENDPOINT = '/api/dsh-electro-lab/generate-cancel'
+const REVEAL_ENDPOINT = '/api/dsh-electro-lab/reveal'
 const LIST_DIRS_ENDPOINT = '/api/dsh-electro-lab/list-dirs'
 const LIST_ROOTS_ENDPOINT = '/api/dsh-electro-lab/list-roots'
 const POLL_MS = 5000
@@ -637,6 +742,25 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     setGenProgress(null)
   }
 
+  /** Reveal a generated file in the OS file manager (select it). */
+  const revealPath = async (path: string): Promise<void> => {
+    try {
+      const res = await fetch(`${REVEAL_ENDPOINT}?path=${encodeURIComponent(path)}`, { method: 'POST' })
+      const body = (await res.json()) as { result?: string }
+      if (!res.ok || body.result !== 'ok') throw new Error(body.result ?? `reveal returned ${res.status}`)
+    } catch (error) {
+      window.alert(`Cannot open: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  /** Reveal the generated file's directory in the OS file manager. */
+  const revealDir = (path: string): void => {
+    // The host returns Windows-style paths (backslashes) — cut at the last separator of either kind.
+    const sep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+    const dir = sep === -1 ? path : path.slice(0, sep + 1)
+    void revealPath(dir)
+  }
+
   /** One node of the host-driven directory tree (hand-rolled: the React-19-only packages are incompatible with this React 18 host). */
   interface DirEntry {
     name: string
@@ -838,8 +962,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           <span className="directory-tree-expand-icon w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center" style={{ color: 'var(--dsw-alias-label-secondary)' }}>
             {isDir ? (expanded ? '▾' : '▸') : ''}
           </span>
-          <span className="directory-tree-type-icon w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center" style={{ fontSize: 12 }}>
-            {isDir ? '📁' : '📄'}
+          <span className="directory-tree-type-icon w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center">
+            {isDir ? <IconFolder size={14} /> : <IconFile size={14} />}
           </span>
           <span className={isDir ? 'directory-tree-name--directory font-medium flex-1 min-w-0' : 'flex-1 min-w-0'} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {node.name}
@@ -872,9 +996,10 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, fontSize: 'var(--dsw-font-markdown-base-font-size)' }}>
+    <div style={{ display: 'flex', height: '100%', minHeight: 0, fontSize: 'var(--dsw-font-markdown-base-font-size)' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--dsw-alias-border-l2)' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             type="button"
             aria-label={t('backToRecords')}
@@ -895,59 +1020,9 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               fontSize: 13,
             }}
           >
-            <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
+            <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center' }}><IconChevronLeft size={16} /></span>
             <span style={{ lineHeight: 1 }}>{t('backToRecords')}</span>
           </button>
-          <span style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              aria-label={t('exportRecord')}
-              title={t('exportRecord')}
-              onClick={() => void exportRecordFile(record)}
-              onMouseEnter={() => setExportHover(true)}
-              onMouseLeave={() => setExportHover(false)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 8px',
-                borderRadius: 6,
-                border: '1px solid var(--dsw-alias-label-tertiary)',
-                borderColor: exportHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
-                background: exportHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-                color: 'var(--dsw-alias-label-primary)',
-                cursor: 'pointer',
-                fontSize: 13,
-              }}
-            >
-              <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>↓</span>
-              <span style={{ lineHeight: 1 }}>{t('exportRecord')}</span>
-            </button>
-            <button
-              type="button"
-              aria-label={t('generate')}
-              title={t('generate')}
-              onClick={() => setGenOpen(true)}
-              onMouseEnter={() => setGenHover(true)}
-              onMouseLeave={() => setGenHover(false)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 8px',
-                borderRadius: 6,
-                border: '1px solid var(--dsw-alias-label-tertiary)',
-                borderColor: genHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
-                background: genHover ? 'var(--dsw-alias-interactive-bg-hover)' : 'none',
-                color: 'var(--dsw-alias-label-primary)',
-                cursor: 'pointer',
-                fontSize: 13,
-              }}
-            >
-              <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>▶</span>
-              <span style={{ lineHeight: 1 }}>{t('generate')}</span>
-            </button>
-          </span>
         </div>
         <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {record.question || `record ${record.id}`}
@@ -995,312 +1070,155 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           {sections.map((section) => sectionBlock(section))}
         </div>
       </div>
-      {genOpen && !genBusy && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--dsw-alias-bg-mask-1)',
-          }}
-          onClick={() => closeGenDialog()}
+      </div>
+      {/* Right action rail: spans the full height so it starts at the title row (C). */}
+      <div style={{ width: 44, flex: 'none', borderLeft: '1px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10 }}>
+        <button
+          type="button"
+          title={t('exportRecord')}
+          aria-label={t('exportRecord')}
+          onClick={() => void exportRecordFile(record)}
+          onMouseEnter={() => setExportHover(true)}
+          onMouseLeave={() => setExportHover(false)}
+          style={iconButtonStyle(exportHover)}
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('generateSetup')}
+          <IconDownload size={14} />
+        </button>
+        <button
+          type="button"
+          title={t('generate')}
+          aria-label={t('generate')}
+          onClick={() => setGenOpen(true)}
+          onMouseEnter={() => setGenHover(true)}
+          onMouseLeave={() => setGenHover(false)}
+          style={iconButtonStyle(genHover)}
+        >
+          <IconPlay size={14} />
+        </button>
+      </div>
+      <Dialog open={genOpen && !genBusy} title={t('generateSetup')} width={420} onClose={closeGenDialog}
+        footer={[
+          <button key="cancel" type="button" style={ghostButtonStyle(false)} onClick={closeGenDialog}>{t('cancel')}</button>,
+          <button key="generate" type="button" style={primaryButtonStyle(false)} onClick={() => void runGenerate()}>{t('generate')}</button>,
+        ]}
+      >
+        {/* Two-column grid: the label column auto-sizes to the longest label (max-content),
+            so keys right-align and values left-align regardless of text length or locale. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '12px 10px', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('format')}</span>
+          <select
+            value="markdown"
             style={{
-              width: 420,
-              maxWidth: 'calc(100vw - 32px)',
-              background: 'var(--dsw-alias-bg-layer-2)',
+              flex: 1,
+              padding: '6px 8px',
+              fontSize: 13,
+              color: 'var(--dsw-alias-label-primary)',
+              background: 'var(--dsw-specific-input-major)',
               border: '1px solid var(--dsw-alias-border-l2)',
-              borderRadius: 10,
-              padding: 16,
-              boxShadow: 'var(--dsw-shadow-lv3)',
+              borderRadius: 6,
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('generateSetup')}</div>
-            {/* Two-column grid: the label column auto-sizes to the longest label (max-content),
-                so keys right-align and values left-align regardless of text length or locale. */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '12px 10px', alignItems: 'center', marginTop: 12 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('format')}</span>
-              <select
-                value="markdown"
-                style={{
-                  flex: 1,
-                  padding: '6px 8px',
-                  fontSize: 13,
-                  color: 'var(--dsw-alias-label-primary)',
-                  background: 'var(--dsw-specific-input-major)',
-                  border: '1px solid var(--dsw-alias-border-l2)',
-                  borderRadius: 6,
-                }}
-              >
-                <option value="markdown">Markdown</option>
-              </select>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('directory')}</span>
-              <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
-                <input
-                  type="text"
-                  value={genDir}
-                  onChange={(e) => setGenDir(e.target.value)}
-                  placeholder="/path/to/output"
-                  style={{ ...genInputStyle }}
-                />
-                <button
-                  type="button"
-                  onClick={() => void openDirBrowser()}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    border: '1px solid var(--dsw-alias-label-tertiary)',
-                    background: 'none',
-                    color: 'var(--dsw-alias-label-primary)',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                  }}
-                >
-                  {t('browse')}
-                </button>
-              </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('fileName')}</span>
-              <input
-                type="text"
-                value={genFile}
-                onChange={(e) => setGenFile(e.target.value)}
-                placeholder={defaultFileName}
-                style={{ ...genInputStyle }}
-              />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <button
-                type="button"
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-border-l2)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-label-primary)',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                }}
-                onClick={() => closeGenDialog()}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={genBusy}
-                onClick={() => void runGenerate()}
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-state-business-primary)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-state-business-primary)',
-                  cursor: genBusy ? 'default' : 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  opacity: genBusy ? 0.5 : 1,
-                }}
-              >
-                {t('generate')}
-              </button>
-            </div>
+            <option value="markdown">Markdown</option>
+          </select>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('directory')}</span>
+          <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+            <input
+              type="text"
+              value={genDir}
+              onChange={(e) => setGenDir(e.target.value)}
+              placeholder="/path/to/output"
+              style={{ ...genInputStyle }}
+            />
+            <button
+              type="button"
+              onClick={() => void openDirBrowser()}
+              style={ghostButtonStyle(false)}
+            >
+              {t('browse')}
+            </button>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('fileName')}</span>
+          <input
+            type="text"
+            value={genFile}
+            onChange={(e) => setGenFile(e.target.value)}
+            placeholder={defaultFileName}
+            style={{ ...genInputStyle }}
+          />
+        </div>
+      </Dialog>
+      <Dialog open={dirBrowserOpen && !genBusy} title={t('browseDirectory')} width={440} onClose={closeDirBrowser}
+        footer={[
+          <button key="cancel" type="button" style={ghostButtonStyle(false)} onClick={closeDirBrowser}>{t('cancel')}</button>,
+          <button key="confirm" type="button" style={primaryButtonStyle(false)} onClick={() => setDirBrowserOpen(false)}>{t('confirm')}</button>,
+        ]}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+          <button
+            type="button"
+            title={t('upLevel')}
+            onClick={() => void goUpLevel()}
+            style={iconButtonStyle(false)}
+          >
+            <IconArrowUp size={13} />
+          </button>
+          <div style={{ font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {dirSelected}
           </div>
         </div>
-      )}
-      {dirBrowserOpen && !genBusy && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--dsw-alias-bg-mask-1)',
-          }}
-          onClick={closeDirBrowser}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('browseDirectory')}
-            style={{
-              width: 440,
-              height: 400,
-              maxWidth: 'calc(100vw - 32px)',
-              maxHeight: 'calc(100vh - 48px)',
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'var(--dsw-alias-bg-layer-2)',
-              border: '1px solid var(--dsw-alias-border-l2)',
-              borderRadius: 10,
-              padding: 16,
-              boxShadow: 'var(--dsw-shadow-lv3)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{t('browseDirectory')}</div>
-            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
-              <button
-                type="button"
-                title={t('upLevel')}
-                onClick={() => void goUpLevel()}
-                style={{
-                  padding: '2px 6px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-label-tertiary)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-label-primary)',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  flex: 'none',
-                  lineHeight: 1,
-                }}
-              >
-                ↑
-              </button>
-              <div style={{ font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {dirSelected}
-              </div>
-            </div>
-            <div ref={treeListRef} style={{ marginTop: 8, flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, padding: '4px 0' }}>
-              {dirLoading && (
-                <div style={{ padding: '4px 8px', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>…</div>
-              )}
-              {dirEntries.map((node) => renderDirNode(node, 0))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flex: 'none' }}>
-              <button
-                type="button"
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-border-l2)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-label-primary)',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                }}
-                onClick={closeDirBrowser}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-state-business-primary)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-state-business-primary)',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-                onClick={() => setDirBrowserOpen(false)}
-              >
-                {t('confirm')}
-              </button>
-            </div>
-          </div>
+        <div ref={treeListRef} style={{ marginTop: 8, flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, padding: '4px 0' }}>
+          {dirLoading && (
+            <div style={{ padding: '4px 8px', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>…</div>
+          )}
+          {dirEntries.map((node) => renderDirNode(node, 0))}
         </div>
-      )}
+      </Dialog>
       {genProgress !== null && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--dsw-alias-bg-mask-1)',
-          }}
+        <Dialog
+          open
+          title={genProgress.status === 'done' ? t('generateDone') : genProgress.status === 'error' ? t('generateFailed') : t('generating')}
+          width={380}
+          dismissible={false}
+          onClose={() => setGenProgress(null)}
+          footer={[
+            genProgress.status === 'running' && (
+              <button key="cancel" type="button" style={ghostButtonStyle(false)} onClick={cancelGenerate}>{t('cancel')}</button>
+            ),
+            genProgress.status === 'done' && genProgress.path !== undefined && (
+              <>
+                <button key="openfile" type="button" style={ghostButtonStyle(false)} onClick={() => revealPath(genProgress.path!)}>{t('openFile')}</button>
+                <button key="opendir" type="button" style={ghostButtonStyle(false)} onClick={() => revealDir(genProgress.path!)}>{t('openDirectory')}</button>
+              </>
+            ),
+            <button
+              key="confirm"
+              type="button"
+              disabled={genProgress.status === 'running'}
+              style={primaryButtonStyle(false, genProgress.status === 'running')}
+              onClick={() => setGenProgress(null)}
+            >
+              {t('confirm')}
+            </button>,
+          ].filter(Boolean)}
+          headerRight={<div style={{ fontSize: 13, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', flex: 'none' }}>{formatElapsed(genElapsed)}</div>}
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={genProgress.status === 'done' ? t('generateDone') : genProgress.status === 'error' ? t('generateFailed') : t('generating')}
-            style={{
-              width: 380,
-              maxWidth: 'calc(100vw - 32px)',
-              background: 'var(--dsw-alias-bg-layer-2)',
-              border: '1px solid var(--dsw-alias-border-l2)',
-              borderRadius: 10,
-              padding: 16,
-              boxShadow: 'var(--dsw-shadow-lv3)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>
-                {genProgress.status === 'done' ? t('generateDone') : genProgress.status === 'error' ? t('generateFailed') : t('generating')}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', flex: 'none' }}>
-                {formatElapsed(genElapsed)}
-              </div>
-            </div>
-            {/* Current stage, or the generated location on success. */}
-            {genProgress.status === 'running' && (
-              <div style={{ marginTop: 14, textAlign: 'center', fontSize: 13, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 }}>
-                {t(genPhaseKey(genProgress.phase))}
-              </div>
-            )}
-            {genProgress.status === 'done' && (
-              <div style={{ marginTop: 14, textAlign: 'center', fontSize: 13, color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
-                {t('generatedAt')} {genProgress.path ?? ''}
-              </div>
-            )}
-            {genProgress.status === 'error' && (
-              <div style={{ marginTop: 14, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {genProgress.error ?? 'unknown error'}
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-              {genProgress.status === 'running' && (
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: 6,
-                    border: '1px solid var(--dsw-alias-label-tertiary)',
-                    background: 'none',
-                    color: 'var(--dsw-alias-label-primary)',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                  }}
-                  onClick={cancelGenerate}
-                >
-                  {t('cancel')}
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={genProgress.status === 'running'}
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-state-business-primary)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-state-business-primary)',
-                  cursor: genProgress.status === 'running' ? 'default' : 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  opacity: genProgress.status === 'running' ? 0.45 : 1,
-                }}
-                onClick={() => setGenProgress(null)}
-              >
-                {t('confirm')}
-              </button>
-            </div>
+        {/* Current stage, or the generated location on success. */}
+        {genProgress.status === 'running' && (
+          <div style={{ marginTop: 14, textAlign: 'center', fontSize: 13, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 }}>
+            {t(genPhaseKey(genProgress.phase))}
           </div>
-        </div>
+        )}
+        {genProgress.status === 'done' && (
+          <div style={{ marginTop: 14, textAlign: 'center', fontSize: 13, color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
+            {t('generatedAt')} {genProgress.path ?? ''}
+          </div>
+        )}
+        {genProgress.status === 'error' && (
+          <div style={{ marginTop: 14, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {genProgress.error ?? 'unknown error'}
+          </div>
+        )}
+        </Dialog>
       )}
     </div>
   )
@@ -1505,77 +1423,35 @@ export function RecordsTab(): React.JSX.Element {
           ))}
         </>
       )}
-      {deleteTarget !== null && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--dsw-alias-bg-mask-1)',
-          }}
-          onClick={() => setDeleteTarget(null)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={deleteTarget.heading}
+      <Dialog open={deleteTarget !== null} title={deleteTarget?.heading ?? ''} width={320} onClose={() => setDeleteTarget(null)}
+        footer={deleteTarget === null ? undefined : [
+          <button key="cancel" type="button" style={ghostButtonStyle(false)} onClick={() => setDeleteTarget(null)}>{t('cancel')}</button>,
+          <button
+            key="delete"
+            type="button"
             style={{
-              width: 320,
-              maxWidth: 'calc(100vw - 32px)',
-              background: 'var(--dsw-alias-bg-layer-2)',
-              border: '1px solid var(--dsw-alias-border-l2)',
-              borderRadius: 10,
-              padding: 16,
-              boxShadow: 'var(--dsw-shadow-lv3)',
+              padding: '4px 12px',
+              borderRadius: 6,
+              border: '1px solid var(--dsw-alias-state-error-primary)',
+              background: 'none',
+              color: 'var(--dsw-alias-state-error-primary)',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => {
+              const target = deleteTarget
+              setDeleteTarget(null)
+              for (const id of target.ids) void removeRecord(id)
+              if (target.ids.length > 1) exitSelectMode()
+            }}
           >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{deleteTarget.heading}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{t('irreversible')}</div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-              <button
-                type="button"
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-border-l2)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-label-primary)',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                }}
-                onClick={() => setDeleteTarget(null)}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--dsw-alias-state-error-primary)',
-                  background: 'none',
-                  color: 'var(--dsw-alias-state-error-primary)',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-                onClick={() => {
-                  const target = deleteTarget
-                  setDeleteTarget(null)
-                  for (const id of target.ids) void removeRecord(id)
-                  if (target.ids.length > 1) exitSelectMode()
-                }}
-              >
-                {t('delete')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            {t('delete')}
+          </button>,
+        ]}
+      >
+        <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{t('irreversible')}</div>
+      </Dialog>
     </div>
   )
 }

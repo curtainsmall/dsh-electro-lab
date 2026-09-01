@@ -14,6 +14,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RecordsTab } from './records.tsx'
 import { t, useAppLocale } from './locales.ts'
+import { IconChevronLeft } from './icons.tsx'
 
 /** Tiny shared store: open state + subscription for the nav button and the panel.
  *  Methods never use `this`: they are passed around detached (React's
@@ -342,7 +343,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
             borderColor: backHover ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
           }}
         >
-          <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>‹</span>
+          <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center' }}><IconChevronLeft size={16} /></span>
           <span style={{ lineHeight: 1 }}>{t('backToSession')}</span>
         </button>
         <h2 style={{ margin: 0, fontSize: 15 }}>ElectroLab</h2>
