@@ -264,6 +264,17 @@ const genInputStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, monospace',
 }
 
+/** Dropdown inside the generation setup dialog (format, language). */
+const genSelectStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '6px 8px',
+  fontSize: 13,
+  color: 'var(--dsw-alias-label-primary)',
+  background: 'var(--dsw-specific-input-major)',
+  border: '1px solid var(--dsw-alias-border-l2)',
+  borderRadius: 6,
+}
+
 function formatTime(time: number): string {
   return new Date(time).toLocaleString(undefined, {
     month: '2-digit',
@@ -671,6 +682,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [genHover, setGenHover] = useState(false)
   const [genOpen, setGenOpen] = useState(false)
   const [genDir, setGenDir] = useState('')
+  const [genLanguage, setGenLanguage] = useState('auto')
   const [genFile, setGenFile] = useState('')
   const [genBusy, setGenBusy] = useState(false)
   const [genProgress, setGenProgress] = useState<{ percent: number; phase: string; status: 'running' | 'done' | 'error'; path?: string; error?: string } | null>(null)
@@ -693,28 +705,32 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   }, [genProgress === null ? null : genProgress.status])
   const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
 
-  // Auto-fill the remembered output directory whenever the dialog opens.
+  // Auto-fill the remembered output directory and article language whenever the dialog opens.
   useEffect(() => {
     if (!genOpen) return
     let alive = true
     fetch(GENERATE_DIR_ENDPOINT)
-      .then((r) => r.json() as Promise<{ directory?: string }>)
+      .then((r) => r.json() as Promise<{ directory?: string; language?: string }>)
       .then((body) => {
-        if (alive && body.directory !== undefined && body.directory !== '') setGenDir(body.directory)
+        if (!alive) return
+        if (body.directory !== undefined && body.directory !== '') setGenDir(body.directory)
+        if (body.language !== undefined && body.language !== '') setGenLanguage(body.language)
       })
       .catch(() => {})
     return () => { alive = false }
   }, [genOpen])
 
-  /** Persist the directory so the next generation dialog auto-fills it. */
-  const saveGenDir = (): void => {
+  /** Persist the directory and language so the next generation dialog auto-fills them. */
+  const saveGenState = (): void => {
     const dir = genDir.trim()
-    if (dir.length === 0) return
-    void fetch(`${GENERATE_DIR_ENDPOINT}?dir=${encodeURIComponent(dir)}`, { method: 'PUT' }).catch(() => {})
+    const params = new URLSearchParams()
+    if (dir.length > 0) params.set('dir', dir)
+    params.set('language', genLanguage)
+    void fetch(`${GENERATE_DIR_ENDPOINT}?${params.toString()}`, { method: 'PUT' }).catch(() => {})
   }
 
   const closeGenDialog = (): void => {
-    saveGenDir()
+    saveGenState()
     setGenOpen(false)
   }
 
@@ -727,7 +743,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     setGenProgress({ percent: 0, phase: 'prepare', status: 'running' })
     try {
       const res = await fetch(
-        `${GENERATE_ENDPOINT}?recordId=${encodeURIComponent(record.id)}&format=markdown&directory=${encodeURIComponent(dir)}&fileName=${encodeURIComponent(genFile.trim())}`,
+        `${GENERATE_ENDPOINT}?recordId=${encodeURIComponent(record.id)}&format=markdown&language=${encodeURIComponent(genLanguage)}&directory=${encodeURIComponent(dir)}&fileName=${encodeURIComponent(genFile.trim())}`,
         { method: 'POST' },
       )
       const body = (await res.json()) as { jobId?: string; error?: string }
@@ -742,7 +758,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
         const job = (await pr.json()) as { status?: string; percent?: number; phase?: string; path?: string; error?: string }
         if (job.status === 'done') {
           genJobIdRef.current = null
-          saveGenDir()
+          saveGenState()
           setGenOpen(false)
           setGenBusy(false)
           setGenProgress({ percent: 100, phase: job.phase ?? 'write', status: 'done', path: job.path })
@@ -1146,17 +1162,19 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('format')}</span>
           <select
             value="markdown"
-            style={{
-              flex: 1,
-              padding: '6px 8px',
-              fontSize: 13,
-              color: 'var(--dsw-alias-label-primary)',
-              background: 'var(--dsw-specific-input-major)',
-              border: '1px solid var(--dsw-alias-border-l2)',
-              borderRadius: 6,
-            }}
+            style={{ ...genSelectStyle }}
           >
             <option value="markdown">Markdown</option>
+          </select>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('language')}</span>
+          <select
+            value={genLanguage}
+            onChange={(e) => setGenLanguage(e.target.value)}
+            style={{ ...genSelectStyle }}
+          >
+            <option value="auto">{t('languageAuto')}</option>
+            <option value="zh-CN">{t('languageZh')}</option>
+            <option value="en">{t('languageEn')}</option>
           </select>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('directory')}</span>
           <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>

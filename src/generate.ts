@@ -17,6 +17,22 @@ export interface GeneratePrompt {
   user: string
 }
 
+/**
+ * Explicit article languages: 'auto' keeps the current behavior (write in the
+ * language of the question); anything else forces the article language.
+ */
+export const ARTICLE_LANGUAGES = ['auto', 'zh-CN', 'en'] as const
+export type ArticleLanguage = (typeof ARTICLE_LANGUAGES)[number]
+
+/** The system-prompt sentence that pins the article language. */
+export function articleLanguageInstruction(language: ArticleLanguage): string {
+  switch (language) {
+    case 'zh-CN': return 'Write the article in Simplified Chinese (简体中文).'
+    case 'en': return 'Write the article in English.'
+    default: return 'Write in the language of the question.'
+  }
+}
+
 /** The record rendered as neutral facts for the model (values verbatim). */
 function renderRecord(record: Record): string {
   const lines: string[] = ['Record information to base the article on:', '']
@@ -38,7 +54,7 @@ function renderRecord(record: Record): string {
  * section headings, formulas and calculations on their own formatted lines —
  * not a chat reply and not the record's own five-section layout.
  */
-export function buildArticlePrompt(record: Record): GeneratePrompt {
+export function buildArticlePrompt(record: Record, language: ArticleLanguage = 'auto'): GeneratePrompt {
   return {
     system: [
       'You are the article writer for DeepSeek Harness ElectroLab.',
@@ -48,7 +64,7 @@ export function buildArticlePrompt(record: Record): GeneratePrompt {
       'Put formulas and calculations on their OWN lines in a clean format: each equation on a separate line (e.g. `τ = R·C = 100 Ω × 0.1 F = 10 s`), intermediate steps as separate lines, and the computed result stated in prose right after the calculation. Use Markdown formatting — headings, lists, and fenced or inline code for equations — so formulas and calculations are visually distinct from the surrounding prose.',
       'Every number must come from the provided tool outputs and the final answer — never invent or recompute values.',
       'Never include record ids or timestamps anywhere in the article.',
-      'Write in the language of the question.',
+      articleLanguageInstruction(language),
     ].join(' '),
     user: renderRecord(record),
   }

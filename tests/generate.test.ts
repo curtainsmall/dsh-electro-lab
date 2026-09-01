@@ -53,4 +53,21 @@ describe('buildArticlePrompt', () => {
     expect(user).not.toMatch(/^Analysis:/m)
     expect(user).not.toMatch(/^Final answer:/m)
   })
+
+  it('defaults to the language of the question when no language is chosen', () => {
+    const { system } = buildArticlePrompt(sample, 'auto')
+    expect(system).toMatch(/language of the question/)
+  })
+
+  it('forces Simplified Chinese when zh-CN is chosen', () => {
+    const { system } = buildArticlePrompt(sample, 'zh-CN')
+    expect(system).toMatch(/Simplified Chinese/)
+    expect(system).not.toMatch(/language of the question/)
+  })
+
+  it('forces English when en is chosen', () => {
+    const { system } = buildArticlePrompt(sample, 'en')
+    expect(system).toMatch(/Write the article in English\./)
+    expect(system).not.toMatch(/language of the question/)
+  })
 })

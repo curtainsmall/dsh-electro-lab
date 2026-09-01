@@ -11,7 +11,7 @@ import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
 import { RecordManager, readRecordArchive, deleteRecordFromArchive, type Record, type RecordEvent } from './records.ts'
-import { buildArticlePrompt } from './generate.ts'
+import { buildArticlePrompt, ARTICLE_LANGUAGES } from './generate.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -72,7 +72,7 @@ interface RequestLike {
 /** The records page endpoint (same origin as the web app; the client polls it). */
 const RECORDS_PATH = '/api/dsh-electro-lab/records'
 
-/** Article generation: POST ?recordId=&format=&directory=&fileName= starts a job and returns its id. */
+/** Article generation: POST ?recordId=&format=&directory=&fileName=&language= starts a job and returns its id. */
 const GENERATE_PATH = '/api/dsh-electro-lab/generate'
 
 /** Article generation progress: GET ?jobId= returns the job snapshot. */
@@ -97,7 +97,7 @@ const LIST_ROOTS_PATH = '/api/dsh-electro-lab/list-roots'
 /** The vendored directory-tree stylesheet (assets/directory-tree.css), served for the client to inject. */
 const DIRECTORY_TREE_CSS_PATH = '/api/dsh-electro-lab/directory-tree.css'
 
-/** Remembered generation output directory (GET) and its persistence (PUT ?dir=). */
+/** Remembered generation state — output directory and article language (GET), persistence (PUT ?dir=&language=). */
 const GENERATE_DIR_PATH = '/api/dsh-electro-lab/generate-dir'
 
 /**
@@ -130,27 +130,47 @@ function getOrCreateManager(sessionId: string): RecordManager {
   return manager
 }
 
-/** The remembered generation output directory, or '' when none was saved. */
-function readGenerateDir(): string {
+/** Non-config serialized state: the remembered generation output directory and article language. */
+interface GenerateState {
+  generateDir?: string
+  generateLanguage?: string
+}
+
+/** Raw state.json contents (never throws — missing or corrupt file reads as {}). */
+function readStoredState(): Partial<GenerateState> {
   try {
-    const parsed = JSON.parse(readFileSync(join(recordsHome, STATE_FILE), 'utf8')) as { generateDir?: unknown }
-    if (typeof parsed.generateDir === 'string') return parsed.generateDir.trim()
+    const parsed = JSON.parse(readFileSync(join(recordsHome, STATE_FILE), 'utf8'))
+    return typeof parsed === 'object' && parsed !== null ? (parsed as Partial<GenerateState>) : {}
   } catch {
-    // fall through to the legacy file
-  }
-  try {
-    const legacy = readFileSync(join(recordsHome, LEGACY_GENERATE_DIR_FILE), 'utf8').trim()
-    if (legacy.length > 0) writeGenerateDir(legacy) // one-time migration
-    return legacy
-  } catch {
-    return ''
+    return {}
   }
 }
 
-/** Persist the generation output directory so the next dialog auto-fills it. */
-function writeGenerateDir(directory: string): void {
+/** The remembered generation state, with a one-time migration from the legacy plain-text file. */
+function readGenerateState(): GenerateState {
+  const stored = readStoredState()
+  const state: GenerateState = {
+    generateDir: typeof stored.generateDir === 'string' && stored.generateDir.trim().length > 0 ? stored.generateDir.trim() : undefined,
+    generateLanguage: typeof stored.generateLanguage === 'string' && stored.generateLanguage.length > 0 ? stored.generateLanguage : undefined,
+  }
+  if (state.generateDir === undefined) {
+    try {
+      const legacy = readFileSync(join(recordsHome, LEGACY_GENERATE_DIR_FILE), 'utf8').trim()
+      if (legacy.length > 0) state.generateDir = legacy
+    } catch {
+      // no legacy file — nothing to migrate
+    }
+  }
+  return state
+}
+
+/** Persist the generation state; undefined fields keep their stored values. */
+function writeGenerateState(state: GenerateState): void {
   mkdirSync(recordsHome, { recursive: true })
-  writeFileSync(join(recordsHome, STATE_FILE), JSON.stringify({ generateDir: directory }), 'utf8')
+  const merged: Partial<GenerateState> = { ...readStoredState(), ...state }
+  if (merged.generateDir === undefined || merged.generateDir.trim().length === 0) delete merged.generateDir
+  if (merged.generateLanguage === undefined || merged.generateLanguage.length === 0) delete merged.generateLanguage
+  writeFileSync(join(recordsHome, STATE_FILE), JSON.stringify(merged), 'utf8')
   try {
     rmSync(join(recordsHome, LEGACY_GENERATE_DIR_FILE), { force: true })
   } catch {
@@ -231,7 +251,7 @@ function launchExplorer(target: string, mode: 'open' | 'reveal'): string {
 }
 
 /** Generate the solution article for one record through the host LLM. */
-async function generateArticle(ctx: Context, record: Record, signal: AbortSignal, onProgress?: (percent: number) => void): Promise<string> {
+async function generateArticle(ctx: Context, record: Record, signal: AbortSignal, language: string, onProgress?: (percent: number) => void): Promise<string> {
   const llm = ctx.get('llm')
   if (llm === undefined) throw new Error('the LLM service is unavailable in this deployment')
   const defaults = ctx.get('agentDefaultModel')
@@ -239,7 +259,7 @@ async function generateArticle(ctx: Context, record: Record, signal: AbortSignal
   if (route === undefined || route.provider === undefined || route.model === undefined) {
     throw new Error('no default model is configured — pick one in Settings first')
   }
-  const { system, user } = buildArticlePrompt(record)
+  const { system, user } = buildArticlePrompt(record, language as never)
   const startedAt = Date.now()
   let text = ''
   for await (const raw of llm.stream({
@@ -281,7 +301,7 @@ interface GenerateJob {
 const generateJobs = new Map<string, GenerateJob>()
 
 /** Start a background generation job and return its id; progress is polled via GET /generate-progress. */
-function startGenerateJob(ctx: Context, record: Record, directory: string, fileName: string): string {
+function startGenerateJob(ctx: Context, record: Record, directory: string, fileName: string, language: string): string {
   const jobId = randomUUID()
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 120_000)
@@ -291,7 +311,7 @@ function startGenerateJob(ctx: Context, record: Record, directory: string, fileN
     try {
       job.percent = 10
       job.phase = 'generate'
-      const article = await generateArticle(ctx, record, controller.signal, (percent) => { job.percent = percent })
+      const article = await generateArticle(ctx, record, controller.signal, language, (percent) => { job.percent = percent })
       job.phase = 'write'
       job.percent = 95
       mkdirSync(directory, { recursive: true })
@@ -318,6 +338,10 @@ function beginGenerate(ctx: Context, url: string): { jobId: string } {
   const recordId = params.get('recordId') ?? ''
   const format = params.get('format') ?? 'markdown'
   if (format !== 'markdown') throw new Error(`unsupported format "${format}"`)
+  const language = params.get('language') ?? 'auto'
+  if (!(ARTICLE_LANGUAGES as readonly string[]).includes(language)) {
+    throw new Error(`unsupported language "${language}"`)
+  }
   const directory = (params.get('directory') ?? '').trim()
   if (directory.length === 0) throw new Error('output directory is required')
   const record = readRecordArchive(join(recordsHome, 'records.jsonl')).find((item) => item.id === recordId)
@@ -327,7 +351,7 @@ function beginGenerate(ctx: Context, url: string): { jobId: string } {
   if (fileName.length === 0) fileName = `electro-lab-${record.id.slice(0, 8)}.md`
   if (!fileName.endsWith('.md')) fileName += '.md'
 
-  return { jobId: startGenerateJob(ctx, record, directory, fileName) }
+  return { jobId: startGenerateJob(ctx, record, directory, fileName, language) }
 }
 
 export function apply(ctx: Context): void {
@@ -545,8 +569,9 @@ export function apply(ctx: Context): void {
       },
     }))
 
-    // The remembered generation directory: GET reads it back, PUT ?dir= saves
-    // it (query param, so no body parsing is needed on the request).
+    // The remembered generation state (output directory + article language):
+    // GET reads it back, PUT ?dir=&language= saves either field (query params,
+    // so no body parsing is needed on the request).
     disposers.push(ctx.webServer.register({
       kind: 'exact',
       path: GENERATE_DIR_PATH,
@@ -554,8 +579,13 @@ export function apply(ctx: Context): void {
         const request = req as RequestLike
         const method = request.method ?? 'GET'
         if (method === 'PUT') {
-          const dir = request.url === undefined ? '' : new URL(request.url, 'http://dsh.local').searchParams.get('dir') ?? ''
-          writeGenerateDir(dir)
+          const url = new URL(request.url ?? '', 'http://dsh.local')
+          const dir = url.searchParams.get('dir')
+          const language = url.searchParams.get('language')
+          const state: GenerateState = {}
+          if (dir !== null) state.generateDir = dir
+          if (language !== null) state.generateLanguage = language
+          writeGenerateState(state)
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ saved: true }))
           return
@@ -565,8 +595,9 @@ export function apply(ctx: Context): void {
           res.end('method not allowed')
           return
         }
+        const state = readGenerateState()
         res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ directory: readGenerateDir() }))
+        res.end(JSON.stringify({ directory: state.generateDir ?? '', language: state.generateLanguage ?? 'auto' }))
       },
     }))
 
