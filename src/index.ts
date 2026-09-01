@@ -77,6 +77,9 @@ const GENERATE_PATH = '/api/dsh-electro-lab/generate'
 /** Article generation progress: GET ?jobId= returns the job snapshot. */
 const GENERATE_PROGRESS_PATH = '/api/dsh-electro-lab/generate-progress'
 
+/** Cancel a running generation: POST ?jobId= aborts the job. */
+const GENERATE_CANCEL_PATH = '/api/dsh-electro-lab/generate-cancel'
+
 /**
  * Host-driven directory browsing: GET ?path= lists the directory's
  * subdirectories plus its parent. Pure HTTP — works locally and remotely
@@ -233,6 +236,7 @@ interface GenerateJob {
   phase: 'prepare' | 'generate' | 'write'
   path?: string
   error?: string
+  abort: () => void
 }
 
 const generateJobs = new Map<string, GenerateJob>()
@@ -240,13 +244,15 @@ const generateJobs = new Map<string, GenerateJob>()
 /** Start a background generation job and return its id; progress is polled via GET /generate-progress. */
 function startGenerateJob(ctx: Context, record: Record, directory: string, fileName: string): string {
   const jobId = randomUUID()
-  const job: GenerateJob = { status: 'running', percent: 5, phase: 'prepare' }
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 120_000)
+  const job: GenerateJob = { status: 'running', percent: 5, phase: 'prepare', abort: () => controller.abort() }
   generateJobs.set(jobId, job)
   void (async () => {
     try {
       job.percent = 10
       job.phase = 'generate'
-      const article = await generateArticle(ctx, record, AbortSignal.timeout(120_000), (percent) => { job.percent = percent })
+      const article = await generateArticle(ctx, record, controller.signal, (percent) => { job.percent = percent })
       job.phase = 'write'
       job.percent = 95
       mkdirSync(directory, { recursive: true })
@@ -259,6 +265,7 @@ function startGenerateJob(ctx: Context, record: Record, directory: string, fileN
       job.status = 'error'
       job.error = error instanceof Error ? error.message : String(error)
     } finally {
+      clearTimeout(timeout)
       // The job is only kept long enough for the client to poll it.
       setTimeout(() => { generateJobs.delete(jobId) }, 60_000)
     }
@@ -422,6 +429,25 @@ export function apply(ctx: Context): void {
         }
         res.setHeader('content-type', 'text/css')
         res.end(readDirectoryTreeCss())
+      },
+    }))
+
+    // Cancel a running generation job: the client's cancel button calls this.
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: GENERATE_CANCEL_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        if ((request.method ?? 'GET') !== 'POST') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        const jobId = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('jobId')
+        const job = jobId === null ? undefined : generateJobs.get(jobId)
+        if (job !== undefined && job.status === 'running') job.abort()
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ cancelled: job !== undefined && job.status === 'running' }))
       },
     }))
 

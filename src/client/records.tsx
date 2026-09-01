@@ -15,6 +15,13 @@ function genPhaseKey(phase: string): LocaleKey | string {
   return ''
 }
 
+/** mm:ss elapsed-time display. */
+function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
 /** Map a stored error type to its translated message key (codes stay raw; unknown types show no message). */
 function errorMessageKey(type: string): LocaleKey | string {
   if (type === 'duplicate-start') return 'errorDuplicateStartMsg'
@@ -73,6 +80,7 @@ const RECORDS_ENDPOINT = '/api/dsh-electro-lab/records'
 const GENERATE_DIR_ENDPOINT = '/api/dsh-electro-lab/generate-dir'
 const GENERATE_ENDPOINT = '/api/dsh-electro-lab/generate'
 const GENERATE_PROGRESS_ENDPOINT = '/api/dsh-electro-lab/generate-progress'
+const GENERATE_CANCEL_ENDPOINT = '/api/dsh-electro-lab/generate-cancel'
 const LIST_DIRS_ENDPOINT = '/api/dsh-electro-lab/list-dirs'
 const LIST_ROOTS_ENDPOINT = '/api/dsh-electro-lab/list-roots'
 const POLL_MS = 5000
@@ -528,7 +536,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [genFile, setGenFile] = useState('')
   const [genBusy, setGenBusy] = useState(false)
   const [genProgress, setGenProgress] = useState<{ percent: number; phase: string; status: 'running' | 'done' | 'error'; path?: string; error?: string } | null>(null)
-  const progressRef = useRef(0)
+  const [genElapsed, setGenElapsed] = useState(0)
+  const genJobIdRef = useRef<string | null>(null)
   const [dirBrowserOpen, setDirBrowserOpen] = useState(false)
   const [dirEntries, setDirEntries] = useState<DirEntry[]>([])
   const [dirExpanded, setDirExpanded] = useState<Set<string>>(new Set())
@@ -536,6 +545,14 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [dirLoading, setDirLoading] = useState(false)
   const [dirSnapshot, setDirSnapshot] = useState<{ dir: string; file: string } | null>(null)
   const treeListRef = useRef<HTMLDivElement>(null)
+
+  // Elapsed-time counter for the generation dialog: ticks only while running,
+  // freezes at the final value once the generation finishes or fails.
+  useEffect(() => {
+    if (genProgress === null || genProgress.status !== 'running') return
+    const timer = setInterval(() => setGenElapsed((seconds) => seconds + 1), 1000)
+    return () => clearInterval(timer)
+  }, [genProgress === null ? null : genProgress.status])
   const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
 
   // Auto-fill the remembered output directory whenever the dialog opens.
@@ -568,7 +585,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     const dir = genDir.trim()
     if (dir.length === 0) return
     setGenBusy(true)
-    progressRef.current = 0
+    setGenElapsed(0)
     setGenProgress({ percent: 0, phase: 'prepare', status: 'running' })
     try {
       const res = await fetch(
@@ -578,6 +595,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
       const body = (await res.json()) as { jobId?: string; error?: string }
       if (!res.ok) throw new Error(body.error ?? `generate returned ${res.status}`)
       if (body.jobId === undefined) throw new Error('no job id returned')
+      genJobIdRef.current = body.jobId
       // Poll the job until it settles.
       for (;;) {
         await new Promise((resolve) => setTimeout(resolve, 500))
@@ -585,37 +603,38 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
         if (!pr.ok) throw new Error(`progress returned ${pr.status}`)
         const job = (await pr.json()) as { status?: string; percent?: number; phase?: string; path?: string; error?: string }
         if (job.status === 'done') {
+          genJobIdRef.current = null
           saveGenDir()
           setGenOpen(false)
           setGenBusy(false)
-          // Ramp smoothly to 100% from the last shown value instead of jumping.
-          const start = Math.min(progressRef.current, 100)
-          setGenProgress({ percent: start, phase: job.phase ?? 'write', status: 'done', path: job.path })
-          let current = start
-          const timer = setInterval(() => {
-            current = Math.min(100, current + 5)
-            progressRef.current = current
-            setGenProgress((prev) => (prev === null ? prev : { ...prev, percent: current }))
-            if (current >= 100) clearInterval(timer)
-          }, 80)
+          setGenProgress({ percent: 100, phase: job.phase ?? 'write', status: 'done', path: job.path })
           return
         }
         if (job.status === 'error') {
+          genJobIdRef.current = null
           setGenBusy(false)
-          setGenProgress({ percent: Math.max(progressRef.current, job.percent ?? 0), phase: job.phase ?? 'prepare', status: 'error', error: job.error ?? 'unknown error' })
+          setGenProgress({ percent: job.percent ?? 0, phase: job.phase ?? 'prepare', status: 'error', error: job.error ?? 'unknown error' })
           return
         }
         if (job.percent !== undefined && job.phase !== undefined) {
-          // The bar only ever climbs: never let a polled value go backwards.
-          const next = Math.max(progressRef.current, job.percent)
-          progressRef.current = next
-          setGenProgress({ percent: next, phase: job.phase, status: 'running' })
+          setGenProgress({ percent: job.percent, phase: job.phase, status: 'running' })
         }
       }
     } catch (error) {
       setGenBusy(false)
       setGenProgress({ percent: 0, phase: 'prepare', status: 'error', error: error instanceof Error ? error.message : String(error) })
     }
+  }
+
+  /** Cancel the running generation: abort the host job and close the dialog. */
+  const cancelGenerate = (): void => {
+    const jobId = genJobIdRef.current
+    genJobIdRef.current = null
+    if (jobId !== null) {
+      void fetch(`${GENERATE_CANCEL_ENDPOINT}?jobId=${encodeURIComponent(jobId)}`, { method: 'POST' }).catch(() => {})
+    }
+    setGenBusy(false)
+    setGenProgress(null)
   }
 
   /** One node of the host-driven directory tree (hand-rolled: the React-19-only packages are incompatible with this React 18 host). */
@@ -1219,86 +1238,67 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
               boxShadow: 'var(--dsw-shadow-lv3)',
             }}
           >
-            <div style={{ fontWeight: 600, fontSize: 14 }}>
-              {genProgress.status === 'done' ? t('generateDone') : genProgress.status === 'error' ? t('generateFailed') : t('generating')}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>
+                {genProgress.status === 'done' ? t('generateDone') : genProgress.status === 'error' ? t('generateFailed') : t('generating')}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', flex: 'none' }}>
+                {formatElapsed(genElapsed)}
+              </div>
             </div>
-            <div style={{ height: 8, borderRadius: 999, background: 'var(--dsw-alias-interactive-bg-hover)', overflow: 'hidden', marginTop: 14 }}>
-              <div
-                style={{
-                  height: '100%',
-                  width: `${genProgress.percent}%`,
-                  background: genProgress.status === 'error' ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-state-business-primary)',
-                  transition: 'width 0.3s linear',
-                }}
-              />
-            </div>
+            {/* Current stage, or the generated location on success. */}
             {genProgress.status === 'running' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
-                <span>{t(genPhaseKey(genProgress.phase))}</span>
-                <span>{Math.round(genProgress.percent)}%</span>
+              <div style={{ marginTop: 14, textAlign: 'center', fontSize: 13, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 }}>
+                {t(genPhaseKey(genProgress.phase))}
               </div>
             )}
             {genProgress.status === 'done' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
-                  <span>{t(genPhaseKey(genProgress.phase))}</span>
-                  <span>{Math.round(genProgress.percent)}%</span>
-                </div>
-                {genProgress.path !== undefined && (
-                  <div style={{ marginTop: 8, font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
-                    {genProgress.path}
-                  </div>
-                )}
-              </>
+              <div style={{ marginTop: 14, textAlign: 'center', fontSize: 13, color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
+                {t('generatedAt')} {genProgress.path ?? ''}
+              </div>
             )}
             {genProgress.status === 'error' && (
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              <div style={{ marginTop: 14, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {genProgress.error ?? 'unknown error'}
               </div>
             )}
-            {genProgress.status !== 'running' && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              {genProgress.status === 'running' && (
                 <button
                   type="button"
-                  disabled={genProgress.percent < 100}
                   style={{
                     padding: '4px 12px',
                     borderRadius: 6,
-                    border: '1px solid var(--dsw-alias-state-business-primary)',
+                    border: '1px solid var(--dsw-alias-label-tertiary)',
                     background: 'none',
-                    color: 'var(--dsw-alias-state-business-primary)',
-                    cursor: genProgress.percent < 100 ? 'default' : 'pointer',
+                    color: 'var(--dsw-alias-label-primary)',
+                    cursor: 'pointer',
                     fontSize: 13,
-                    fontWeight: 600,
-                    opacity: genProgress.percent < 100 ? 0.45 : 1,
                   }}
-                  onClick={() => setGenProgress(null)}
+                  onClick={cancelGenerate}
                 >
-                  {t('confirm')}
+                  {t('cancel')}
                 </button>
-              </div>
-            )}
-            {genProgress.status === 'running' && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-                <button
-                  type="button"
-                  disabled
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: 6,
-                    border: '1px solid var(--dsw-alias-state-business-primary)',
-                    background: 'none',
-                    color: 'var(--dsw-alias-state-business-primary)',
-                    cursor: 'default',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    opacity: 0.45,
-                  }}
-                >
-                  {t('confirm')}
-                </button>
-              </div>
-            )}
+              )}
+              <button
+                type="button"
+                disabled={genProgress.status === 'running'}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--dsw-alias-state-business-primary)',
+                  background: 'none',
+                  color: 'var(--dsw-alias-state-business-primary)',
+                  cursor: genProgress.status === 'running' ? 'default' : 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  opacity: genProgress.status === 'running' ? 0.45 : 1,
+                }}
+                onClick={() => setGenProgress(null)}
+              >
+                {t('confirm')}
+              </button>
+            </div>
           </div>
         </div>
       )}
