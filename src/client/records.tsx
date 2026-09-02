@@ -1137,12 +1137,13 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
       </div>
       </div>
       {/* Right action rail: spans the full height so it starts at the title row (C).
-          Buttons stretch to the rail's full width (VS Code activity-bar style);
-          marginRight -14 bleeds the rail through the page's 14px padding so it
-          sits flush against the panel edge.
+          Width 55px matches the measured DSH global sidebar rail; buttons stretch
+          to the rail's full width (VS Code activity-bar style); marginRight -14
+          bleeds the rail through the page's 14px padding so it sits flush against
+          the panel edge.
           One generate button per format — each opens its own dedicated setup
           dialog, so no dialog ever switches formats. */}
-      <div style={{ width: 44, flex: 'none', borderLeft: '1px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4, paddingTop: 8, marginRight: -14 }}>
+      <div style={{ width: 55, flex: 'none', borderLeft: '1px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4, paddingTop: 8, marginRight: -14 }}>
         <button
           type="button"
           title={t('exportRecord')}
