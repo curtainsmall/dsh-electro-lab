@@ -8,6 +8,7 @@
  * store, so the job is never lost while it runs.
  */
 import { useSyncExternalStore } from 'react'
+import type { ArticleFormat, ArticleLanguage } from '../generate.ts'
 
 /** One generation job snapshot, mirroring the host's /generate-progress body. */
 export interface GenProgress {
@@ -21,8 +22,8 @@ export interface GenProgress {
 /** What a generation setup submits to the host. */
 export interface GenerateRequest {
   recordId: string
-  format: string
-  language: string
+  format: ArticleFormat
+  language: ArticleLanguage
   directory: string
   fileName: string
 }

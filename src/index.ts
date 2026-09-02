@@ -11,7 +11,7 @@ import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
 import { RecordManager, readRecordArchive, deleteRecordFromArchive, type Record, type RecordEvent } from './records.ts'
-import { buildArticlePrompt, ARTICLE_LANGUAGES } from './generate.ts'
+import { ArticleFormat, ArticleLanguage, TemplateLanguage, buildArticlePrompt, buildLatexDocument, normalizeFileName, resolveTemplateLanguage, templateLanguageToArticleLanguage } from './generate.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -130,10 +130,11 @@ function getOrCreateManager(sessionId: string): RecordManager {
   return manager
 }
 
-/** Non-config serialized state: the remembered generation output directory and article language. */
+/** Non-config serialized state: the remembered generation output directory, article language and format. */
 interface GenerateState {
   generateDir?: string
   generateLanguage?: string
+  generateFormat?: string
 }
 
 /** Raw state.json contents (never throws — missing or corrupt file reads as {}). */
@@ -146,12 +147,35 @@ function readStoredState(): Partial<GenerateState> {
   }
 }
 
+/** Membership guards for the query-string values (string enums travel as raw strings over HTTP). */
+function isArticleFormat(value: unknown): value is ArticleFormat {
+  switch (value) {
+    case ArticleFormat.Markdown:
+    case ArticleFormat.Latex:
+      return true
+    default:
+      return false
+  }
+}
+
+function isArticleLanguage(value: unknown): value is ArticleLanguage {
+  switch (value) {
+    case ArticleLanguage.Auto:
+    case ArticleLanguage.ZhCN:
+    case ArticleLanguage.En:
+      return true
+    default:
+      return false
+  }
+}
+
 /** The remembered generation state, with a one-time migration from the legacy plain-text file. */
 function readGenerateState(): GenerateState {
   const stored = readStoredState()
   const state: GenerateState = {
     generateDir: typeof stored.generateDir === 'string' && stored.generateDir.trim().length > 0 ? stored.generateDir.trim() : undefined,
     generateLanguage: typeof stored.generateLanguage === 'string' && stored.generateLanguage.length > 0 ? stored.generateLanguage : undefined,
+    generateFormat: isArticleFormat(stored.generateFormat) ? stored.generateFormat : undefined,
   }
   if (state.generateDir === undefined) {
     try {
@@ -170,6 +194,7 @@ function writeGenerateState(state: GenerateState): void {
   const merged: Partial<GenerateState> = { ...readStoredState(), ...state }
   if (merged.generateDir === undefined || merged.generateDir.trim().length === 0) delete merged.generateDir
   if (merged.generateLanguage === undefined || merged.generateLanguage.length === 0) delete merged.generateLanguage
+  if (merged.generateFormat === undefined || !isArticleFormat(merged.generateFormat)) delete merged.generateFormat
   writeFileSync(join(recordsHome, STATE_FILE), JSON.stringify(merged), 'utf8')
   try {
     rmSync(join(recordsHome, LEGACY_GENERATE_DIR_FILE), { force: true })
@@ -297,8 +322,12 @@ async function launchInOs(target: string, mode: 'open' | 'reveal'): Promise<stri
   return 'failed: no suitable opener found'
 }
 
-/** Generate the solution article for one record through the host LLM. */
-async function generateArticle(ctx: Context, record: Record, signal: AbortSignal, language: string, onProgress?: (percent: number) => void): Promise<string> {
+/**
+ * Generate the solution article for one record through the host LLM. For
+ * Markdown the model's text IS the article; for LaTeX the model writes only
+ * the body, which is sanitized and wrapped in the document shell here.
+ */
+async function generateArticle(ctx: Context, record: Record, signal: AbortSignal, language: ArticleLanguage, format: ArticleFormat, onProgress?: (percent: number) => void): Promise<string> {
   const llm = ctx.get('llm')
   if (llm === undefined) throw new Error('the LLM service is unavailable in this deployment')
   const defaults = ctx.get('agentDefaultModel')
@@ -306,7 +335,21 @@ async function generateArticle(ctx: Context, record: Record, signal: AbortSignal
   if (route === undefined || route.provider === undefined || route.model === undefined) {
     throw new Error('no default model is configured — pick one in Settings first')
   }
-  const { system, user } = buildArticlePrompt(record, language as never)
+  // LaTeX needs the document class fixed BEFORE generation: resolve the
+  // template language (auto → probe the question text) and pin the prompt to
+  // it. Markdown keeps the raw selection (auto follows the question).
+  let templateLanguage: TemplateLanguage | undefined
+  switch (format) {
+    case ArticleFormat.Latex:
+      templateLanguage = resolveTemplateLanguage(language, record.question)
+      break
+    case ArticleFormat.Markdown:
+      break
+  }
+  const promptLanguage: ArticleLanguage = templateLanguage === undefined
+    ? language
+    : templateLanguageToArticleLanguage(templateLanguage)
+  const { system, user } = buildArticlePrompt(record, promptLanguage, format)
   const startedAt = Date.now()
   let text = ''
   for await (const raw of llm.stream({
@@ -332,7 +375,10 @@ async function generateArticle(ctx: Context, record: Record, signal: AbortSignal
   }
   const trimmed = text.trim()
   if (trimmed.length === 0) throw new Error('the model produced no article text')
-  return trimmed
+  if (templateLanguage === undefined) return trimmed
+  const document = buildLatexDocument(trimmed, templateLanguage)
+  if (!document.ok) throw new Error(`LaTeX validation failed: ${document.error}`)
+  return document.text
 }
 
 /** One in-memory generation job (never persisted — no generation log). */
@@ -348,7 +394,7 @@ interface GenerateJob {
 const generateJobs = new Map<string, GenerateJob>()
 
 /** Start a background generation job and return its id; progress is polled via GET /generate-progress. */
-function startGenerateJob(ctx: Context, record: Record, directory: string, fileName: string, language: string): string {
+function startGenerateJob(ctx: Context, record: Record, directory: string, fileName: string, language: ArticleLanguage, format: ArticleFormat): string {
   const jobId = randomUUID()
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 120_000)
@@ -358,7 +404,7 @@ function startGenerateJob(ctx: Context, record: Record, directory: string, fileN
     try {
       job.percent = 10
       job.phase = 'generate'
-      const article = await generateArticle(ctx, record, controller.signal, language, (percent) => { job.percent = percent })
+      const article = await generateArticle(ctx, record, controller.signal, language, format, (percent) => { job.percent = percent })
       job.phase = 'write'
       job.percent = 95
       mkdirSync(directory, { recursive: true })
@@ -383,22 +429,21 @@ function startGenerateJob(ctx: Context, record: Record, directory: string, fileN
 function beginGenerate(ctx: Context, url: string): { jobId: string } {
   const params = new URL(url, 'http://dsh.local').searchParams
   const recordId = params.get('recordId') ?? ''
-  const format = params.get('format') ?? 'markdown'
-  if (format !== 'markdown') throw new Error(`unsupported format "${format}"`)
-  const language = params.get('language') ?? 'auto'
-  if (!(ARTICLE_LANGUAGES as readonly string[]).includes(language)) {
-    throw new Error(`unsupported language "${language}"`)
-  }
+  const formatParam = params.get('format') ?? ArticleFormat.Markdown
+  if (!isArticleFormat(formatParam)) throw new Error(`unsupported format "${formatParam}"`)
+  const languageParam = params.get('language') ?? ArticleLanguage.Auto
+  if (!isArticleLanguage(languageParam)) throw new Error(`unsupported language "${languageParam}"`)
   const directory = (params.get('directory') ?? '').trim()
   if (directory.length === 0) throw new Error('output directory is required')
   const record = readRecordArchive(join(recordsHome, 'records.jsonl')).find((item) => item.id === recordId)
   if (record === undefined) throw new Error(`record "${recordId}" not found`)
 
-  let fileName = (params.get('fileName') ?? '').trim()
-  if (fileName.length === 0) fileName = `electro-lab-${record.id.slice(0, 8)}.md`
-  if (!fileName.endsWith('.md')) fileName += '.md'
+  const rawName = (params.get('fileName') ?? '').trim()
+  const fileName = rawName.length === 0
+    ? normalizeFileName(`electro-lab-${record.id.slice(0, 8)}`, formatParam)
+    : normalizeFileName(rawName, formatParam)
 
-  return { jobId: startGenerateJob(ctx, record, directory, fileName, language) }
+  return { jobId: startGenerateJob(ctx, record, directory, fileName, languageParam, formatParam) }
 }
 
 export function apply(ctx: Context): void {
@@ -632,9 +677,11 @@ export function apply(ctx: Context): void {
           const url = new URL(request.url ?? '', 'http://dsh.local')
           const dir = url.searchParams.get('dir')
           const language = url.searchParams.get('language')
+          const format = url.searchParams.get('format')
           const state: GenerateState = {}
           if (dir !== null) state.generateDir = dir
           if (language !== null) state.generateLanguage = language
+          if (format !== null) state.generateFormat = format
           writeGenerateState(state)
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ saved: true }))
@@ -647,7 +694,11 @@ export function apply(ctx: Context): void {
         }
         const state = readGenerateState()
         res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ directory: state.generateDir ?? '', language: state.generateLanguage ?? 'auto' }))
+        res.end(JSON.stringify({
+          directory: state.generateDir ?? '',
+          language: state.generateLanguage ?? 'auto',
+          format: state.generateFormat ?? 'markdown',
+        }))
       },
     }))
 

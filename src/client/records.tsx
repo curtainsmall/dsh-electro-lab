@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
 import { useGenState, startGenerate, cancelGenerate, clearProgress, setMinimized } from './generation.ts'
+import { ArticleFormat, ArticleLanguage } from '../generate.ts'
 import { IconChevronLeft, IconDownload, IconPlay, IconArrowUp, IconFolder, IconFile, IconMinus } from './icons.tsx'
 
 /* ── Shared dialog shell + button language (A + B) ─────────────────────────── */
@@ -679,13 +680,45 @@ async function exportRecordFile(record: DetailRecord): Promise<void> {
  * shared scroll area on the right whose section headings stick to the top
  * while scrolling — no nested scrollbars, no framework, no popup shell.
  */
+/** Parse the remembered/typed format from its raw string (unknown values → undefined). */
+function parseArticleFormat(value: string | undefined): ArticleFormat | undefined {
+  switch (value) {
+    case ArticleFormat.Markdown:
+    case ArticleFormat.Latex:
+      return value
+    default:
+      return undefined
+  }
+}
+
+/** Parse the remembered/typed language from its raw string (unknown values → undefined). */
+function parseArticleLanguage(value: string | undefined): ArticleLanguage | undefined {
+  switch (value) {
+    case ArticleLanguage.Auto:
+    case ArticleLanguage.ZhCN:
+    case ArticleLanguage.En:
+      return value
+    default:
+      return undefined
+  }
+}
+
+/** The file extension for an output format. */
+function formatExtension(format: ArticleFormat): string {
+  switch (format) {
+    case ArticleFormat.Latex: return 'tex'
+    case ArticleFormat.Markdown: return 'md'
+  }
+}
+
 function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
   const [backHover, setBackHover] = useState(false)
   const [exportHover, setExportHover] = useState(false)
   const [genHover, setGenHover] = useState(false)
   const [genOpen, setGenOpen] = useState(false)
   const [genDir, setGenDir] = useState('')
-  const [genLanguage, setGenLanguage] = useState('auto')
+  const [genLanguage, setGenLanguage] = useState<ArticleLanguage>(ArticleLanguage.Auto)
+  const [genFormat, setGenFormat] = useState<ArticleFormat>(ArticleFormat.Markdown)
   const [genFile, setGenFile] = useState('')
   const [genSetupError, setGenSetupError] = useState<string | null>(null)
   // The job itself lives in the module-level generation store (survives page
@@ -701,29 +734,42 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [dirSnapshot, setDirSnapshot] = useState<{ dir: string; file: string } | null>(null)
   const treeListRef = useRef<HTMLDivElement>(null)
 
-  const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.md`
+  const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.${formatExtension(genFormat)}`
 
-  // Auto-fill the remembered output directory and article language whenever the dialog opens.
+  /** Switch the output format, keeping any typed file name on the new extension. */
+  const switchGenFormat = (format: ArticleFormat): void => {
+    setGenFormat(format)
+    setGenFile((file) => {
+      const base = file.replace(/\.(md|tex)$/i, '')
+      return base.trim().length === 0 ? '' : `${base}.${formatExtension(format)}`
+    })
+  }
+
+  // Auto-fill the remembered generation settings whenever the dialog opens.
   useEffect(() => {
     if (!genOpen) return
     let alive = true
     fetch(GENERATE_DIR_ENDPOINT)
-      .then((r) => r.json() as Promise<{ directory?: string; language?: string }>)
+      .then((r) => r.json() as Promise<{ directory?: string; language?: string; format?: string }>)
       .then((body) => {
         if (!alive) return
         if (body.directory !== undefined && body.directory !== '') setGenDir(body.directory)
-        if (body.language !== undefined && body.language !== '') setGenLanguage(body.language)
+        const language = parseArticleLanguage(body.language)
+        if (language !== undefined) setGenLanguage(language)
+        const format = parseArticleFormat(body.format)
+        if (format !== undefined) setGenFormat(format)
       })
       .catch(() => {})
     return () => { alive = false }
   }, [genOpen])
 
-  /** Persist the directory and language so the next generation dialog auto-fills them. */
+  /** Persist the directory, language and format so the next generation dialog auto-fills them. */
   const saveGenState = (): void => {
     const dir = genDir.trim()
     const params = new URLSearchParams()
     if (dir.length > 0) params.set('dir', dir)
     params.set('language', genLanguage)
+    params.set('format', genFormat)
     void fetch(`${GENERATE_DIR_ENDPOINT}?${params.toString()}`, { method: 'PUT' }).catch(() => {})
   }
 
@@ -744,7 +790,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     setGenOpen(false)
     startGenerate({
       recordId: record.id,
-      format: 'markdown',
+      format: genFormat,
       language: genLanguage,
       directory: dir,
       fileName: genFile.trim(),
@@ -1097,15 +1143,23 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
         <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '12px 10px', alignItems: 'center' }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('format')}</span>
           <select
-            value="markdown"
+            value={genFormat}
+            onChange={(e) => {
+              const format = parseArticleFormat(e.target.value)
+              if (format !== undefined) switchGenFormat(format)
+            }}
             style={{ ...genSelectStyle }}
           >
             <option value="markdown">Markdown</option>
+            <option value="latex">LaTeX</option>
           </select>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('language')}</span>
           <select
             value={genLanguage}
-            onChange={(e) => setGenLanguage(e.target.value)}
+            onChange={(e) => {
+              const language = parseArticleLanguage(e.target.value)
+              if (language !== undefined) setGenLanguage(language)
+            }}
             style={{ ...genSelectStyle }}
           >
             <option value="auto">{t('languageAuto')}</option>
