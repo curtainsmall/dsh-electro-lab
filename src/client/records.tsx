@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
 import { useGenState, startGenerate, cancelGenerate, clearProgress, setMinimized } from './generation.ts'
 import { ArticleFormat, ArticleLanguage, GenerationPhase } from '../generate.ts'
-import { IconChevronLeft, IconDownload, IconPlay, IconArrowUp, IconFolder, IconFile, IconMinus } from './icons.tsx'
+import { IconChevronLeft, IconDownload, IconArrowUp, IconFolder, IconFile, IconMinus, IconMarkdown, IconLatex } from './icons.tsx'
 
 /* ── Shared dialog shell + button language (A + B) ─────────────────────────── */
 
@@ -138,8 +138,8 @@ function PrimaryButton({ children, onClick, disabled = false }: { children: Reac
 /** Icon button for the detail-page action bar / inline actions. */
 function iconButtonStyle(hovered: boolean): React.CSSProperties {
   return {
-    width: 30,
-    height: 30,
+    width: 32,
+    height: 32,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -682,17 +682,6 @@ async function exportRecordFile(record: DetailRecord): Promise<void> {
  * shared scroll area on the right whose section headings stick to the top
  * while scrolling — no nested scrollbars, no framework, no popup shell.
  */
-/** Parse the remembered/typed format from its raw string (unknown values → undefined). */
-function parseArticleFormat(value: string | undefined): ArticleFormat | undefined {
-  switch (value) {
-    case ArticleFormat.Markdown:
-    case ArticleFormat.Latex:
-      return value
-    default:
-      return undefined
-  }
-}
-
 /** Parse the remembered/typed language from its raw string (unknown values → undefined). */
 function parseArticleLanguage(value: string | undefined): ArticleLanguage | undefined {
   switch (value) {
@@ -716,17 +705,18 @@ function formatExtension(format: ArticleFormat): string {
 function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: () => void }): React.JSX.Element {
   const [backHover, setBackHover] = useState(false)
   const [exportHover, setExportHover] = useState(false)
-  const [genHover, setGenHover] = useState(false)
-  const [genOpen, setGenOpen] = useState(false)
+  const [genMdHover, setGenMdHover] = useState(false)
+  const [genLatexHover, setGenLatexHover] = useState(false)
+  // Which format's setup dialog is open (one per format — see the rail).
+  const [genSetup, setGenSetup] = useState<ArticleFormat | null>(null)
   const [genDir, setGenDir] = useState('')
   const [genLanguage, setGenLanguage] = useState<ArticleLanguage>(ArticleLanguage.Auto)
-  const [genFormat, setGenFormat] = useState<ArticleFormat>(ArticleFormat.Markdown)
   const [genCompile, setGenCompile] = useState(false)
   const [genFile, setGenFile] = useState('')
   const [genSetupError, setGenSetupError] = useState<string | null>(null)
   // The job itself lives in the module-level generation store (survives page
-  // navigation); this page only drives the setup dialog. `genRunning` gates
-  // the Generate button while a job is in flight.
+  // navigation); this page only drives the setup dialogs. `genRunning` gates
+  // the Generate buttons while a job is in flight.
   const { progress: genProgress } = useGenState()
   const genRunning = genProgress?.status === 'running'
   const [dirBrowserOpen, setDirBrowserOpen] = useState(false)
@@ -737,20 +727,13 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [dirSnapshot, setDirSnapshot] = useState<{ dir: string; file: string } | null>(null)
   const treeListRef = useRef<HTMLDivElement>(null)
 
-  const defaultFileName = `electro-lab-${record.id.slice(0, 8)}.${formatExtension(genFormat)}`
+  /** Default file name placeholder of a format's setup dialog. */
+  const defaultFileNameFor = (format: ArticleFormat): string =>
+    `electro-lab-${record.id.slice(0, 8)}.${formatExtension(format)}`
 
-  /** Switch the output format, keeping any typed file name on the new extension. */
-  const switchGenFormat = (format: ArticleFormat): void => {
-    setGenFormat(format)
-    setGenFile((file) => {
-      const base = file.replace(/\.(md|tex)$/i, '')
-      return base.trim().length === 0 ? '' : `${base}.${formatExtension(format)}`
-    })
-  }
-
-  // Auto-fill the remembered generation settings whenever the dialog opens.
+  // Auto-fill the remembered generation settings whenever a setup dialog opens.
   useEffect(() => {
-    if (!genOpen) return
+    if (genSetup === null) return
     let alive = true
     fetch(GENERATE_DIR_ENDPOINT)
       .then((r) => r.json() as Promise<{ directory?: string; language?: string; format?: string; compile?: boolean }>)
@@ -759,32 +742,29 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
         if (body.directory !== undefined && body.directory !== '') setGenDir(body.directory)
         const language = parseArticleLanguage(body.language)
         if (language !== undefined) setGenLanguage(language)
-        const format = parseArticleFormat(body.format)
-        if (format !== undefined) setGenFormat(format)
         if (typeof body.compile === 'boolean') setGenCompile(body.compile)
       })
       .catch(() => {})
     return () => { alive = false }
-  }, [genOpen])
+  }, [genSetup])
 
-  /** Persist the directory, language, format and PDF-compile toggle so the next generation dialog auto-fills them. */
+  /** Persist the directory, language and PDF-compile toggle so the next dialog auto-fills them. */
   const saveGenState = (): void => {
     const dir = genDir.trim()
     const params = new URLSearchParams()
     if (dir.length > 0) params.set('dir', dir)
     params.set('language', genLanguage)
-    params.set('format', genFormat)
     params.set('compile', String(genCompile))
     void fetch(`${GENERATE_DIR_ENDPOINT}?${params.toString()}`, { method: 'PUT' }).catch(() => {})
   }
 
   const closeGenDialog = (): void => {
     saveGenState()
-    setGenOpen(false)
+    setGenSetup(null)
   }
 
   /** Ask the host to generate the article (LLM) and write it to disk; the module-level store runs and polls the job. */
-  const runGenerate = (): void => {
+  const runGenerate = (format: ArticleFormat): void => {
     const dir = genDir.trim()
     if (dir.length === 0) {
       setGenSetupError(t('directoryRequired'))
@@ -792,16 +772,59 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     }
     setGenSetupError(null)
     saveGenState()
-    setGenOpen(false)
+    setGenSetup(null)
     startGenerate({
       recordId: record.id,
-      format: genFormat,
+      format,
       language: genLanguage,
       directory: dir,
       fileName: genFile.trim(),
       compile: genCompile,
     })
   }
+
+  /** One label span of the setup grid (fixed 104px column, left-aligned). */
+  const setupLabel = (text: string, muted = false): React.JSX.Element => (
+    <span style={{ fontSize: 12, fontWeight: 600, color: muted ? 'var(--dsw-alias-label-tertiary)' : 'var(--dsw-alias-label-secondary)', textAlign: 'left' }}>{text}</span>
+  )
+
+  /** The setup form rows shared by both format dialogs (language/directory/file name). */
+  const setupBaseRows = (): React.JSX.Element => (
+    <>
+      {setupLabel(t('language'))}
+      <select
+        value={genLanguage}
+        onChange={(e) => {
+          const language = parseArticleLanguage(e.target.value)
+          if (language !== undefined) setGenLanguage(language)
+        }}
+        style={{ ...genSelectStyle }}
+      >
+        <option value="auto">{t('languageAuto')}</option>
+        <option value="zh-CN">{t('languageZh')}</option>
+        <option value="en">{t('languageEn')}</option>
+      </select>
+      {setupLabel(t('directory'))}
+      <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+        <input
+          type="text"
+          value={genDir}
+          onChange={(e) => { setGenDir(e.target.value); if (genSetupError !== null) setGenSetupError(null) }}
+          placeholder="/path/to/output"
+          style={{ ...genInputStyle }}
+        />
+        <GhostButton onClick={() => void openDirBrowser()}>{t('browse')}</GhostButton>
+      </div>
+      {setupLabel(t('fileName'))}
+      <input
+        type="text"
+        value={genFile}
+        onChange={(e) => setGenFile(e.target.value)}
+        placeholder={defaultFileNameFor(genSetup ?? ArticleFormat.Markdown)}
+        style={{ ...genInputStyle }}
+      />
+    </>
+  )
 
   /** One node of the host-driven directory tree (hand-rolled: the React-19-only packages are incompatible with this React 18 host). */
   interface DirEntry {
@@ -1113,8 +1136,13 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
         </div>
       </div>
       </div>
-      {/* Right action rail: spans the full height so it starts at the title row (C). */}
-      <div style={{ width: 44, flex: 'none', borderLeft: '1px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10 }}>
+      {/* Right action rail: spans the full height so it starts at the title row (C).
+          Buttons stretch to the rail's full width (VS Code activity-bar style);
+          marginRight -14 bleeds the rail through the page's 14px padding so it
+          sits flush against the panel edge.
+          One generate button per format — each opens its own dedicated setup
+          dialog, so no dialog ever switches formats. */}
+      <div style={{ width: 44, flex: 'none', borderLeft: '1px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4, paddingTop: 8, marginRight: -14 }}>
         <button
           type="button"
           title={t('exportRecord')}
@@ -1122,86 +1150,67 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           onClick={() => void exportRecordFile(record)}
           onMouseEnter={() => setExportHover(true)}
           onMouseLeave={() => setExportHover(false)}
-          style={iconButtonStyle(exportHover)}
+          style={{ ...iconButtonStyle(exportHover), width: 'auto', borderRadius: 8 }}
         >
-          <IconDownload size={14} />
+          <IconDownload size={18} />
         </button>
         <button
           type="button"
-          title={t('generate')}
-          aria-label={t('generate')}
-          onClick={() => setGenOpen(true)}
-          onMouseEnter={() => setGenHover(true)}
-          onMouseLeave={() => setGenHover(false)}
-          style={iconButtonStyle(genHover)}
+          title={t('generateMarkdown')}
+          aria-label={t('generateMarkdown')}
+          disabled={genRunning}
+          onClick={() => setGenSetup(ArticleFormat.Markdown)}
+          onMouseEnter={() => setGenMdHover(true)}
+          onMouseLeave={() => setGenMdHover(false)}
+          style={{ ...iconButtonStyle(genMdHover), width: 'auto', borderRadius: 8, opacity: genRunning ? 0.45 : 1 }}
         >
-          <IconPlay size={14} />
+          <IconMarkdown size={18} />
+        </button>
+        <button
+          type="button"
+          title={t('generateLatex')}
+          aria-label={t('generateLatex')}
+          disabled={genRunning}
+          onClick={() => setGenSetup(ArticleFormat.Latex)}
+          onMouseEnter={() => setGenLatexHover(true)}
+          onMouseLeave={() => setGenLatexHover(false)}
+          style={{ ...iconButtonStyle(genLatexHover), width: 'auto', borderRadius: 8, opacity: genRunning ? 0.45 : 1 }}
+        >
+          <IconLatex size={18} />
         </button>
       </div>
-      <Dialog open={genOpen} title={t('generateSetup')} width={420} onClose={closeGenDialog}
+      {/* Markdown setup dialog: language / directory / file name only. */}
+      <Dialog open={genSetup === ArticleFormat.Markdown} title={t('generateSetupMarkdown')} width={420} onClose={closeGenDialog}
         footer={[
           <GhostButton key="cancel" onClick={closeGenDialog}>{t('cancel')}</GhostButton>,
-          <PrimaryButton key="generate" disabled={genRunning} onClick={runGenerate}>{t('generate')}</PrimaryButton>,
+          <PrimaryButton key="generate" disabled={genRunning} onClick={() => runGenerate(ArticleFormat.Markdown)}>{t('generate')}</PrimaryButton>,
         ]}
       >
-        {/* Two-column grid: the label column auto-sizes to the longest label (max-content),
-            so keys right-align and values left-align regardless of text length or locale. */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '12px 10px', alignItems: 'center' }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('format')}</span>
-          <select
-            value={genFormat}
-            onChange={(e) => {
-              const format = parseArticleFormat(e.target.value)
-              if (format !== undefined) switchGenFormat(format)
-            }}
-            style={{ ...genSelectStyle }}
-          >
-            <option value="markdown">Markdown</option>
-            <option value="latex">LaTeX</option>
-          </select>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('language')}</span>
-          <select
-            value={genLanguage}
-            onChange={(e) => {
-              const language = parseArticleLanguage(e.target.value)
-              if (language !== undefined) setGenLanguage(language)
-            }}
-            style={{ ...genSelectStyle }}
-          >
-            <option value="auto">{t('languageAuto')}</option>
-            <option value="zh-CN">{t('languageZh')}</option>
-            <option value="en">{t('languageEn')}</option>
-          </select>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('directory')}</span>
-          <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
-            <input
-              type="text"
-              value={genDir}
-              onChange={(e) => { setGenDir(e.target.value); if (genSetupError !== null) setGenSetupError(null) }}
-              placeholder="/path/to/output"
-              style={{ ...genInputStyle }}
-            />
-            <GhostButton onClick={() => void openDirBrowser()}>{t('browse')}</GhostButton>
-          </div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('fileName')}</span>
+        {/* Two-column grid with a FIXED label column: the vertical separator stays
+            identical across formats and locales. */}
+        <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '12px 10px', alignItems: 'center' }}>
+          {setupBaseRows()}
+        </div>
+        {genSetupError !== null && (
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)' }}>{genSetupError}</div>
+        )}
+      </Dialog>
+      {/* LaTeX setup dialog: the same base rows plus the PDF-compile toggle. */}
+      <Dialog open={genSetup === ArticleFormat.Latex} title={t('generateSetupLatex')} width={420} onClose={closeGenDialog}
+        footer={[
+          <GhostButton key="cancel" onClick={closeGenDialog}>{t('cancel')}</GhostButton>,
+          <PrimaryButton key="generate" disabled={genRunning} onClick={() => runGenerate(ArticleFormat.Latex)}>{t('generate')}</PrimaryButton>,
+        ]}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '12px 10px', alignItems: 'center' }}>
+          {setupBaseRows()}
+          {setupLabel(t('compilePdf'))}
           <input
-            type="text"
-            value={genFile}
-            onChange={(e) => setGenFile(e.target.value)}
-            placeholder={defaultFileName}
-            style={{ ...genInputStyle }}
+            type="checkbox"
+            checked={genCompile}
+            onChange={(e) => setGenCompile(e.target.checked)}
+            style={{ width: 14, height: 14, accentColor: 'var(--dsw-alias-state-business-primary)', cursor: 'pointer' }}
           />
-          {genFormat === ArticleFormat.Latex && (
-            <>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('compilePdf')}</span>
-              <input
-                type="checkbox"
-                checked={genCompile}
-                onChange={(e) => setGenCompile(e.target.checked)}
-                style={{ width: 14, height: 14, accentColor: 'var(--dsw-alias-state-business-primary)', cursor: 'pointer' }}
-              />
-            </>
-          )}
         </div>
         {genSetupError !== null && (
           <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)' }}>{genSetupError}</div>

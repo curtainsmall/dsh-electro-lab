@@ -66,3 +66,25 @@ export function IconFile({ size = 14 }: IconProps): React.JSX.Element {
 export function IconMinus({ size = 13 }: IconProps): React.JSX.Element {
   return <svg {...svgProps(size)}><path d="M3.5 8h9" /></svg>
 }
+
+/** M Markdown: a bordered sheet with the bold M letterform and a right stem. */
+export function IconMarkdown({ size = 14 }: IconProps): React.JSX.Element {
+  return (
+    <svg {...svgProps(size)}>
+      <path d="M1.5 4.5h13v7h-13z" />
+      <path d="M4.5 9V6.5l1.75 2 1.75-2V9" />
+      <path d="M11.5 9V6.5" />
+    </svg>
+  )
+}
+
+/** TeX: the T bar over a slanted X — the LaTeX identity. */
+export function IconLatex({ size = 14 }: IconProps): React.JSX.Element {
+  return (
+    <svg {...svgProps(size)}>
+      <path d="M3.5 4.5h7" />
+      <path d="M7 4.5v4" />
+      <path d="M11 9l4 4m0-4l-4 4" />
+    </svg>
+  )
+}

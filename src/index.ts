@@ -438,6 +438,52 @@ function xelatexCandidates(): string[] {
   return candidates
 }
 
+/** Candidate pandoc commands: PATH first, then the usual Windows install location. */
+function pandocCandidates(): string[] {
+  const candidates = ['pandoc']
+  if (process.platform === 'win32') {
+    candidates.push('C:\\Program Files\\Pandoc\\pandoc.exe')
+    const local = process.env.LOCALAPPDATA
+    if (local !== undefined) candidates.push(join(local, 'Pandoc', 'pandoc.exe'))
+  }
+  return candidates
+}
+
+/** The CJK fallback font pandoc passes to xelatex for Chinese Markdown articles (per-OS default). */
+function cjkMainFont(): string {
+  switch (process.platform) {
+    case 'darwin': return 'PingFang SC'
+    case 'win32': return 'Microsoft YaHei'
+    default: return 'Noto Sans CJK SC'
+  }
+}
+
+/**
+ * Compile a generated Markdown article to PDF through pandoc + xelatex (the
+ * engine the LaTeX path already probes). pandoc needs to be installed; when it
+ * is missing the error tells the user exactly that. The .md stays the primary
+ * artifact — a failure never fails the job.
+ */
+async function compileMarkdownToPdf(directory: string, fileName: string): Promise<{ ok: true; pdfPath: string } | { ok: false; error: string }> {
+  const pdfName = fileName.replace(/\.(md)$/i, '.pdf')
+  const pdfPath = join(directory, pdfName)
+  const args = [fileName, '-o', pdfName, '--pdf-engine=xelatex', '-V', `CJKmainfont=${cjkMainFont()}`]
+  if (process.platform === 'win32') args.push('--pdf-engine-opt=--enable-installer')
+  let firstFailure: string | undefined
+  for (const command of pandocCandidates()) {
+    const result = await runCommand(command, args, directory, 150_000)
+    if (!result.ok) {
+      if (result.code !== null || !result.output.includes('ENOENT')) {
+        firstFailure = `pandoc failed: ${result.output.trim()}`
+      }
+      continue
+    }
+    if (!existsSync(pdfPath)) return { ok: false, error: 'pandoc finished but produced no PDF' }
+    return { ok: true, pdfPath }
+  }
+  return { ok: false, error: firstFailure ?? 'pandoc was not found — install it (e.g. winget install JohnMacFarlane.Pandoc) to compile Markdown to PDF' }
+}
+
 /**
  * Compile a generated LaTeX source to PDF with xelatex (two passes so any
  * \label/\ref resolves). The .tex stays the primary artifact: a failure here
@@ -493,10 +539,12 @@ function startGenerateJob(ctx: Context, record: Record, directory: string, fileN
       mkdirSync(targetDir, { recursive: true })
       const target = join(targetDir, fileName)
       writeFileSync(target, article, 'utf8')
-      if (compile && isLatex) {
+      if (compile) {
         job.phase = GenerationPhase.Compile
         job.percent = 96
-        const compiled = await compileLatexToPdf(targetDir, fileName)
+        const compiled = isLatex
+          ? await compileLatexToPdf(targetDir, fileName)
+          : await compileMarkdownToPdf(directory, fileName)
         if (compiled.ok) job.pdfPath = compiled.pdfPath
         else job.compileError = compiled.error
       }
