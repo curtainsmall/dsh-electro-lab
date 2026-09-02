@@ -176,11 +176,13 @@ describe('latex document shell', () => {
     }
   })
 
-  it('uses ctexart for zh-CN and article for en', () => {
+  it('uses ctexart for zh-CN and article for en, both with scalable math', () => {
     expect(latexDocumentShell(TemplateLanguage.ZhCN)).toContain('\\documentclass{ctexart}')
     expect(latexDocumentShell(TemplateLanguage.ZhCN)).toContain('\\usepackage{siunitx}')
+    expect(latexDocumentShell(TemplateLanguage.ZhCN)).toContain('\\usepackage{unicode-math}')
     expect(latexDocumentShell(TemplateLanguage.En)).toContain('\\documentclass{article}')
     expect(latexDocumentShell(TemplateLanguage.En)).toContain('\\usepackage{fontspec}')
+    expect(latexDocumentShell(TemplateLanguage.En)).toContain('\\usepackage{unicode-math}')
   })
 
   it('fails when the body is rejected by the sanitizer', () => {

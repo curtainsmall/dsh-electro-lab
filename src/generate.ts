@@ -192,22 +192,28 @@ export function sanitizeLatexBody(body: string): SanitizeResult {
  * language (Unicode-native; ctex needs it); template rows are the extension
  * point for further languages (jlreq, kotex, …). The H1-equivalent title and
  * author are fixed by the host — never by the model — and carry no date.
+ *
+ * unicode-math switches math to scalable OpenType fonts (Latin Modern Math),
+ * which removes the fixed-size cmex font entirely — without it, ctexart's
+ * zh-CN size ladder requests odd math sizes (e.g. 10.53937pt) and LaTeX emits
+ * "Font shape OMX/cmex/m/n not available" substitution warnings.
  */
 export function latexDocumentShell(templateLanguage: TemplateLanguage): string {
   const title = '\\title{DeepSeek Harness ElectroLab Solution}\n'
   const author = '\\author{DeepSeek Harness ElectroLab}\n'
   const head = '% !TeX program = xelatex\n'
   const opening = '\n\\begin{document}\n\\maketitle\n'
+  const math = '\\usepackage{unicode-math}\n'
   switch (templateLanguage) {
     case TemplateLanguage.ZhCN:
       // ctexart auto-selects the CJK fontset for the OS: Windows (SimSun/雅黑),
       // macOS (苹方), Linux (TeX Live's Fandol) — cross-platform by construction.
       return head + '\\documentclass{ctexart}\n' +
-        '\\usepackage{amsmath}\n\\usepackage{siunitx}\n' +
+        '\\usepackage{amsmath}\n\\usepackage{siunitx}\n' + math +
         title + author + opening
     case TemplateLanguage.En:
       return head + '\\documentclass{article}\n' +
-        '\\usepackage{fontspec}\n\\usepackage{amsmath}\n\\usepackage{siunitx}\n' +
+        '\\usepackage{fontspec}\n\\usepackage{amsmath}\n\\usepackage{siunitx}\n' + math +
         title + author + opening
   }
 }
