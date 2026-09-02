@@ -43,6 +43,14 @@ export enum TemplateLanguage {
   En = 'en',
 }
 
+/** Generation job phases, reported through /generate-progress (shared wire codes host ↔ client). */
+export enum GenerationPhase {
+  Prepare = 'prepare',
+  Generate = 'generate',
+  Write = 'write',
+  Compile = 'compile',
+}
+
 /** The article-language face of a template language (same wire values, distinct enum types). */
 export function templateLanguageToArticleLanguage(templateLanguage: TemplateLanguage): ArticleLanguage {
   switch (templateLanguage) {

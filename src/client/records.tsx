@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { t, useAppLocale, type LocaleKey } from './locales.ts'
 import { useGenState, startGenerate, cancelGenerate, clearProgress, setMinimized } from './generation.ts'
-import { ArticleFormat, ArticleLanguage } from '../generate.ts'
+import { ArticleFormat, ArticleLanguage, GenerationPhase } from '../generate.ts'
 import { IconChevronLeft, IconDownload, IconPlay, IconArrowUp, IconFolder, IconFile, IconMinus } from './icons.tsx'
 
 /* ── Shared dialog shell + button language (A + B) ─────────────────────────── */
@@ -152,11 +152,13 @@ function iconButtonStyle(hovered: boolean): React.CSSProperties {
 }
 
 /** Map a generation phase code to its translated label; unknown phases show no text. */
-function genPhaseKey(phase: string): LocaleKey | string {
-  if (phase === 'prepare') return 'phasePrepare'
-  if (phase === 'generate') return 'phaseGenerate'
-  if (phase === 'write') return 'phaseWrite'
-  return ''
+function genPhaseKey(phase: GenerationPhase): LocaleKey | string {
+  switch (phase) {
+    case GenerationPhase.Prepare: return 'phasePrepare'
+    case GenerationPhase.Generate: return 'phaseGenerate'
+    case GenerationPhase.Write: return 'phaseWrite'
+    case GenerationPhase.Compile: return 'phaseCompile'
+  }
 }
 
 /** mm:ss elapsed-time display. */
@@ -719,6 +721,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
   const [genDir, setGenDir] = useState('')
   const [genLanguage, setGenLanguage] = useState<ArticleLanguage>(ArticleLanguage.Auto)
   const [genFormat, setGenFormat] = useState<ArticleFormat>(ArticleFormat.Markdown)
+  const [genCompile, setGenCompile] = useState(false)
   const [genFile, setGenFile] = useState('')
   const [genSetupError, setGenSetupError] = useState<string | null>(null)
   // The job itself lives in the module-level generation store (survives page
@@ -750,7 +753,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
     if (!genOpen) return
     let alive = true
     fetch(GENERATE_DIR_ENDPOINT)
-      .then((r) => r.json() as Promise<{ directory?: string; language?: string; format?: string }>)
+      .then((r) => r.json() as Promise<{ directory?: string; language?: string; format?: string; compile?: boolean }>)
       .then((body) => {
         if (!alive) return
         if (body.directory !== undefined && body.directory !== '') setGenDir(body.directory)
@@ -758,18 +761,20 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
         if (language !== undefined) setGenLanguage(language)
         const format = parseArticleFormat(body.format)
         if (format !== undefined) setGenFormat(format)
+        if (typeof body.compile === 'boolean') setGenCompile(body.compile)
       })
       .catch(() => {})
     return () => { alive = false }
   }, [genOpen])
 
-  /** Persist the directory, language and format so the next generation dialog auto-fills them. */
+  /** Persist the directory, language, format and PDF-compile toggle so the next generation dialog auto-fills them. */
   const saveGenState = (): void => {
     const dir = genDir.trim()
     const params = new URLSearchParams()
     if (dir.length > 0) params.set('dir', dir)
     params.set('language', genLanguage)
     params.set('format', genFormat)
+    params.set('compile', String(genCompile))
     void fetch(`${GENERATE_DIR_ENDPOINT}?${params.toString()}`, { method: 'PUT' }).catch(() => {})
   }
 
@@ -794,6 +799,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
       language: genLanguage,
       directory: dir,
       fileName: genFile.trim(),
+      compile: genCompile,
     })
   }
 
@@ -1185,6 +1191,17 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             placeholder={defaultFileName}
             style={{ ...genInputStyle }}
           />
+          {genFormat === ArticleFormat.Latex && (
+            <>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' }}>{t('compilePdf')}</span>
+              <input
+                type="checkbox"
+                checked={genCompile}
+                onChange={(e) => setGenCompile(e.target.checked)}
+                style={{ width: 14, height: 14, accentColor: 'var(--dsw-alias-state-business-primary)', cursor: 'pointer' }}
+              />
+            </>
+          )}
         </div>
         {genSetupError !== null && (
           <div style={{ marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)' }}>{genSetupError}</div>
@@ -1252,6 +1269,7 @@ function revealDir(path: string): void {
  */
 export function GenerationOverlay(): React.JSX.Element | null {
   useAppLocale() // Re-render when the active language changes.
+  const [minimizeHover, setMinimizeHover] = useState(false)
   const { progress, minimized, elapsed } = useGenState()
   if (progress === null) return null
   return (
@@ -1277,7 +1295,7 @@ export function GenerationOverlay(): React.JSX.Element | null {
             ),
             progress.status === 'done' && progress.path !== undefined && (
               <>
-                <GhostButton key="openfile" onClick={() => openFile(progress.path!)}>{t('openFile')}</GhostButton>
+                <GhostButton key="openfile" onClick={() => openFile(progress.pdfPath ?? progress.path!)}>{t('openFile')}</GhostButton>
                 <GhostButton key="opendir" onClick={() => revealDir(progress.path!)}>{t('openDirectory')}</GhostButton>
               </>
             ),
@@ -1298,7 +1316,9 @@ export function GenerationOverlay(): React.JSX.Element | null {
                   title={t('minimize')}
                   aria-label={t('minimize')}
                   onClick={() => setMinimized(true)}
-                  style={iconButtonStyle(false)}
+                  onMouseEnter={() => setMinimizeHover(true)}
+                  onMouseLeave={() => setMinimizeHover(false)}
+                  style={iconButtonStyle(minimizeHover)}
                 >
                   <IconMinus size={13} />
                 </button>
@@ -1315,9 +1335,21 @@ export function GenerationOverlay(): React.JSX.Element | null {
               </div>
             )}
             {progress.status === 'done' && (
-              <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
-                {t('generatedAt')} {progress.path ?? ''}
-              </div>
+              <>
+                <div style={{ fontSize: 13, color: 'var(--dsw-alias-label-primary)', wordBreak: 'break-all' }}>
+                  {t('generatedAt')} {progress.path ?? ''}
+                </div>
+                {progress.pdfPath !== undefined && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all' }}>
+                    {t('generatedPdfAt')} {progress.pdfPath}
+                  </div>
+                )}
+                {progress.compileError !== undefined && progress.pdfPath === undefined && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {t('compileFailed')} {progress.compileError}
+                  </div>
+                )}
+              </>
             )}
             {progress.status === 'error' && (
               <div style={{ fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>

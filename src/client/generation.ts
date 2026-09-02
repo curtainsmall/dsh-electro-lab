@@ -8,14 +8,16 @@
  * store, so the job is never lost while it runs.
  */
 import { useSyncExternalStore } from 'react'
-import type { ArticleFormat, ArticleLanguage } from '../generate.ts'
+import { GenerationPhase, type ArticleFormat, type ArticleLanguage } from '../generate.ts'
 
 /** One generation job snapshot, mirroring the host's /generate-progress body. */
 export interface GenProgress {
   percent: number
-  phase: string
+  phase: GenerationPhase
   status: 'running' | 'done' | 'error'
   path?: string
+  pdfPath?: string
+  compileError?: string
   error?: string
 }
 
@@ -26,6 +28,8 @@ export interface GenerateRequest {
   language: ArticleLanguage
   directory: string
   fileName: string
+  /** LaTeX only: ask the host to compile the source to PDF after writing it. */
+  compile: boolean
 }
 
 interface GenState {
@@ -79,6 +83,19 @@ function getSnapshot(): GenState {
   return state
 }
 
+/** Parse the wire phase string back to the enum; unknown values fall back to Prepare. */
+function parsePhase(value: string | undefined): GenerationPhase {
+  switch (value) {
+    case GenerationPhase.Prepare:
+    case GenerationPhase.Generate:
+    case GenerationPhase.Write:
+    case GenerationPhase.Compile:
+      return value
+    default:
+      return GenerationPhase.Prepare
+  }
+}
+
 /** Subscribe a component to the generation state (useSyncExternalStore). */
 export function useGenState(): GenState {
   return useSyncExternalStore(subscribe, getSnapshot)
@@ -92,11 +109,11 @@ export function startGenerate(request: GenerateRequest): void {
   // minimized flag and elapsed counter (they may still be set if the last job
   // was dismissed from the pill without being restored).
   state = { ...state, minimized: false, elapsed: 0 }
-  setProgress({ percent: 0, phase: 'prepare', status: 'running' })
+  setProgress({ percent: 0, phase: GenerationPhase.Prepare, status: 'running' })
   void (async () => {
     try {
       const res = await fetch(
-        `${GENERATE_ENDPOINT}?recordId=${encodeURIComponent(request.recordId)}&format=${encodeURIComponent(request.format)}&language=${encodeURIComponent(request.language)}&directory=${encodeURIComponent(request.directory)}&fileName=${encodeURIComponent(request.fileName)}`,
+        `${GENERATE_ENDPOINT}?recordId=${encodeURIComponent(request.recordId)}&format=${encodeURIComponent(request.format)}&language=${encodeURIComponent(request.language)}&directory=${encodeURIComponent(request.directory)}&fileName=${encodeURIComponent(request.fileName)}&compile=${request.compile ? 'true' : 'false'}`,
         { method: 'POST' },
       )
       const body = (await res.json()) as { jobId?: string; error?: string }
@@ -107,21 +124,28 @@ export function startGenerate(request: GenerateRequest): void {
         await new Promise((resolve) => setTimeout(resolve, 500))
         const pr = await fetch(`${GENERATE_PROGRESS_ENDPOINT}?jobId=${encodeURIComponent(body.jobId)}`)
         if (!pr.ok) throw new Error(`progress returned ${pr.status}`)
-        const job = (await pr.json()) as { status?: string; percent?: number; phase?: string; path?: string; error?: string }
+        const job = (await pr.json()) as { status?: string; percent?: number; phase?: string; path?: string; pdfPath?: string; compileError?: string; error?: string }
         if (job.status === 'done') {
-          setProgress({ percent: 100, phase: job.phase ?? 'write', status: 'done', path: job.path })
+          setProgress({
+            percent: 100,
+            phase: parsePhase(job.phase),
+            status: 'done',
+            path: job.path,
+            ...(job.pdfPath === undefined ? {} : { pdfPath: job.pdfPath }),
+            ...(job.compileError === undefined ? {} : { compileError: job.compileError }),
+          })
           return
         }
         if (job.status === 'error') {
-          setProgress({ percent: job.percent ?? 0, phase: job.phase ?? 'prepare', status: 'error', error: job.error ?? 'unknown error' })
+          setProgress({ percent: job.percent ?? 0, phase: parsePhase(job.phase), status: 'error', error: job.error ?? 'unknown error' })
           return
         }
         if (job.percent !== undefined && job.phase !== undefined) {
-          setProgress({ percent: job.percent, phase: job.phase, status: 'running' })
+          setProgress({ percent: job.percent, phase: parsePhase(job.phase), status: 'running' })
         }
       }
     } catch (error) {
-      setProgress({ percent: 0, phase: 'prepare', status: 'error', error: error instanceof Error ? error.message : String(error) })
+      setProgress({ percent: 0, phase: GenerationPhase.Prepare, status: 'error', error: error instanceof Error ? error.message : String(error) })
     }
   })()
 }
