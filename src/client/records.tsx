@@ -1151,9 +1151,9 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           onClick={() => void exportRecordFile(record)}
           onMouseEnter={() => setExportHover(true)}
           onMouseLeave={() => setExportHover(false)}
-          style={{ ...iconButtonStyle(exportHover), width: 'auto', borderRadius: 8 }}
+          style={{ ...iconButtonStyle(exportHover), width: 'auto', height: 40, borderRadius: 8 }}
         >
-          <IconDownload size={18} />
+          <IconDownload size={20} />
         </button>
         <button
           type="button"
@@ -1163,9 +1163,9 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           onClick={() => setGenSetup(ArticleFormat.Markdown)}
           onMouseEnter={() => setGenMdHover(true)}
           onMouseLeave={() => setGenMdHover(false)}
-          style={{ ...iconButtonStyle(genMdHover), width: 'auto', borderRadius: 8, opacity: genRunning ? 0.45 : 1 }}
+          style={{ ...iconButtonStyle(genMdHover), width: 'auto', height: 40, borderRadius: 8, opacity: genRunning ? 0.45 : 1 }}
         >
-          <IconMarkdown size={18} />
+          <IconMarkdown size={20} />
         </button>
         <button
           type="button"
@@ -1175,9 +1175,9 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           onClick={() => setGenSetup(ArticleFormat.Latex)}
           onMouseEnter={() => setGenLatexHover(true)}
           onMouseLeave={() => setGenLatexHover(false)}
-          style={{ ...iconButtonStyle(genLatexHover), width: 'auto', borderRadius: 8, opacity: genRunning ? 0.45 : 1 }}
+          style={{ ...iconButtonStyle(genLatexHover), width: 'auto', height: 40, borderRadius: 8, opacity: genRunning ? 0.45 : 1 }}
         >
-          <IconLatex size={18} />
+          <IconLatex size={20} />
         </button>
       </div>
       {/* Markdown setup dialog: language / directory / file name only. */}
@@ -1230,7 +1230,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
             onClick={() => void goUpLevel()}
             style={iconButtonStyle(false)}
           >
-            <IconArrowUp size={13} />
+            <IconArrowUp size={18} />
           </button>
           <div style={{ font: '12px ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)', wordBreak: 'break-all', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {dirSelected}
@@ -1330,7 +1330,7 @@ export function GenerationOverlay(): React.JSX.Element | null {
                   onMouseLeave={() => setMinimizeHover(false)}
                   style={iconButtonStyle(minimizeHover)}
                 >
-                  <IconMinus size={13} />
+                  <IconMinus size={18} />
                 </button>
               )}
             </div>

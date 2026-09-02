@@ -190,7 +190,10 @@ const ENTRY_FAMILY = ['[data-dsh-taskboard-entry]', '[data-dsh-ssh-entry]', '[da
 const ENTRY_ICON =
   '<svg viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">' +
   '<path d="M64 96c0-17.7 14.3-32 32-32l160 0c17.7 0 32 14.3 32 32l0 288 96 0 0-128c0-17.7 14.3-32 32-32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-32 0 0 128c0 17.7-14.3 32-32 32l-160 0c-17.7 0-32-14.3-32-32l0-288-96 0 0 128c0 17.7-14.3 32-32 32l-64 0c-17.7 0-32-14.3-32-32s14.3-32 32-32l32 0 0-128z"/></svg>'
-/** Entry styles: the exact rules the SSH/task-board/skills entries use, self-contained. */
+/** Entry styles: the exact rules the SSH/task-board/skills entries use, self-contained.
+ *  The collapsed variant keys off ANY ancestor whose class contains "collapsed"
+ *  (the shell's rail carries e.g. "hHd-Xa_collapsed"); there is no stable
+ *  [data-dsh-frame] attribute to hang a selector on. */
 const ENTRY_CSS = `
 .dsh-elab-entry{box-sizing:border-box;width:100%;min-height:36px;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:8px;align-items:center;gap:10px;padding:0 10px;font-size:13px;display:flex}
 .dsh-elab-entry:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
@@ -198,8 +201,8 @@ const ENTRY_CSS = `
 .dsh-elab-entryIcon{flex:none;justify-content:center;align-items:center;width:24px;height:24px;display:inline-flex}
 .dsh-elab-entryIcon svg{width:18px;height:18px;display:block}
 .dsh-elab-entryLabel{text-overflow:ellipsis;overflow:hidden}
-[data-dsh-frame][data-sidebar-collapsed] .dsh-elab-entry{border-radius:50%;justify-content:center;width:36px;min-height:36px;margin:0 auto 12px;padding:0}
-[data-dsh-frame][data-sidebar-collapsed] .dsh-elab-entryLabel{display:none}
+[class*="collapsed"] .dsh-elab-entry{border-radius:50%;justify-content:center;width:36px;min-height:36px;margin:0 auto 12px;padding:0}
+[class*="collapsed"] .dsh-elab-entryLabel{display:none}
 `
 
 /**
