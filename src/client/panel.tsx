@@ -186,11 +186,10 @@ const SIDEBAR_COLUMN_SELECTOR = '[data-pane="sidebar"], [class*="sidebarCol"]'
 const ENTRY_ATTR = 'data-dsh-electrolab-entry'
 /** The rail family this entry joins, in shell order — placed after the last one. */
 const ENTRY_FAMILY = ['[data-dsh-taskboard-entry]', '[data-dsh-ssh-entry]', '[data-dsh-skill-explorer-entry]']
-/** Oscilloscope trace glyph: a sine wave on a baseline — the ElectroLab identity, rendered like the shell's 16px line icons. */
+/** Wave-square glyph (Font Awesome, CC BY 4.0) — the ElectroLab identity, rendered like the shell's line icons. */
 const ENTRY_ICON =
-  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
-  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M2 8h2c.5-3.5 1.5-3.5 2 0s1.5 3.5 2 0 1.5-3.5 2 0 1.5 3.5 2 0h2"/></svg>'
+  '<svg viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">' +
+  '<path d="M64 96c0-17.7 14.3-32 32-32l160 0c17.7 0 32 14.3 32 32l0 288 96 0 0-128c0-17.7 14.3-32 32-32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-32 0 0 128c0 17.7-14.3 32-32 32l-160 0c-17.7 0-32-14.3-32-32l0-288-96 0 0 128c0 17.7-14.3 32-32 32l-64 0c-17.7 0-32-14.3-32-32s14.3-32 32-32l32 0 0-128z"/></svg>'
 /** Entry styles: the exact rules the SSH/task-board/skills entries use, self-contained. */
 const ENTRY_CSS = `
 .dsh-elab-entry{box-sizing:border-box;width:100%;min-height:36px;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:8px;align-items:center;gap:10px;padding:0 10px;font-size:13px;display:flex}
