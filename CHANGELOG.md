@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-03
+
+### Added
+
+- LaTeX article generation: the record detail action rail now has one Generate button per format (Markdown / LaTeX), each opening its own dedicated setup dialog — the format never switches inside a dialog, so layouts stay stable. LaTeX articles are proper technical documents: XeLaTeX shells (ctexart for zh-CN, article for en; both with unicode-math scalable math fonts — no cmex substitution warnings), the model writes only the body, and the host sanitizes it (forbidden preamble commands, brace/dollar balance, bare-% escaping) before wrapping.
+- Compile-to-PDF checkbox (LaTeX dialog): the host finds xelatex (PATH first, then known MiKTeX install locations), runs two passes with `-interaction=nonstopmode -halt-on-error -synctex=1` (plus `--enable-installer` on Windows so MiKTeX never shows an interactive prompt that would hang the job) and reports both the .tex and the PDF paths on completion; Open file opens the PDF. No TeX on the machine degrades gracefully to .tex only.
+- Per-project output folders for LaTeX: `<output>/<name>/` holds `<name>.tex`, the PDF and the compiler's `.aux`/`.log` files, keeping the chosen directory clean; Markdown output stays a flat single file.
+- Markdown→PDF compilation through pandoc + xelatex when pandoc is installed (the compile checkbox works for both formats); a missing converter reports exactly what to install.
+- The `compile` phase in the generation progress dialog ("Compiling PDF…" / 「编译 PDF 中…」), shared `GenerationPhase` wire codes between host and client, and a fixed-width label column + left-aligned labels in the setup dialogs.
+- All UI icons now come from Font Awesome free (SVG core, per-icon deep imports so the bundle stays small), including the official Markdown and TeX brand logos; the sidebar entry glyph is the FA wave-square path.
+
+### Changed
+
+- The single Generate action was replaced by two per-format buttons with their own dialogs; the detail action rail matches the global sidebar width (55px) with full-width buttons.
+
 ## [0.8.1] - 2026-09-02
 
 ### Added
@@ -159,6 +174,7 @@ oiseFigureDb`, `gainDb`, `magnitudeDb`, `returnLossDb`…) — dB is a log scale
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.9.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.9.0
 [0.8.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.8.1
 [0.8.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.8.0
 [0.7.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.7.0

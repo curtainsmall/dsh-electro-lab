@@ -4,26 +4,24 @@ An electrical & electronics calculation plugin for the DeepSeek Harness.
 
 [English](README.md) | [简体中文](docs/README.zh-CN.md)
 
-## Features
-
-- **ElectroLab Mode** — the **ElectroLab Mode** agent preset isolates the session to the plugin's calculation tools: no shell, no file system, no network.
-- **Calculations you can trust** — every number comes from a tool call result, never from memory or hand arithmetic.
-- **Records for inspection** — every solve is settled to disk and browsable in the client panel.
-- **Solution articles** — one click turns any settled record into a full technical article through the host LLM.
-
-All tools are listed in [tools.md](docs/tools.md).
-
 ## Install
 
 ```sh
 dsh plugin --profile web add dsh-electro-lab
 ```
 
-Published on npm — stable releases on the `latest` dist-tag, prereleases on `beta`.
+## ElectroLab Mode
 
-## Usage
+The plugin works as an agent preset: pick **ElectroLab Mode** when starting a session and ask any electrical or electronics calculation question in plain language. The session is isolated to the plugin's calculation tools — no shell, no file system, no network — so every number in the answer comes from a tool call result, and the agent stops and asks when the conditions are insufficient.
 
-The plugin registers its tools, skills and the **ElectroLab Mode** agent preset on mount. Pick the preset when starting a session: all numeric values must come from tool calls, and the preset stops when conditions are insufficient.
+The toolset covers circuit, signal and electronics math with complex numbers, exact unit handling, and solutions that always carry their verification. Tools are invoked by the agent, not typed by you — you describe the problem, it picks the tool, feeds it the conditions, and reports the result. See [tools.md](docs/tools.md).
+
+Every solve is settled to disk and browsable in the client panel: inspect the full record, export it, or delete it. One click turns any settled record into a full technical article through the host LLM and saves it to disk. The article can be generated in two formats:
+
+| Format | Description |
+|---|---|
+| Markdown | plain article text, readable and editable anywhere |
+| LaTeX | XeLaTeX typesetting source, with optional PDF compilation |
 
 ## Development
 
