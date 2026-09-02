@@ -1177,7 +1177,7 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
           onMouseLeave={() => setGenLatexHover(false)}
           style={{ ...iconButtonStyle(genLatexHover), width: 'auto', height: 40, borderRadius: 8, opacity: genRunning ? 0.45 : 1 }}
         >
-          <IconLatex size={20} />
+          <IconLatex size={26} />
         </button>
       </div>
       {/* Markdown setup dialog: language / directory / file name only. */}
