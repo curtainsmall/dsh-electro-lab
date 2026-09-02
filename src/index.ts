@@ -2,7 +2,7 @@
  * Host half of dsh-electro-lab.
  */
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -216,38 +216,85 @@ function readDirectoryTreeCss(): string {
 }
 
 /** Reveal a generated file (select it) or directory in the OS file manager. */
-function revealPath(target: string): string {
-  return launchExplorer(target, 'reveal')
+function revealPath(target: string): Promise<string> {
+  return launchInOs(target, 'reveal')
 }
 
 /** Open a generated file with its default application. */
-function openFilePath(target: string): string {
-  return launchExplorer(target, 'open')
+function openFilePath(target: string): Promise<string> {
+  return launchInOs(target, 'open')
 }
 
-/**
- * ShellExecute through explorer.exe. mode 'open' opens the file with its
- * default application; 'reveal' opens the containing folder with the file
- * selected (or the directory itself when target is a directory). explorer.exe
- * exits with code 1 when an Explorer instance already runs (it hands the
- * request over) — that is success, not failure. detached + unref: never wait
- * on it; spawn failures are logged, not fatal. windowsHide:true
- * (CREATE_NO_WINDOW) and stdio:'ignore' each silently suppress the Explorer
- * window on Windows (verified empirically) — only detached:true is safe.
- */
-function launchExplorer(target: string, mode: 'open' | 'reveal'): string {
-  if (process.platform !== 'win32') return 'not supported on this platform'
-  const args = mode === 'open'
-    ? [target]
-    : [existsSync(target) && statSync(target).isDirectory() ? target : `/select,${target}`]
-  try {
-    const child = spawn('explorer.exe', args, { detached: true })
-    child.on('error', () => {})
-    child.unref()
-    return 'ok'
-  } catch (error) {
-    return `failed: ${error instanceof Error ? error.message : String(error)}`
+/** One platform's "open in the OS" recipe: candidate commands plus the argv builder. */
+interface OpenRecipe {
+  /** Candidate commands tried in order (the first that spawns wins). */
+  commands: string[]
+  /** Build the argv for open/reveal from the target and whether it is a directory. */
+  args: (target: string, mode: 'open' | 'reveal', isDir: boolean) => string[]
+}
+
+function openRecipe(): OpenRecipe {
+  switch (process.platform) {
+    case 'darwin':
+      // open <file> uses the default app; open -R <file> reveals it in Finder.
+      return {
+        commands: ['/usr/bin/open'],
+        args: (target, mode, isDir) => mode === 'open' || isDir ? [target] : ['-R', target],
+      }
+    case 'win32':
+      // explorer.exe opens with the shell; /select,<file> reveals the file.
+      // explorer exits with code 1 when an Explorer instance already runs (it
+      // hands the request over) — that is success, not failure. windowsHide:
+      // true (CREATE_NO_WINDOW) and stdio:'ignore' each silently suppress the
+      // Explorer window (verified empirically) — detached only, never wait.
+      return {
+        commands: ['explorer.exe'],
+        args: (target, mode, isDir) => mode === 'open' ? [target] : [isDir ? target : `/select,${target}`],
+      }
+    default:
+      // xdg-open has no reveal/select — revealing a file opens its folder.
+      return {
+        commands: ['xdg-open', '/usr/bin/xdg-open'],
+        args: (target, mode, isDir) => [mode === 'open' || isDir ? target : dirname(target)],
+      }
   }
+}
+
+/** Spawn one launcher detached and report spawn success/failure (ENOENT included). */
+function spawnDetached(command: string, args: string[]): Promise<{ ok: boolean; code?: string; message: string }> {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(command, args, { detached: true })
+      const timer = setTimeout(() => resolve({ ok: true, message: 'ok' }), 10_000)
+      child.once('spawn', () => {
+        clearTimeout(timer)
+        resolve({ ok: true, message: 'ok' })
+      })
+      child.once('error', (error) => {
+        clearTimeout(timer)
+        resolve({ ok: false, code: (error as NodeJS.ErrnoException).code, message: error.message })
+      })
+      child.unref()
+    } catch (error) {
+      resolve({ ok: false, code: 'THROW', message: error instanceof Error ? error.message : String(error) })
+    }
+  })
+}
+
+/** Open/reveal a path through the OS file manager or the default application. */
+async function launchInOs(target: string, mode: 'open' | 'reveal'): Promise<string> {
+  if (!existsSync(target)) return `failed: no such file or directory: ${target}`
+  const isDir = statSync(target).isDirectory()
+  const recipe = openRecipe()
+  const args = recipe.args(target, mode, isDir)
+  for (const command of recipe.commands) {
+    const outcome = await spawnDetached(command, args)
+    if (outcome.ok) return 'ok'
+    // A missing command (e.g. xdg-open not on PATH) falls through to the next
+    // candidate; any other spawn failure is reported as-is.
+    if (outcome.code !== 'ENOENT') return `failed: ${outcome.message}`
+  }
+  return 'failed: no suitable opener found'
 }
 
 /** Generate the solution article for one record through the host LLM. */
@@ -514,11 +561,14 @@ export function apply(ctx: Context): void {
       },
     }))
 
-    // Reveal a generated file or directory in the OS file manager.
+    // Reveal a generated file or directory in the OS file manager (or open it
+    // with the default application): POST ?path=&action=open|reveal. The
+    // launcher is per-platform (explorer / open / xdg-open), so it works on
+    // every OS the host runs on.
     disposers.push(ctx.webServer.register({
       kind: 'exact',
       path: REVEAL_PATH,
-      handler: (req, res) => {
+      handler: async (req, res) => {
         const request = req as RequestLike
         if ((request.method ?? 'GET') !== 'POST') {
           res.statusCode = 405
@@ -535,7 +585,7 @@ export function apply(ctx: Context): void {
         }
         const action = url.searchParams.get('action') === 'open' ? 'open' : 'reveal'
         res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ result: action === 'open' ? openFilePath(target) : revealPath(target) }))
+        res.end(JSON.stringify({ result: await (action === 'open' ? openFilePath(target) : revealPath(target)) }))
       },
     }))
 
