@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { buildArticlePrompt } from '../src/generate.ts'
+import {
+  ArticleFormat,
+  ArticleLanguage,
+  TemplateLanguage,
+  buildArticlePrompt,
+  buildLatexDocument,
+  latexDocumentShell,
+  normalizeFileName,
+  resolveTemplateLanguage,
+  sanitizeLatexBody,
+} from '../src/generate.ts'
 import type { Record } from '../src/records.ts'
 
 const sample: Record = {
@@ -54,22 +64,129 @@ describe('buildArticlePrompt', () => {
     expect(user).not.toMatch(/^Final answer:/m)
   })
 
-  it('defaults to the language of the question when no language is chosen', () => {
-    const { system } = buildArticlePrompt(sample, 'auto')
+  it('defaults to the language of the question when auto is chosen', () => {
+    const { system } = buildArticlePrompt(sample, ArticleLanguage.Auto)
     expect(system).toMatch(/language of the question/)
   })
 
-  it('forces Simplified Chinese when zh-CN is chosen', () => {
-    const { system, user } = buildArticlePrompt(sample, 'zh-CN')
+  it('forces Simplified Chinese when ZhCN is chosen', () => {
+    const { system, user } = buildArticlePrompt(sample, ArticleLanguage.ZhCN)
     expect(system).toMatch(/Simplified Chinese/)
     expect(user).toMatch(/Simplified Chinese/)
     expect(system).not.toMatch(/language of the question/)
   })
 
-  it('forces English when en is chosen, in both the system and user prompt', () => {
-    const { system, user } = buildArticlePrompt(sample, 'en')
+  it('forces English when En is chosen, in both the system and user prompt', () => {
+    const { system, user } = buildArticlePrompt(sample, ArticleLanguage.En)
     expect(system).toMatch(/must be written in English/)
     expect(user).toMatch(/must be written in English/)
     expect(system).not.toMatch(/language of the question/)
+  })
+})
+
+describe('latex prompts', () => {
+  it('asks for a body only: section headings, no preamble or environment commands', () => {
+    const { system, user } = buildArticlePrompt(sample, ArticleLanguage.ZhCN, ArticleFormat.Latex)
+    expect(system).toMatch(/\\section headings/)
+    expect(system).toMatch(/Output ONLY the body/)
+    expect(system).toMatch(/ALREADY in place/)
+    expect(system).not.toMatch(/Markdown article/)
+    expect(system).toMatch(/Simplified Chinese/)
+    expect(user).toContain(sample.question)
+  })
+
+  it('keeps the language instruction for an english latex body', () => {
+    const { system } = buildArticlePrompt(sample, ArticleLanguage.En, ArticleFormat.Latex)
+    expect(system).toMatch(/must be written in English/)
+    expect(system).toMatch(/siunitx/)
+  })
+})
+
+describe('resolveTemplateLanguage', () => {
+  it('auto + a Chinese question resolves to zh-CN', () => {
+    expect(resolveTemplateLanguage(ArticleLanguage.Auto, '给定 R = 100 Ω，求电流')).toBe(TemplateLanguage.ZhCN)
+  })
+
+  it('auto + a non-CJK question resolves to en', () => {
+    expect(resolveTemplateLanguage(ArticleLanguage.Auto, 'Given R = 100 ohm, find the current.')).toBe(TemplateLanguage.En)
+  })
+
+  it('an explicit choice wins over the question text', () => {
+    expect(resolveTemplateLanguage(ArticleLanguage.En, '给定 R = 100 Ω，求电流')).toBe(TemplateLanguage.En)
+    expect(resolveTemplateLanguage(ArticleLanguage.ZhCN, 'Find the current.')).toBe(TemplateLanguage.ZhCN)
+  })
+})
+
+describe('normalizeFileName', () => {
+  it('appends the format extension and swaps a stale one', () => {
+    expect(normalizeFileName('report', ArticleFormat.Latex)).toBe('report.tex')
+    expect(normalizeFileName('report.md', ArticleFormat.Latex)).toBe('report.tex')
+    expect(normalizeFileName('report.tex', ArticleFormat.Markdown)).toBe('report.md')
+    expect(normalizeFileName('report.TEX', ArticleFormat.Markdown)).toBe('report.md')
+  })
+
+  it('keeps the default base name when empty', () => {
+    expect(normalizeFileName('', ArticleFormat.Latex)).toBe('electro-lab-article.tex')
+    expect(normalizeFileName('  ', ArticleFormat.Markdown)).toBe('electro-lab-article.md')
+  })
+})
+
+describe('sanitizeLatexBody', () => {
+  it('rejects preamble and restructuring commands', () => {
+    expect(sanitizeLatexBody('\\documentclass{article}')).toMatchObject({ ok: false })
+    expect(sanitizeLatexBody('\\usepackage{amsmath}')).toMatchObject({ ok: false })
+    expect(sanitizeLatexBody('x \\input{secret} y')).toMatchObject({ ok: false })
+    expect(sanitizeLatexBody('\\begin{document}')).toMatchObject({ ok: false })
+    expect(sanitizeLatexBody('\\end{document}')).toMatchObject({ ok: false })
+    expect(sanitizeLatexBody('\\write18{rm -rf /}')).toMatchObject({ ok: false })
+  })
+
+  it('allows math environments like align', () => {
+    const result = sanitizeLatexBody('\\begin{align}\na &= b\n\\end{align}')
+    expect(result.ok).toBe(true)
+  })
+
+  it('escapes bare percent signs but keeps existing ones', () => {
+    const result = sanitizeLatexBody('Efficiency is 50 % of the ideal \\%\\ 100 %.')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.body).toBe('Efficiency is 50 \\% of the ideal \\%\\ 100 \\%.')
+    }
+  })
+
+  it('flags unbalanced braces and odd dollar counts', () => {
+    expect(sanitizeLatexBody('a { b } c {')).toMatchObject({ ok: false })
+    expect(sanitizeLatexBody('price $5 only')).toMatchObject({ ok: false })
+    expect(sanitizeLatexBody('price $5 and $6')).toMatchObject({ ok: true })
+    expect(sanitizeLatexBody('\\$5 and \\$6')).toMatchObject({ ok: true })
+  })
+})
+
+describe('latex document shell', () => {
+  it('builds a full xelatex document around the sanitized body', () => {
+    const document = buildLatexDocument('\\section{Question}\nGiven $R$, find $v$.', TemplateLanguage.En)
+    expect(document.ok).toBe(true)
+    if (document.ok) {
+      expect(document.text).toContain('% !TeX program = xelatex')
+      expect(document.text).toContain('\\documentclass{article}')
+      expect(document.text).toContain('\\title{DeepSeek Harness ElectroLab Solution}')
+      expect(document.text).toContain('\\author{DeepSeek Harness ElectroLab}')
+      expect(document.text).toContain('\\section{Question}')
+      expect(document.text).toContain('\\end{document}')
+    }
+  })
+
+  it('uses ctexart for zh-CN and article for en, both with scalable math', () => {
+    expect(latexDocumentShell(TemplateLanguage.ZhCN)).toContain('\\documentclass{ctexart}')
+    expect(latexDocumentShell(TemplateLanguage.ZhCN)).toContain('\\usepackage{siunitx}')
+    expect(latexDocumentShell(TemplateLanguage.ZhCN)).toContain('\\usepackage{unicode-math}')
+    expect(latexDocumentShell(TemplateLanguage.En)).toContain('\\documentclass{article}')
+    expect(latexDocumentShell(TemplateLanguage.En)).toContain('\\usepackage{fontspec}')
+    expect(latexDocumentShell(TemplateLanguage.En)).toContain('\\usepackage{unicode-math}')
+  })
+
+  it('fails when the body is rejected by the sanitizer', () => {
+    const document = buildLatexDocument('\\documentclass{book}\nHijacked', TemplateLanguage.En)
+    expect(document.ok).toBe(false)
   })
 })

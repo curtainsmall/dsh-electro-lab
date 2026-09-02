@@ -2,7 +2,7 @@
 
 感谢你对 **DeepSeek Harness ElectroLab** 的关注与贡献。
 
-[English](../.github/CONTRIBUTING.md) | [简体中文](CONTRIBUTING.zh-CN.md)
+[English]（../.github/CONTRIBUTING.md） | [简体中文]（CONTRIBUTING.zh-CN.md）
 
 ## 开发流程
 
@@ -60,4 +60,4 @@ main      ← 仅发布（PR 合并、打 tag、GitHub Actions）
 
 ## 许可
 
-通过参与贡献，你同意你的贡献以 [MIT 许可](../LICENSE) 授权。
+通过参与贡献，你同意你的贡献以 [MIT 许可]（../LICENSE） 授权。

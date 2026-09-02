@@ -11,7 +11,7 @@ import { registerTools } from './tools/index.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
 import { RecordManager, readRecordArchive, deleteRecordFromArchive, type Record, type RecordEvent } from './records.ts'
-import { buildArticlePrompt, ARTICLE_LANGUAGES } from './generate.ts'
+import { ArticleFormat, ArticleLanguage, GenerationPhase, TemplateLanguage, buildArticlePrompt, buildLatexDocument, normalizeFileName, resolveTemplateLanguage, templateLanguageToArticleLanguage } from './generate.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -130,10 +130,12 @@ function getOrCreateManager(sessionId: string): RecordManager {
   return manager
 }
 
-/** Non-config serialized state: the remembered generation output directory and article language. */
+/** Non-config serialized state: the remembered generation output directory, article language, format and PDF-compile toggle. */
 interface GenerateState {
   generateDir?: string
   generateLanguage?: string
+  generateFormat?: string
+  generateCompile?: boolean
 }
 
 /** Raw state.json contents (never throws — missing or corrupt file reads as {}). */
@@ -146,12 +148,36 @@ function readStoredState(): Partial<GenerateState> {
   }
 }
 
+/** Membership guards for the query-string values (string enums travel as raw strings over HTTP). */
+function isArticleFormat(value: unknown): value is ArticleFormat {
+  switch (value) {
+    case ArticleFormat.Markdown:
+    case ArticleFormat.Latex:
+      return true
+    default:
+      return false
+  }
+}
+
+function isArticleLanguage(value: unknown): value is ArticleLanguage {
+  switch (value) {
+    case ArticleLanguage.Auto:
+    case ArticleLanguage.ZhCN:
+    case ArticleLanguage.En:
+      return true
+    default:
+      return false
+  }
+}
+
 /** The remembered generation state, with a one-time migration from the legacy plain-text file. */
 function readGenerateState(): GenerateState {
   const stored = readStoredState()
   const state: GenerateState = {
     generateDir: typeof stored.generateDir === 'string' && stored.generateDir.trim().length > 0 ? stored.generateDir.trim() : undefined,
     generateLanguage: typeof stored.generateLanguage === 'string' && stored.generateLanguage.length > 0 ? stored.generateLanguage : undefined,
+    generateFormat: isArticleFormat(stored.generateFormat) ? stored.generateFormat : undefined,
+    generateCompile: typeof stored.generateCompile === 'boolean' ? stored.generateCompile : undefined,
   }
   if (state.generateDir === undefined) {
     try {
@@ -170,6 +196,8 @@ function writeGenerateState(state: GenerateState): void {
   const merged: Partial<GenerateState> = { ...readStoredState(), ...state }
   if (merged.generateDir === undefined || merged.generateDir.trim().length === 0) delete merged.generateDir
   if (merged.generateLanguage === undefined || merged.generateLanguage.length === 0) delete merged.generateLanguage
+  if (merged.generateFormat === undefined || !isArticleFormat(merged.generateFormat)) delete merged.generateFormat
+  if (merged.generateCompile === undefined || typeof merged.generateCompile !== 'boolean') delete merged.generateCompile
   writeFileSync(join(recordsHome, STATE_FILE), JSON.stringify(merged), 'utf8')
   try {
     rmSync(join(recordsHome, LEGACY_GENERATE_DIR_FILE), { force: true })
@@ -297,8 +325,12 @@ async function launchInOs(target: string, mode: 'open' | 'reveal'): Promise<stri
   return 'failed: no suitable opener found'
 }
 
-/** Generate the solution article for one record through the host LLM. */
-async function generateArticle(ctx: Context, record: Record, signal: AbortSignal, language: string, onProgress?: (percent: number) => void): Promise<string> {
+/**
+ * Generate the solution article for one record through the host LLM. For
+ * Markdown the model's text IS the article; for LaTeX the model writes only
+ * the body, which is sanitized and wrapped in the document shell here.
+ */
+async function generateArticle(ctx: Context, record: Record, signal: AbortSignal, language: ArticleLanguage, format: ArticleFormat, onProgress?: (percent: number) => void): Promise<string> {
   const llm = ctx.get('llm')
   if (llm === undefined) throw new Error('the LLM service is unavailable in this deployment')
   const defaults = ctx.get('agentDefaultModel')
@@ -306,7 +338,21 @@ async function generateArticle(ctx: Context, record: Record, signal: AbortSignal
   if (route === undefined || route.provider === undefined || route.model === undefined) {
     throw new Error('no default model is configured — pick one in Settings first')
   }
-  const { system, user } = buildArticlePrompt(record, language as never)
+  // LaTeX needs the document class fixed BEFORE generation: resolve the
+  // template language (auto → probe the question text) and pin the prompt to
+  // it. Markdown keeps the raw selection (auto follows the question).
+  let templateLanguage: TemplateLanguage | undefined
+  switch (format) {
+    case ArticleFormat.Latex:
+      templateLanguage = resolveTemplateLanguage(language, record.question)
+      break
+    case ArticleFormat.Markdown:
+      break
+  }
+  const promptLanguage: ArticleLanguage = templateLanguage === undefined
+    ? language
+    : templateLanguageToArticleLanguage(templateLanguage)
+  const { system, user } = buildArticlePrompt(record, promptLanguage, format)
   const startedAt = Date.now()
   let text = ''
   for await (const raw of llm.stream({
@@ -332,38 +378,176 @@ async function generateArticle(ctx: Context, record: Record, signal: AbortSignal
   }
   const trimmed = text.trim()
   if (trimmed.length === 0) throw new Error('the model produced no article text')
-  return trimmed
+  if (templateLanguage === undefined) return trimmed
+  const document = buildLatexDocument(trimmed, templateLanguage)
+  if (!document.ok) throw new Error(`LaTeX validation failed: ${document.error}`)
+  return document.text
 }
 
 /** One in-memory generation job (never persisted — no generation log). */
 interface GenerateJob {
   status: 'running' | 'done' | 'error'
   percent: number
-  phase: 'prepare' | 'generate' | 'write'
+  phase: GenerationPhase
   path?: string
+  /** Present when the LaTeX source compiled successfully. */
+  pdfPath?: string
+  /** Present when compilation was requested but failed (the .tex is still written). */
+  compileError?: string
   error?: string
   abort: () => void
 }
 
 const generateJobs = new Map<string, GenerateJob>()
 
+/** Run one command and collect its output tail; kills on timeout. */
+function runCommand(command: string, args: string[], cwd: string, timeoutMs: number): Promise<{ ok: boolean; code: number | null; output: string }> {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(command, args, { cwd })
+      let output = ''
+      const timer = setTimeout(() => { child.kill() }, timeoutMs)
+      child.stdout?.on('data', (chunk: Buffer) => { output += String(chunk) })
+      child.stderr?.on('data', (chunk: Buffer) => { output += String(chunk) })
+      child.on('error', (error) => {
+        clearTimeout(timer)
+        resolve({ ok: false, code: null, output: error.message })
+      })
+      child.on('close', (code) => {
+        clearTimeout(timer)
+        resolve({ ok: code === 0, code, output: output.slice(-4000) })
+      })
+    } catch (error) {
+      resolve({ ok: false, code: null, output: error instanceof Error ? error.message : String(error) })
+    }
+  })
+}
+
+/** Candidate xelatex commands: PATH first, then known MiKTeX install locations on Windows. */
+function xelatexCandidates(): string[] {
+  const candidates = ['xelatex']
+  if (process.platform === 'win32') {
+    for (const root of listDriveRoots()) {
+      candidates.push(join(root, 'MiKTeX', 'miktex', 'bin', 'x64', 'xelatex.exe'))
+    }
+    const local = process.env.LOCALAPPDATA
+    if (local !== undefined) candidates.push(join(local, 'Programs', 'MiKTeX', 'miktex', 'bin', 'x64', 'xelatex.exe'))
+    candidates.push('C:\\Program Files\\MiKTeX\\miktex\\bin\\x64\\xelatex.exe')
+    candidates.push('C:\\Program Files (x86)\\MiKTeX\\miktex\\bin\\x64\\xelatex.exe')
+  }
+  return candidates
+}
+
+/** Candidate pandoc commands: PATH first, then the usual Windows install location. */
+function pandocCandidates(): string[] {
+  const candidates = ['pandoc']
+  if (process.platform === 'win32') {
+    candidates.push('C:\\Program Files\\Pandoc\\pandoc.exe')
+    const local = process.env.LOCALAPPDATA
+    if (local !== undefined) candidates.push(join(local, 'Pandoc', 'pandoc.exe'))
+  }
+  return candidates
+}
+
+/** The CJK fallback font pandoc passes to xelatex for Chinese Markdown articles (per-OS default). */
+function cjkMainFont(): string {
+  switch (process.platform) {
+    case 'darwin': return 'PingFang SC'
+    case 'win32': return 'Microsoft YaHei'
+    default: return 'Noto Sans CJK SC'
+  }
+}
+
+/**
+ * Compile a generated Markdown article to PDF through pandoc + xelatex (the
+ * engine the LaTeX path already probes). pandoc needs to be installed; when it
+ * is missing the error tells the user exactly that. The .md stays the primary
+ * artifact — a failure never fails the job.
+ */
+async function compileMarkdownToPdf(directory: string, fileName: string): Promise<{ ok: true; pdfPath: string } | { ok: false; error: string }> {
+  const pdfName = fileName.replace(/\.(md)$/i, '.pdf')
+  const pdfPath = join(directory, pdfName)
+  const args = [fileName, '-o', pdfName, '--pdf-engine=xelatex', '-V', `CJKmainfont=${cjkMainFont()}`]
+  if (process.platform === 'win32') args.push('--pdf-engine-opt=--enable-installer')
+  let firstFailure: string | undefined
+  for (const command of pandocCandidates()) {
+    const result = await runCommand(command, args, directory, 150_000)
+    if (!result.ok) {
+      if (result.code !== null || !result.output.includes('ENOENT')) {
+        firstFailure = `pandoc failed: ${result.output.trim()}`
+      }
+      continue
+    }
+    if (!existsSync(pdfPath)) return { ok: false, error: 'pandoc finished but produced no PDF' }
+    return { ok: true, pdfPath }
+  }
+  return { ok: false, error: firstFailure ?? 'pandoc was not found — install it (e.g. winget install JohnMacFarlane.Pandoc) to compile Markdown to PDF' }
+}
+
+/**
+ * Compile a generated LaTeX source to PDF with xelatex (two passes so any
+ * \label/\ref resolves). The .tex stays the primary artifact: a failure here
+ * never fails the job — it is reported as compileError on the done snapshot.
+ * --enable-installer (Windows/MiKTeX only) auto-installs missing packages
+ * instead of showing an interactive prompt that would hang the job.
+ */
+async function compileLatexToPdf(directory: string, fileName: string): Promise<{ ok: true; pdfPath: string } | { ok: false; error: string }> {
+  const pdfPath = join(directory, fileName.replace(/\.(tex)$/i, '.pdf'))
+  const args = ['-interaction=nonstopmode', '-halt-on-error', '-synctex=1']
+  if (process.platform === 'win32') args.push('--enable-installer')
+  // Pass the file NAME only, with cwd = the output directory: xelatex (MiKTeX)
+  // exits with code 1 when given an absolute Windows path as the file argument.
+  args.push(fileName)
+  let firstFailure: string | undefined
+  for (const command of xelatexCandidates()) {
+    const first = await runCommand(command, args, directory, 100_000)
+    if (!first.ok) {
+      // ENOENT: command missing — try the next candidate; anything else is a real compile failure.
+      if (first.code !== null || !first.output.includes('ENOENT')) {
+        firstFailure = `xelatex failed: ${first.output.trim()}`
+      }
+      continue
+    }
+    // Second pass resolves references; ignore its failure (the PDF already exists).
+    await runCommand(command, args, directory, 100_000)
+    if (!existsSync(pdfPath)) return { ok: false, error: 'xelatex finished but produced no PDF' }
+    return { ok: true, pdfPath }
+  }
+  return { ok: false, error: firstFailure ?? 'xelatex was not found on this machine' }
+}
+
 /** Start a background generation job and return its id; progress is polled via GET /generate-progress. */
-function startGenerateJob(ctx: Context, record: Record, directory: string, fileName: string, language: string): string {
+function startGenerateJob(ctx: Context, record: Record, directory: string, fileName: string, language: ArticleLanguage, format: ArticleFormat, compile: boolean): string {
   const jobId = randomUUID()
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 120_000)
-  const job: GenerateJob = { status: 'running', percent: 5, phase: 'prepare', abort: () => controller.abort() }
+  const timeout = setTimeout(() => controller.abort(), 300_000)
+  const job: GenerateJob = { status: 'running', percent: 5, phase: GenerationPhase.Prepare, abort: () => controller.abort() }
   generateJobs.set(jobId, job)
   void (async () => {
     try {
       job.percent = 10
-      job.phase = 'generate'
-      const article = await generateArticle(ctx, record, controller.signal, language, (percent) => { job.percent = percent })
-      job.phase = 'write'
-      job.percent = 95
-      mkdirSync(directory, { recursive: true })
-      const target = join(directory, fileName)
+      job.phase = GenerationPhase.Generate
+      const article = await generateArticle(ctx, record, controller.signal, language, format, (percent) => { job.percent = percent })
+      job.phase = GenerationPhase.Write
+      job.percent = 92
+      // LaTeX generations own a folder named after the file (the setup dialog's
+      // output name = folder name = .tex name): every artifact — source, PDF and
+      // the compiler's .aux/.log/.synctex.gz — stays inside it, keeping the
+      // chosen output directory clean. Markdown stays a flat single file.
+      const isLatex = format === ArticleFormat.Latex
+      const targetDir = isLatex ? join(directory, fileName.replace(/\.tex$/i, '')) : directory
+      mkdirSync(targetDir, { recursive: true })
+      const target = join(targetDir, fileName)
       writeFileSync(target, article, 'utf8')
+      if (compile) {
+        job.phase = GenerationPhase.Compile
+        job.percent = 96
+        const compiled = isLatex
+          ? await compileLatexToPdf(targetDir, fileName)
+          : await compileMarkdownToPdf(directory, fileName)
+        if (compiled.ok) job.pdfPath = compiled.pdfPath
+        else job.compileError = compiled.error
+      }
       job.status = 'done'
       job.percent = 100
       job.path = target
@@ -383,22 +567,23 @@ function startGenerateJob(ctx: Context, record: Record, directory: string, fileN
 function beginGenerate(ctx: Context, url: string): { jobId: string } {
   const params = new URL(url, 'http://dsh.local').searchParams
   const recordId = params.get('recordId') ?? ''
-  const format = params.get('format') ?? 'markdown'
-  if (format !== 'markdown') throw new Error(`unsupported format "${format}"`)
-  const language = params.get('language') ?? 'auto'
-  if (!(ARTICLE_LANGUAGES as readonly string[]).includes(language)) {
-    throw new Error(`unsupported language "${language}"`)
-  }
+  const formatParam = params.get('format') ?? ArticleFormat.Markdown
+  if (!isArticleFormat(formatParam)) throw new Error(`unsupported format "${formatParam}"`)
+  const languageParam = params.get('language') ?? ArticleLanguage.Auto
+  if (!isArticleLanguage(languageParam)) throw new Error(`unsupported language "${languageParam}"`)
   const directory = (params.get('directory') ?? '').trim()
   if (directory.length === 0) throw new Error('output directory is required')
   const record = readRecordArchive(join(recordsHome, 'records.jsonl')).find((item) => item.id === recordId)
   if (record === undefined) throw new Error(`record "${recordId}" not found`)
 
-  let fileName = (params.get('fileName') ?? '').trim()
-  if (fileName.length === 0) fileName = `electro-lab-${record.id.slice(0, 8)}.md`
-  if (!fileName.endsWith('.md')) fileName += '.md'
+  const rawName = (params.get('fileName') ?? '').trim()
+  const fileName = rawName.length === 0
+    ? normalizeFileName(`electro-lab-${record.id.slice(0, 8)}`, formatParam)
+    : normalizeFileName(rawName, formatParam)
 
-  return { jobId: startGenerateJob(ctx, record, directory, fileName, language) }
+  const compile = params.get('compile') === 'true'
+
+  return { jobId: startGenerateJob(ctx, record, directory, fileName, languageParam, formatParam, compile) }
 }
 
 export function apply(ctx: Context): void {
@@ -614,6 +799,8 @@ export function apply(ctx: Context): void {
           percent: job.percent,
           phase: job.phase,
           ...(job.path === undefined ? {} : { path: job.path }),
+          ...(job.pdfPath === undefined ? {} : { pdfPath: job.pdfPath }),
+          ...(job.compileError === undefined ? {} : { compileError: job.compileError }),
           ...(job.error === undefined ? {} : { error: job.error }),
         }))
       },
@@ -632,9 +819,13 @@ export function apply(ctx: Context): void {
           const url = new URL(request.url ?? '', 'http://dsh.local')
           const dir = url.searchParams.get('dir')
           const language = url.searchParams.get('language')
+          const format = url.searchParams.get('format')
+          const compileParam = url.searchParams.get('compile')
           const state: GenerateState = {}
           if (dir !== null) state.generateDir = dir
           if (language !== null) state.generateLanguage = language
+          if (format !== null) state.generateFormat = format
+          if (compileParam === 'true' || compileParam === 'false') state.generateCompile = compileParam === 'true'
           writeGenerateState(state)
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ saved: true }))
@@ -647,7 +838,12 @@ export function apply(ctx: Context): void {
         }
         const state = readGenerateState()
         res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ directory: state.generateDir ?? '', language: state.generateLanguage ?? 'auto' }))
+        res.end(JSON.stringify({
+          directory: state.generateDir ?? '',
+          language: state.generateLanguage ?? 'auto',
+          format: state.generateFormat ?? 'markdown',
+          compile: state.generateCompile ?? false,
+        }))
       },
     }))
 

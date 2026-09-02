@@ -1,68 +1,67 @@
 /**
- * Minimal inline SVG icon set, drawn in the shell's line-icon style:
- * 16×16 viewBox, 1.5px stroke, currentColor — no emoji, no system-font
- * glyphs, so rendering is identical across platforms and themes.
+ * UI icons — Font Awesome free tier (SVG/JS core, no font files shipped).
+ * Per-icon deep imports keep the bundle tiny: the set root exports are not
+ * side-effect-free, so importing from it would pull in every icon.
+ * Icons by Font Awesome — https://fontawesome.com (CC BY 4.0).
+ *
+ * Sizing note: react-fontawesome v3 ignores width/height props, so the size
+ * is forced through inline style (CSS beats the default 1em sizing).
  */
+import { FontAwesomeIcon, type CSSVariables } from '@fortawesome/react-fontawesome'
+import { faChevronLeft } from '@fortawesome/free-solid-svg-icons/faChevronLeft'
+import { faDownload } from '@fortawesome/free-solid-svg-icons/faDownload'
+import { faArrowUp } from '@fortawesome/free-solid-svg-icons/faArrowUp'
+import { faFolder } from '@fortawesome/free-solid-svg-icons/faFolder'
+import { faFile } from '@fortawesome/free-solid-svg-icons/faFile'
+import { faMinus } from '@fortawesome/free-solid-svg-icons/faMinus'
+import { faMarkdown } from '@fortawesome/free-brands-svg-icons/faMarkdown'
+import { faTex } from '@fortawesome/free-brands-svg-icons/faTex'
 
 interface IconProps {
   size?: number
 }
 
-function svgProps(size: number): Record<string, unknown> {
-  return {
-    viewBox: '0 0 16 16',
-    width: size,
-    height: size,
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.5,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
-    'aria-hidden': true,
-    style: { width: size, height: size, display: 'block', flex: 'none' },
-  }
+/** Shared inline sizing: react-fontawesome v3 does not honor width/height props. */
+function sized(size: number): React.CSSProperties & CSSVariables {
+  return { width: size, height: size, display: 'block', flex: 'none' }
 }
 
 /** ‹ back / collapse. */
 export function IconChevronLeft({ size = 16 }: IconProps): React.JSX.Element {
-  return <svg {...svgProps(size)}><path d="M10 3 5 8l5 5" /></svg>
+  return <FontAwesomeIcon icon={faChevronLeft} style={sized(size)} />
 }
 
 /** ↓ export / download. */
-export function IconDownload({ size = 14 }: IconProps): React.JSX.Element {
-  return <svg {...svgProps(size)}><path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13h10" /></svg>
-}
-
-/** ▶ generate / run. */
-export function IconPlay({ size = 14 }: IconProps): React.JSX.Element {
-  return <svg {...svgProps(size)}><path d="M5 3.5v9l7-4.5z" /></svg>
+export function IconDownload({ size = 16 }: IconProps): React.JSX.Element {
+  return <FontAwesomeIcon icon={faDownload} style={sized(size)} />
 }
 
 /** ↑ up one level. */
-export function IconArrowUp({ size = 13 }: IconProps): React.JSX.Element {
-  return <svg {...svgProps(size)}><path d="M8 13V3m0 0L4 7m4-4 4 4" /></svg>
+export function IconArrowUp({ size = 14 }: IconProps): React.JSX.Element {
+  return <FontAwesomeIcon icon={faArrowUp} style={sized(size)} />
 }
 
 /** 📁 folder. */
 export function IconFolder({ size = 14 }: IconProps): React.JSX.Element {
-  return (
-    <svg {...svgProps(size)}>
-      <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 2H12.5A1.5 1.5 0 0 1 14 6.5v5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5z" />
-    </svg>
-  )
+  return <FontAwesomeIcon icon={faFolder} style={sized(size)} />
 }
 
 /** 📄 file. */
 export function IconFile({ size = 14 }: IconProps): React.JSX.Element {
-  return (
-    <svg {...svgProps(size)}>
-      <path d="M4 2h5l3 3v9H4z" />
-      <path d="M9 2v3h3" />
-    </svg>
-  )
+  return <FontAwesomeIcon icon={faFile} style={sized(size)} />
 }
 
 /** — minimize / collapse. */
-export function IconMinus({ size = 13 }: IconProps): React.JSX.Element {
-  return <svg {...svgProps(size)}><path d="M3.5 8h9" /></svg>
+export function IconMinus({ size = 14 }: IconProps): React.JSX.Element {
+  return <FontAwesomeIcon icon={faMinus} style={sized(size)} />
+}
+
+/** Official Markdown brand logo (Font Awesome brands). */
+export function IconMarkdown({ size = 16 }: IconProps): React.JSX.Element {
+  return <FontAwesomeIcon icon={faMarkdown} style={sized(size)} />
+}
+
+/** Official TeX brand logo (Font Awesome brands, free tier). */
+export function IconLatex({ size = 16 }: IconProps): React.JSX.Element {
+  return <FontAwesomeIcon icon={faTex} style={sized(size)} />
 }

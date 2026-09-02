@@ -8,6 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@fortawesome/fontawesome-svg-core':
+        specifier: ^7.3.1
+        version: 7.3.1
+      '@fortawesome/free-brands-svg-icons':
+        specifier: ^7.3.1
+        version: 7.3.1
+      '@fortawesome/free-solid-svg-icons':
+        specifier: ^7.3.1
+        version: 7.3.1
+      '@fortawesome/react-fontawesome':
+        specifier: ^3.5.0
+        version: 3.5.0(@fortawesome/fontawesome-svg-core@7.3.1)(react@18.3.1)
       complex.js:
         specifier: ^2.4.3
         version: 2.4.3
@@ -170,6 +182,29 @@ packages:
 
   '@deepseek-ai/schemastery@3.18.1':
     resolution: {integrity: sha512-Qn0FCSwCQnpnj6SB31I6i2sIKgKWnkbJM8O0EU91Gv2UsYVvtZTl6IA0sCwk2e2MZf5S8w5hpq9QkeVvK9qwxg==}
+
+  '@fortawesome/fontawesome-common-types@7.3.1':
+    resolution: {integrity: sha512-k0C0sdHmZtAo6dRDtd1Z/qcpyHbL0CKsjV8seMY/21xGhY5Wsv0XRmiI/xEEH4y2c9b1+jvgNs/3EqhV27yUEA==}
+    engines: {node: '>=6'}
+
+  '@fortawesome/fontawesome-svg-core@7.3.1':
+    resolution: {integrity: sha512-BoxVN3PKnMbgStHhjoaky/oWdxHomDqmBVA24IA3KEmssFGeI7u9YT/BJceOjIum/t6TpPa/vcMKaVYQeIQ/3Q==}
+    engines: {node: '>=6'}
+
+  '@fortawesome/free-brands-svg-icons@7.3.1':
+    resolution: {integrity: sha512-8eiNzycuFhy3mZsi5EVO8JpO3H8l7/kSCl4Gk4iUew9hJuzYFqAAD6kqgeEup3+YZ9hL+5cjjorGzrRLkYuURg==}
+    engines: {node: '>=6'}
+
+  '@fortawesome/free-solid-svg-icons@7.3.1':
+    resolution: {integrity: sha512-v0BLa0eqg7ubvVWeNSHVBs8fWH/GJicERZoJaxJ3FE/lj67VSqzoMg9pzfZVOfLMX10y0pGwQAuxoRVVH2patg==}
+    engines: {node: '>=6'}
+
+  '@fortawesome/react-fontawesome@3.5.0':
+    resolution: {integrity: sha512-63mlRr6fiBbJ0wjr1Cf6dsDGtP2lNvk9lnatKgxs/fIkhslsZT291hIUzJkuUkI9yr69ZvWnWfgb2qXm4QyVaA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@fortawesome/fontawesome-svg-core': ~6 || ~7
+      react: ^18.0.0 || ^19.0.0
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
@@ -1002,6 +1037,25 @@ snapshots:
     dependencies:
       '@deepseek-ai/cosmokit': 1.8.2
       '@standard-schema/spec': 1.1.0
+
+  '@fortawesome/fontawesome-common-types@7.3.1': {}
+
+  '@fortawesome/fontawesome-svg-core@7.3.1':
+    dependencies:
+      '@fortawesome/fontawesome-common-types': 7.3.1
+
+  '@fortawesome/free-brands-svg-icons@7.3.1':
+    dependencies:
+      '@fortawesome/fontawesome-common-types': 7.3.1
+
+  '@fortawesome/free-solid-svg-icons@7.3.1':
+    dependencies:
+      '@fortawesome/fontawesome-common-types': 7.3.1
+
+  '@fortawesome/react-fontawesome@3.5.0(@fortawesome/fontawesome-svg-core@7.3.1)(react@18.3.1)':
+    dependencies:
+      '@fortawesome/fontawesome-svg-core': 7.3.1
+      react: 18.3.1
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
