@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-09-02
+
+### Added
+
+- Cross-platform Open file / Open directory: the launcher follows the host's OS — explorer.exe on Windows, `open` with `-R` reveal on macOS, xdg-open on Linux (reveal opens the containing folder, since xdg-open has no select). Previously non-Windows returned "not supported on this platform".
+- Spawn error detection: a missing opener binary (ENOENT, with a `/usr/bin` fallback for xdg-open) or a nonexistent target path is now reported to the client instead of silently succeeding.
+
 ## [0.8.0] - 2026-09-02
 
 ### Added
@@ -152,6 +159,7 @@ oiseFigureDb`, `gainDb`, `magnitudeDb`, `returnLossDb`…) — dB is a log scale
 
 - First public beta of ElectroLab: the complete feature set listed under [0.1.0] above, published to npm under the `beta` dist-tag.
 
+[0.8.1]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.8.1
 [0.8.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.8.0
 [0.7.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.7.0
 [0.6.0]: https://github.com/curtainsmall/dsh-electro-lab/releases/tag/v0.6.0
