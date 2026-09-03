@@ -21,7 +21,7 @@ export const filterTool = defineJsonTool({
       resistance: { type: 'number', kind: QuantityKind.Resistance },
       elements: {
         type: 'array',
-        item: {
+        items: {
           type: 'object',
           fields: {
             role: { type: 'string' },

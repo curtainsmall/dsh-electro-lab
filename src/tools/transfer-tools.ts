@@ -34,7 +34,7 @@ export const transferTools = [
       fields: {
         terms: {
           type: 'array',
-          item: {
+          items: {
             type: 'object',
             fields: {
               pole: { type: 'complex', kind: QuantityKind.None },
@@ -43,7 +43,7 @@ export const transferTools = [
             },
           },
         },
-        polynomial: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        polynomial: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -73,8 +73,8 @@ export const transferTools = [
       type: 'object',
       fields: {
         variable: { type: 'string' },
-        frequencies: { type: 'array', item: { type: 'number', kind: QuantityKind.None } },
-        responses: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        frequencies: { type: 'array', items: { type: 'number', kind: QuantityKind.None } },
+        responses: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -113,7 +113,7 @@ export const transferTools = [
     returns: {
       type: 'object',
       fields: {
-        values: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        values: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -141,7 +141,7 @@ export const transferTools = [
     returns: {
       type: 'object',
       fields: {
-        output: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        output: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -167,7 +167,7 @@ export const transferTools = [
         variable: { type: 'string' },
         points: {
           type: 'array',
-          item: {
+          items: {
             type: 'object',
             fields: {
               frequency: { type: 'number', kind: QuantityKind.Frequency },

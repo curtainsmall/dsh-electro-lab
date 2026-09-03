@@ -26,8 +26,8 @@ export type ToolReturns =
   | { type: 'complex'; kind: QuantityKind }
   /** A named-fields object; every field declared recursively. */
   | { type: 'object'; fields: Record<string, ToolReturns> }
-  /** A homogeneous array; items declared recursively. */
-  | { type: 'array'; item: ToolReturns }
+  /** A homogeneous array; elements declared recursively (JSON-Schema naming, same as parameter arrays). */
+  | { type: 'array'; items: ToolReturns }
 
 /** Declared return shapes keyed by tool name — the record layer reads these when settling a result. */
 export const TOOL_RETURNS = new Map<string, ToolReturns>()

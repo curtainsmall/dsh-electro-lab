@@ -48,8 +48,8 @@ export const expressionTools = [
         variable: { type: 'string' },
         numeratorDegree: { type: 'number', kind: QuantityKind.None },
         denominatorDegree: { type: 'number', kind: QuantityKind.None },
-        numerator: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
-        denominator: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        numerator: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
+        denominator: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {

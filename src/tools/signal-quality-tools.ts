@@ -18,7 +18,7 @@ export const signalQualityTools = [
         thd: { type: 'number', kind: QuantityKind.None },
         thdDb: { type: 'number', kind: QuantityKind.Log },
         fundamental: { type: 'number', kind: QuantityKind.None },
-        harmonicAmplitudes: { type: 'array', item: { type: 'number', kind: QuantityKind.None } },
+        harmonicAmplitudes: { type: 'array', items: { type: 'number', kind: QuantityKind.None } },
       },
     },
     parameters: {

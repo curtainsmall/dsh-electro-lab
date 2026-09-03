@@ -31,7 +31,7 @@ export const dftTools = [
       type: 'object',
       fields: {
         window: { type: 'string' },
-        spectrum: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        spectrum: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -58,7 +58,7 @@ export const dftTools = [
     returns: {
       type: 'object',
       fields: {
-        samples: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        samples: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -80,8 +80,8 @@ export const dftTools = [
         waveform: { type: 'string' },
         harmonics: { type: 'number', kind: QuantityKind.None },
         dc: { type: 'number', kind: QuantityKind.None },
-        cosine: { type: 'array', item: { type: 'number', kind: QuantityKind.None } },
-        sine: { type: 'array', item: { type: 'number', kind: QuantityKind.None } },
+        cosine: { type: 'array', items: { type: 'number', kind: QuantityKind.None } },
+        sine: { type: 'array', items: { type: 'number', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -117,7 +117,7 @@ export const dftTools = [
         peak: { type: 'number', kind: QuantityKind.None },
         peakToPeak: { type: 'number', kind: QuantityKind.None },
         dc: { type: 'number', kind: QuantityKind.None },
-        spectrum: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        spectrum: { type: 'array', items: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {

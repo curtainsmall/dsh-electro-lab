@@ -103,7 +103,7 @@ export const smithTools = [
               fields: {
                 elements: {
                   type: 'array',
-                  item: {
+                  items: {
                     type: 'object',
                     fields: {
                       role: { type: 'string' },
@@ -120,7 +120,7 @@ export const smithTools = [
               fields: {
                 elements: {
                   type: 'array',
-                  item: {
+                  items: {
                     type: 'object',
                     fields: {
                       role: { type: 'string' },

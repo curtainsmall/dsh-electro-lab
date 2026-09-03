@@ -147,7 +147,7 @@ export const circuitTools = [
         mode: { type: 'string' },
         points: {
           type: 'array',
-          item: {
+          items: {
             type: 'object',
             fields: {
               time: { type: 'number', kind: QuantityKind.Time },
