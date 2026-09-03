@@ -14,18 +14,18 @@ export const filterTool = defineJsonTool({
   returns: {
     type: 'object',
     fields: {
-      response: { type: 'scalar' },
-      kind: { type: 'scalar' },
-      order: { type: 'scalar' },
-      cutoffFrequency: { type: 'quantity', kind: QuantityKind.Frequency },
-      resistance: { type: 'quantity', kind: QuantityKind.Resistance },
+      response: { type: 'string' },
+      kind: { type: 'string' },
+      order: { type: 'number', kind: QuantityKind.None },
+      cutoffFrequency: { type: 'number', kind: QuantityKind.Frequency },
+      resistance: { type: 'number', kind: QuantityKind.Resistance },
       elements: {
         type: 'array',
         item: {
           type: 'object',
           fields: {
-            role: { type: 'scalar' },
-            kind: { type: 'scalar' },
+            role: { type: 'string' },
+            kind: { type: 'string' },
             // element.value is serializeReal'd with the element's own kind
             // (inductance for series L, capacitance for shunt C) — no single
             // QuantityKind covers both, so the leaf stays untagged.
@@ -33,8 +33,8 @@ export const filterTool = defineJsonTool({
           },
         },
       },
-      attenuationAtCutoffDb: { type: 'quantity', kind: QuantityKind.Log },
-      attenuationAtQueryDb: { type: 'quantity', kind: QuantityKind.Log },
+      attenuationAtCutoffDb: { type: 'number', kind: QuantityKind.Log },
+      attenuationAtQueryDb: { type: 'number', kind: QuantityKind.Log },
     },
   },
   parameters: {

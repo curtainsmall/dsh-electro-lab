@@ -15,11 +15,11 @@ export const seriesTools = [
     returns: {
       type: 'object',
       fields: {
-        kind: { type: 'scalar' },
-        power: { type: 'scalar' },
-        sum: { type: 'quantity', kind: QuantityKind.None },
-        lastTerm: { type: 'quantity', kind: QuantityKind.None },
-        converges: { type: 'scalar' },
+        kind: { type: 'string' },
+        power: { type: 'string' },
+        sum: { type: 'number', kind: QuantityKind.None },
+        lastTerm: { type: 'number', kind: QuantityKind.None },
+        converges: { type: 'boolean' },
       },
     },
     parameters: {

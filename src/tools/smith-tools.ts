@@ -24,7 +24,7 @@ export const smithTools = [
   defineJsonTool({
     name: 'impedance_to_reflection',
     description: 'Reflection coefficient Γ = (Z − Z0) / (Z + Z0) for impedance on a referenceImpedance line (default 50).',
-    returns: { type: 'quantity', kind: QuantityKind.None },
+    returns: { type: 'complex', kind: QuantityKind.None },
     parameters: {
       impedance: { ...createValueParam(QuantityKind.Resistance, 'load impedance'), required: true },
       referenceImpedance: { ...createValueParam(QuantityKind.Resistance, 'reference impedance (default 50)') },
@@ -41,8 +41,8 @@ export const smithTools = [
     returns: {
       type: 'object',
       fields: {
-        vswr: { type: 'quantity', kind: QuantityKind.None },
-        infinite: { type: 'scalar' },
+        vswr: { type: 'number', kind: QuantityKind.None },
+        infinite: { type: 'boolean' },
       },
     },
     parameters: {
@@ -60,8 +60,8 @@ export const smithTools = [
     returns: {
       type: 'object',
       fields: {
-        returnLossDb: { type: 'quantity', kind: QuantityKind.Log },
-        infinite: { type: 'scalar' },
+        returnLossDb: { type: 'number', kind: QuantityKind.Log },
+        infinite: { type: 'boolean' },
       },
     },
     parameters: {
@@ -76,7 +76,7 @@ export const smithTools = [
   defineJsonTool({
     name: 'quarter_wave_transformer',
     description: 'Quarter-wave transformer characteristic impedance: Z1 = √(Z0·ZL), matching a real load impedance to a line impedance.',
-    returns: { type: 'quantity', kind: QuantityKind.Resistance },
+    returns: { type: 'complex', kind: QuantityKind.Resistance },
     parameters: {
       lineImpedance: { ...createValueParam(QuantityKind.Resistance, 'line impedance'), required: true },
       loadImpedance: { ...createValueParam(QuantityKind.Resistance, 'real load impedance'), required: true },
@@ -93,8 +93,8 @@ export const smithTools = [
     returns: {
       type: 'object',
       fields: {
-        topology: { type: 'scalar' },
-        qualityFactor: { type: 'quantity', kind: QuantityKind.None },
+        topology: { type: 'string' },
+        qualityFactor: { type: 'number', kind: QuantityKind.None },
         solutions: {
           type: 'object',
           fields: {
@@ -106,10 +106,10 @@ export const smithTools = [
                   item: {
                     type: 'object',
                     fields: {
-                      role: { type: 'scalar' },
-                      reactance: { type: 'quantity', kind: QuantityKind.Resistance },
-                      inductance: { type: 'quantity', kind: QuantityKind.Inductance },
-                      capacitance: { type: 'quantity', kind: QuantityKind.Capacitance },
+                      role: { type: 'string' },
+                      reactance: { type: 'number', kind: QuantityKind.Resistance },
+                      inductance: { type: 'number', kind: QuantityKind.Inductance },
+                      capacitance: { type: 'number', kind: QuantityKind.Capacitance },
                     },
                   },
                 },
@@ -123,10 +123,10 @@ export const smithTools = [
                   item: {
                     type: 'object',
                     fields: {
-                      role: { type: 'scalar' },
-                      reactance: { type: 'quantity', kind: QuantityKind.Resistance },
-                      inductance: { type: 'quantity', kind: QuantityKind.Inductance },
-                      capacitance: { type: 'quantity', kind: QuantityKind.Capacitance },
+                      role: { type: 'string' },
+                      reactance: { type: 'number', kind: QuantityKind.Resistance },
+                      inductance: { type: 'number', kind: QuantityKind.Inductance },
+                      capacitance: { type: 'number', kind: QuantityKind.Capacitance },
                     },
                   },
                 },

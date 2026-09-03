@@ -15,10 +15,10 @@ export const signalQualityTools = [
     returns: {
       type: 'object',
       fields: {
-        thd: { type: 'quantity', kind: QuantityKind.None },
-        thdDb: { type: 'quantity', kind: QuantityKind.Log },
-        fundamental: { type: 'quantity', kind: QuantityKind.None },
-        harmonicAmplitudes: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        thd: { type: 'number', kind: QuantityKind.None },
+        thdDb: { type: 'number', kind: QuantityKind.Log },
+        fundamental: { type: 'number', kind: QuantityKind.None },
+        harmonicAmplitudes: { type: 'array', item: { type: 'number', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -48,7 +48,7 @@ export const signalQualityTools = [
     returns: {
       type: 'object',
       fields: {
-        snrDb: { type: 'quantity', kind: QuantityKind.Log },
+        snrDb: { type: 'number', kind: QuantityKind.Log },
       },
     },
     parameters: {
@@ -69,11 +69,11 @@ export const signalQualityTools = [
     returns: {
       type: 'object',
       fields: {
-        snrQuantizationDb: { type: 'quantity', kind: QuantityKind.Log },
-        snrJitterDb: { type: 'quantity', kind: QuantityKind.Log },
-        snrTotalDb: { type: 'quantity', kind: QuantityKind.Log },
-        enob: { type: 'quantity', kind: QuantityKind.None },
-        snrThermalDb: { type: 'quantity', kind: QuantityKind.Log },
+        snrQuantizationDb: { type: 'number', kind: QuantityKind.Log },
+        snrJitterDb: { type: 'number', kind: QuantityKind.Log },
+        snrTotalDb: { type: 'number', kind: QuantityKind.Log },
+        enob: { type: 'number', kind: QuantityKind.None },
+        snrThermalDb: { type: 'number', kind: QuantityKind.Log },
       },
     },
     parameters: {

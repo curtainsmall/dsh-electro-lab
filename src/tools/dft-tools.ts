@@ -30,8 +30,8 @@ export const dftTools = [
     returns: {
       type: 'object',
       fields: {
-        window: { type: 'scalar' },
-        spectrum: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        window: { type: 'string' },
+        spectrum: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -58,7 +58,7 @@ export const dftTools = [
     returns: {
       type: 'object',
       fields: {
-        samples: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        samples: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -77,11 +77,11 @@ export const dftTools = [
     returns: {
       type: 'object',
       fields: {
-        waveform: { type: 'scalar' },
-        harmonics: { type: 'scalar' },
-        dc: { type: 'quantity', kind: QuantityKind.None },
-        cosine: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
-        sine: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        waveform: { type: 'string' },
+        harmonics: { type: 'number', kind: QuantityKind.None },
+        dc: { type: 'number', kind: QuantityKind.None },
+        cosine: { type: 'array', item: { type: 'number', kind: QuantityKind.None } },
+        sine: { type: 'array', item: { type: 'number', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -112,12 +112,12 @@ export const dftTools = [
     returns: {
       type: 'object',
       fields: {
-        window: { type: 'scalar' },
-        rms: { type: 'quantity', kind: QuantityKind.None },
-        peak: { type: 'quantity', kind: QuantityKind.None },
-        peakToPeak: { type: 'quantity', kind: QuantityKind.None },
-        dc: { type: 'quantity', kind: QuantityKind.None },
-        spectrum: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        window: { type: 'string' },
+        rms: { type: 'number', kind: QuantityKind.None },
+        peak: { type: 'number', kind: QuantityKind.None },
+        peakToPeak: { type: 'number', kind: QuantityKind.None },
+        dc: { type: 'number', kind: QuantityKind.None },
+        spectrum: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {

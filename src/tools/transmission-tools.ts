@@ -20,9 +20,9 @@ export const transmissionTools = [
     returns: {
       type: 'object',
       fields: {
-        frequency: { type: 'quantity', kind: QuantityKind.Frequency },
-        velocityFactor: { type: 'quantity', kind: QuantityKind.None },
-        wavelength: { type: 'quantity', kind: QuantityKind.None },
+        frequency: { type: 'number', kind: QuantityKind.Frequency },
+        velocityFactor: { type: 'number', kind: QuantityKind.None },
+        wavelength: { type: 'number', kind: QuantityKind.None },
       },
     },
     parameters: {
@@ -45,10 +45,10 @@ export const transmissionTools = [
     returns: {
       type: 'object',
       fields: {
-        impedance: { type: 'quantity', kind: QuantityKind.Resistance },
-        velocityFactor: { type: 'quantity', kind: QuantityKind.None },
-        capacitancePerMeter: { type: 'quantity', kind: QuantityKind.Capacitance },
-        inductancePerMeter: { type: 'quantity', kind: QuantityKind.Inductance },
+        impedance: { type: 'number', kind: QuantityKind.Resistance },
+        velocityFactor: { type: 'number', kind: QuantityKind.None },
+        capacitancePerMeter: { type: 'number', kind: QuantityKind.Capacitance },
+        inductancePerMeter: { type: 'number', kind: QuantityKind.Inductance },
       },
     },
     parameters: {
@@ -76,8 +76,8 @@ export const transmissionTools = [
     returns: {
       type: 'object',
       fields: {
-        bandwidth: { type: 'quantity', kind: QuantityKind.Frequency },
-        riseTime: { type: 'quantity', kind: QuantityKind.Time },
+        bandwidth: { type: 'number', kind: QuantityKind.Frequency },
+        riseTime: { type: 'number', kind: QuantityKind.Time },
       },
     },
     parameters: {

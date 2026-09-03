@@ -26,9 +26,9 @@ export const electronicsTools = [
     returns: {
       type: 'object',
       fields: {
-        configuration: { type: 'scalar' },
-        gain: { type: 'quantity', kind: QuantityKind.None },
-        outputVoltage: { type: 'quantity', kind: QuantityKind.Voltage },
+        configuration: { type: 'string' },
+        gain: { type: 'complex', kind: QuantityKind.None },
+        outputVoltage: { type: 'complex', kind: QuantityKind.Voltage },
       },
     },
     parameters: {
@@ -142,8 +142,8 @@ export const electronicsTools = [
     returns: {
       type: 'object',
       fields: {
-        timeConstant: { type: 'quantity', kind: QuantityKind.Time },
-        cutoffFrequency: { type: 'quantity', kind: QuantityKind.Frequency },
+        timeConstant: { type: 'number', kind: QuantityKind.Time },
+        cutoffFrequency: { type: 'number', kind: QuantityKind.Frequency },
       },
     },
     parameters: {
@@ -168,10 +168,10 @@ export const electronicsTools = [
     returns: {
       type: 'object',
       fields: {
-        outputVoltage: { type: 'quantity', kind: QuantityKind.Voltage },
-        outputResistance: { type: 'quantity', kind: QuantityKind.Resistance },
-        unloadedOutputVoltage: { type: 'quantity', kind: QuantityKind.Voltage },
-        loadCurrent: { type: 'quantity', kind: QuantityKind.Current },
+        outputVoltage: { type: 'number', kind: QuantityKind.Voltage },
+        outputResistance: { type: 'number', kind: QuantityKind.Resistance },
+        unloadedOutputVoltage: { type: 'number', kind: QuantityKind.Voltage },
+        loadCurrent: { type: 'number', kind: QuantityKind.Current },
       },
     },
     parameters: {
@@ -203,8 +203,8 @@ export const electronicsTools = [
     returns: {
       type: 'object',
       fields: {
-        resistance: { type: 'quantity', kind: QuantityKind.Resistance },
-        power: { type: 'quantity', kind: QuantityKind.Power },
+        resistance: { type: 'number', kind: QuantityKind.Resistance },
+        power: { type: 'number', kind: QuantityKind.Power },
       },
     },
     parameters: {

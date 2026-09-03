@@ -36,7 +36,7 @@ export const circuitTools = [
   defineJsonTool({
     name: 'equivalent_impedance',
     description: 'Total impedance of a set of impedances combined in series (Z = Σ Zi) or in parallel (1/Z = Σ 1/Zi). Pass each impedance as a complex value object; earlier step outputs may be referenced with @stepN in solve_steps.',
-    returns: { type: 'quantity', kind: QuantityKind.Resistance },
+    returns: { type: 'complex', kind: QuantityKind.Resistance },
     parameters: {
       topology: { type: 'string', enum: [CircuitMode.Series, CircuitMode.Parallel], description: 'how to combine the impedances', required: true },
       impedances: {
@@ -66,7 +66,7 @@ export const circuitTools = [
   defineJsonTool({
     name: 'circuit_impedance',
     description: 'Total impedance of a (possibly nested) network at a frequency. The network is a tree: a leaf is a complex value object of kind resistance|inductance|capacitance; a group is {"topology": "series"|"parallel", "elements": [node, ...]}. Nested groups are allowed. Returns the driving-point impedance.',
-    returns: { type: 'quantity', kind: QuantityKind.Resistance },
+    returns: { type: 'complex', kind: QuantityKind.Resistance },
     parameters: {
       network: { type: 'json', description: 'network tree, e.g. {"topology":"series","elements":[{"form":"rect","re":10,"im":0,"kind":"resistance"},{"form":"rect","re":0.001,"im":0,"kind":"inductance"}]}', required: true },
       frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency'), required: true },
@@ -83,10 +83,10 @@ export const circuitTools = [
     returns: {
       type: 'object',
       fields: {
-        resonantFrequency: { type: 'quantity', kind: QuantityKind.Frequency },
-        mode: { type: 'scalar' },
-        qualityFactor: { type: 'quantity', kind: QuantityKind.None },
-        bandwidth: { type: 'quantity', kind: QuantityKind.Frequency },
+        resonantFrequency: { type: 'number', kind: QuantityKind.Frequency },
+        mode: { type: 'string' },
+        qualityFactor: { type: 'number', kind: QuantityKind.None },
+        bandwidth: { type: 'number', kind: QuantityKind.Frequency },
       },
     },
     parameters: {
@@ -113,10 +113,10 @@ export const circuitTools = [
     returns: {
       type: 'object',
       fields: {
-        apparent: { type: 'quantity', kind: QuantityKind.Power },
-        real: { type: 'quantity', kind: QuantityKind.Power },
-        reactive: { type: 'quantity', kind: QuantityKind.Power },
-        powerFactor: { type: 'quantity', kind: QuantityKind.None },
+        apparent: { type: 'number', kind: QuantityKind.Power },
+        real: { type: 'number', kind: QuantityKind.Power },
+        reactive: { type: 'number', kind: QuantityKind.Power },
+        powerFactor: { type: 'number', kind: QuantityKind.None },
       },
     },
     parameters: {
@@ -143,23 +143,23 @@ export const circuitTools = [
     returns: {
       type: 'object',
       fields: {
-        kind: { type: 'scalar' },
-        mode: { type: 'scalar' },
+        kind: { type: 'string' },
+        mode: { type: 'string' },
         points: {
           type: 'array',
           item: {
             type: 'object',
             fields: {
-              time: { type: 'quantity', kind: QuantityKind.Time },
-              voltage: { type: 'quantity', kind: QuantityKind.Voltage },
-              current: { type: 'quantity', kind: QuantityKind.Current },
+              time: { type: 'number', kind: QuantityKind.Time },
+              voltage: { type: 'number', kind: QuantityKind.Voltage },
+              current: { type: 'number', kind: QuantityKind.Current },
             },
           },
         },
-        alpha: { type: 'quantity', kind: QuantityKind.Frequency },
-        omega0: { type: 'quantity', kind: QuantityKind.Frequency },
-        dampingRatio: { type: 'quantity', kind: QuantityKind.None },
-        damping: { type: 'scalar' },
+        alpha: { type: 'number', kind: QuantityKind.Frequency },
+        omega0: { type: 'number', kind: QuantityKind.Frequency },
+        dampingRatio: { type: 'number', kind: QuantityKind.None },
+        damping: { type: 'string' },
       },
     },
     parameters: {

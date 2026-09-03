@@ -21,9 +21,9 @@ export const noiseTools = [
     returns: {
       type: 'object',
       fields: {
-        temperature: { type: 'quantity', kind: QuantityKind.None },
-        bandwidth: { type: 'quantity', kind: QuantityKind.Frequency },
-        noisePowerWatts: { type: 'quantity', kind: QuantityKind.Power },
+        temperature: { type: 'number', kind: QuantityKind.None },
+        bandwidth: { type: 'number', kind: QuantityKind.Frequency },
+        noisePowerWatts: { type: 'number', kind: QuantityKind.Power },
       },
     },
     parameters: {
@@ -48,7 +48,7 @@ export const noiseTools = [
     returns: {
       type: 'object',
       fields: {
-        totalNoiseFigureDb: { type: 'quantity', kind: QuantityKind.Log },
+        totalNoiseFigureDb: { type: 'number', kind: QuantityKind.Log },
       },
     },
     parameters: {
@@ -69,7 +69,7 @@ export const noiseTools = [
     returns: {
       type: 'object',
       fields: {
-        snrDb: { type: 'quantity', kind: QuantityKind.Log },
+        snrDb: { type: 'number', kind: QuantityKind.Log },
       },
     },
     parameters: {

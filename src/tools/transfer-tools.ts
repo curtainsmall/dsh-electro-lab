@@ -37,13 +37,13 @@ export const transferTools = [
           item: {
             type: 'object',
             fields: {
-              pole: { type: 'quantity', kind: QuantityKind.None },
-              order: { type: 'scalar' },
-              residue: { type: 'quantity', kind: QuantityKind.None },
+              pole: { type: 'complex', kind: QuantityKind.None },
+              order: { type: 'number', kind: QuantityKind.None },
+              residue: { type: 'complex', kind: QuantityKind.None },
             },
           },
         },
-        polynomial: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        polynomial: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -72,9 +72,9 @@ export const transferTools = [
     returns: {
       type: 'object',
       fields: {
-        variable: { type: 'scalar' },
-        frequencies: { type: 'array', item: { type: 'scalar' } },
-        responses: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        variable: { type: 'string' },
+        frequencies: { type: 'array', item: { type: 'number', kind: QuantityKind.None } },
+        responses: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -113,7 +113,7 @@ export const transferTools = [
     returns: {
       type: 'object',
       fields: {
-        values: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        values: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -141,7 +141,7 @@ export const transferTools = [
     returns: {
       type: 'object',
       fields: {
-        output: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        output: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -164,15 +164,15 @@ export const transferTools = [
     returns: {
       type: 'object',
       fields: {
-        variable: { type: 'scalar' },
+        variable: { type: 'string' },
         points: {
           type: 'array',
           item: {
             type: 'object',
             fields: {
-              frequency: { type: 'quantity', kind: QuantityKind.Frequency },
-              magnitudeDb: { type: 'quantity', kind: QuantityKind.Log },
-              phase: { type: 'quantity', kind: QuantityKind.Angle },
+              frequency: { type: 'number', kind: QuantityKind.Frequency },
+              magnitudeDb: { type: 'number', kind: QuantityKind.Log },
+              phase: { type: 'number', kind: QuantityKind.Angle },
             },
           },
         },

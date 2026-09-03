@@ -81,8 +81,8 @@ export const unitTools = [
     returns: {
       type: 'object',
       fields: {
-        from: { type: 'scalar' },
-        to: { type: 'scalar' },
+        from: { type: 'string' },
+        to: { type: 'string' },
         // value is serializeComplex'd with the kind of the resolved unit family
         // (temperature|pressure|energy|power|length|mass|angle|log) — no single
         // QuantityKind covers every family, so the leaf stays untagged.

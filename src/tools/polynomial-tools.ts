@@ -22,10 +22,10 @@ export const polynomialTools = [
     returns: {
       type: 'object',
       fields: {
-        numeratorDegree: { type: 'scalar' },
-        denominatorDegree: { type: 'scalar' },
-        zeros: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
-        poles: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        numeratorDegree: { type: 'number', kind: QuantityKind.None },
+        denominatorDegree: { type: 'number', kind: QuantityKind.None },
+        zeros: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
+        poles: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -50,8 +50,8 @@ export const polynomialTools = [
     returns: {
       type: 'object',
       fields: {
-        count: { type: 'scalar' },
-        coefficients: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        count: { type: 'number', kind: QuantityKind.None },
+        coefficients: { type: 'array', item: { type: 'complex', kind: QuantityKind.None } },
       },
     },
     parameters: {
