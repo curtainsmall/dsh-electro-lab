@@ -22,18 +22,25 @@ export enum ExternalHttpMethod {
   Post = 'POST',
 }
 
-/** The non-value parameter spec dialects (values use `kind` instead). */
+/** A parameter's settled semantic type — quantity mirrors the returns leaves. */
 export enum ExternalParamType {
+  Quantity = 'quantity',
   String = 'string',
   Boolean = 'boolean',
+  Array = 'array',
 }
 
-/** One parameter of an external tool: the internal tools' two spec dialects as JSON. */
+/** One parameter of an external tool: a single settled semantic type; kind is
+ *  the semantic payload of the quantity type (mirrors returns). */
 export type ExternalParamSpec =
-  /** Non-value parameter, identical to the internal tools' plain spec. */
-  | { type: ExternalParamType; enum?: string[]; description?: string; required?: boolean }
-  /** Value parameter: JSON form of createValueParam — kind is a lowercase QuantityKind name. */
-  | { kind: string; description?: string; required?: boolean }
+  /** A quantity (accepts bare-number, {re,im} or {mag,ang} payloads); kind is a lowercase QuantityKind name. */
+  | { type: ExternalParamType.Quantity; kind: string; description?: string; required?: boolean }
+  /** A plain string (optionally enum-constrained). */
+  | { type: ExternalParamType.String; enum?: string[]; description?: string; required?: boolean }
+  /** A plain boolean. */
+  | { type: ExternalParamType.Boolean; description?: string; required?: boolean }
+  /** A homogeneous array of arbitrary length; every element matches the same recursive item spec. */
+  | { type: ExternalParamType.Array; items: ExternalParamSpec; description?: string; required?: boolean }
 
 export type ExternalParameters = Record<string, ExternalParamSpec>
 
