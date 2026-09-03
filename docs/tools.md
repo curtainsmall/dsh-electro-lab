@@ -114,3 +114,13 @@ All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every to
 | `record_question` | Open a record and submit the consolidated question; a second open settles the open record as a duplicate-start error record |
 | `record_analyse` | Submit the analysis text into the open record |
 | `record_answer` | Submit the answer text and settle the record; a merged template in the text is split automatically |
+
+## External tools
+
+External tools are user-owned calculation tools that the host reaches over an http or file transport. Declarations live in `external-tools.jsonl` under the plugin home (`~/.dsh-electro-lab`); at plugin start every declaration that is not explicitly disabled is compiled and registered as a tool, so a change applies only after a host restart. Declarations use the same value dialect as the built-in tools: a quantity parameter accepts a bare number or a compact complex object — `{re, im}` (rectangular) or `{mag, ang}` (polar, angles in radians) — and an array parameter declares homogeneous items. Saving a declaration is the authorization for its transport. The manager tools edit the declaration archive; the Records panel's External tools tab offers the same actions.
+
+| Tool | Purpose |
+|---|---|
+| `external_tool_add` | Register a new external tool declaration (fails when the name already exists) |
+| `external_tool_update` | Replace an existing external tool declaration (fails when it does not exist) |
+| `external_tool_delete` | Remove an external tool declaration by name |

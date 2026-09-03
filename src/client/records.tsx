@@ -13,7 +13,7 @@ import { IconChevronLeft, IconDownload, IconArrowUp, IconFolder, IconFile, IconM
 /* ── Shared dialog shell + button language (A + B) ─────────────────────────── */
 
 /** Shared modal shell: fixed overlay, themed panel, title (with optional right-side content), body, footer. */
-function Dialog({ open, title, width = 400, height, dismissible = true, headerRight, footer, children, onClose }: {
+export function Dialog({ open, title, width = 400, height, dismissible = true, headerRight, footer, children, onClose }: {
   open: boolean
   title: string
   width?: number
@@ -103,7 +103,7 @@ function primaryButtonStyle(hovered: boolean, disabled = false): React.CSSProper
 }
 
 /** Ghost button with self-managed hover state. */
-function GhostButton({ children, onClick, style }: { children: ReactNode; onClick: () => void; style?: React.CSSProperties }): React.JSX.Element {
+export function GhostButton({ children, onClick, style }: { children: ReactNode; onClick: () => void; style?: React.CSSProperties }): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   return (
     <button
@@ -119,7 +119,7 @@ function GhostButton({ children, onClick, style }: { children: ReactNode; onClic
 }
 
 /** Primary button with self-managed hover state. */
-function PrimaryButton({ children, onClick, disabled = false }: { children: ReactNode; onClick: () => void; disabled?: boolean }): React.JSX.Element {
+export function PrimaryButton({ children, onClick, disabled = false }: { children: ReactNode; onClick: () => void; disabled?: boolean }): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   return (
     <button

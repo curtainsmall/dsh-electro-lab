@@ -174,6 +174,8 @@ export function validateExternalTool(config: unknown): string[] {
   }
   if (typeof tool.description !== "string")
     errors.push("description is required");
+  if (tool.enabled !== undefined && typeof tool.enabled !== "boolean")
+    errors.push("enabled must be a boolean when present");
   if (
     tool.transport !== ExternalTransport.Http &&
     tool.transport !== ExternalTransport.File
@@ -182,7 +184,11 @@ export function validateExternalTool(config: unknown): string[] {
       `transport must be one of ${Object.values(ExternalTransport).join(", ")}`,
     );
   }
-  if (typeof tool.parameters !== "object" || tool.parameters === null) {
+  if (
+    typeof tool.parameters !== "object" ||
+    tool.parameters === null ||
+    Array.isArray(tool.parameters)
+  ) {
     errors.push("parameters must be an object");
   } else {
     for (const [key, spec] of Object.entries(
@@ -202,33 +208,42 @@ export function validateExternalTool(config: unknown): string[] {
     errors.push("transportOptions is required");
     return errors;
   }
+  // The declared transport decides which options shape is expected (the
+  // union discriminant); an invalid transport already reported itself and
+  // skips the per-shape checks.
   const http = options as { url?: unknown; method?: unknown };
   const file = options as { directory?: unknown; pollMs?: unknown };
-  if ("url" in http) {
-    if (typeof http.url !== "string" || !/^https?:\/\//.test(http.url)) {
-      errors.push("transportOptions.url must be an http(s) URL");
-    }
-    if (
-      http.method !== ExternalHttpMethod.Get &&
-      http.method !== ExternalHttpMethod.Post
-    ) {
-      errors.push(
-        `transportOptions.method must be one of ${Object.values(ExternalHttpMethod).join(", ")}`,
-      );
-    }
-  } else {
-    if (
-      typeof file.directory !== "string" ||
-      (file.directory as string).length === 0
-    ) {
-      errors.push("transportOptions.directory is required for file transport");
-    }
-    if (
-      file.pollMs !== undefined &&
-      (!Number.isFinite(file.pollMs as number) || (file.pollMs as number) <= 0)
-    ) {
-      errors.push("transportOptions.pollMs must be a positive number");
-    }
+  switch (tool.transport) {
+    case ExternalTransport.Http:
+      if (typeof http.url !== "string" || !/^https?:\/\//.test(http.url)) {
+        errors.push("transportOptions.url must be an http(s) URL");
+      }
+      if (
+        http.method !== ExternalHttpMethod.Get &&
+        http.method !== ExternalHttpMethod.Post
+      ) {
+        errors.push(
+          `transportOptions.method must be one of ${Object.values(ExternalHttpMethod).join(", ")}`,
+        );
+      }
+      break;
+    case ExternalTransport.File:
+      if (
+        typeof file.directory !== "string" ||
+        (file.directory as string).length === 0
+      ) {
+        errors.push(
+          "transportOptions.directory is required for file transport",
+        );
+      }
+      if (
+        file.pollMs !== undefined &&
+        (!Number.isFinite(file.pollMs as number) ||
+          (file.pollMs as number) <= 0)
+      ) {
+        errors.push("transportOptions.pollMs must be a positive number");
+      }
+      break;
   }
   return errors;
 }

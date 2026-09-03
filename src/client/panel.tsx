@@ -13,6 +13,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RecordsTab, GenerationOverlay } from './records.tsx'
+import { ExternalToolsTab } from './external-tools.tsx'
 import { t, useAppLocale } from './locales.ts'
 import { IconChevronLeft } from './icons.tsx'
 
@@ -326,12 +327,32 @@ function tabButtonStyle(hovered: boolean): React.CSSProperties {
   }
 }
 
+/** One tab button: active styling plus a self-managed hover state. */
+function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }): React.JSX.Element {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      data-active={active ? '' : undefined}
+      data-dsh-part="tab"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={tabButtonStyle(hovered)}
+    >
+      {label}
+    </button>
+  )
+}
+
 /** The panel body: title bar with a back-to-session button, tabs, content. */
 export function ElectroLabPanel(): React.JSX.Element | null {
   useAppLocale() // Re-render when the active language changes.
   const open = useSyncExternalStore(panelStore.subscribe, () => panelStore.open)
   const [backHover, setBackHover] = useState(false)
-  const [tabHover, setTabHover] = useState(false)
+  const [tab, setTab] = useState<'records' | 'external'>('records')
 
   if (!open) return null
 
@@ -365,21 +386,11 @@ export function ElectroLabPanel(): React.JSX.Element | null {
         <h2 style={{ margin: 0, fontSize: 15 }}>ElectroLab</h2>
       </div>
       <div role="tablist" style={tabBarStyle} data-dsh-part="tab-bar">
-        <button
-          type="button"
-          role="tab"
-          aria-selected="true"
-          data-active=""
-          data-dsh-part="tab"
-          onMouseEnter={() => setTabHover(true)}
-          onMouseLeave={() => setTabHover(false)}
-          style={tabButtonStyle(tabHover)}
-        >
-          {t('tabRecords')}
-        </button>
+        <TabButton active={tab === 'records'} label={t('tabRecords')} onClick={() => setTab('records')} />
+        <TabButton active={tab === 'external'} label={t('tabExternal')} onClick={() => setTab('external')} />
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
-        <RecordsTab />
+        {tab === 'records' ? <RecordsTab /> : <ExternalToolsTab />}
       </div>
     </div>
   )

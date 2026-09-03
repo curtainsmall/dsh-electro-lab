@@ -14,6 +14,7 @@ import { RecordManager, readRecordArchive, deleteRecordFromArchive, type Record,
 import { ArticleFormat, ArticleLanguage, GenerationPhase, TemplateLanguage, buildArticlePrompt, buildLatexDocument, normalizeFileName, resolveTemplateLanguage, templateLanguageToArticleLanguage } from './generate.ts'
 import { clearRestartRequired, deleteExternalTool, readExternalTools, restartRequired, upsertExternalTool, validateExternalTool } from './external-tool/registry.ts'
 import { compileExternalTool } from './external-tool/compile.ts'
+import { createExternalManagerTools } from './external-tool/manager-tools.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -859,12 +860,20 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     const disposers: Array<() => void> = []
     for (const config of readExternalTools(recordsHome)) {
-      if (!config.enabled) continue
+      // A declaration without the flag registers (enabled is the default);
+      // only an explicit false disables the tool.
+      if (config.enabled === false) continue
       try {
         disposers.push(ctx.tools.register(compileExternalTool(config)))
       } catch (error) {
         ctx.logger?.warn(`[dsh-electro-lab] failed to register external tool "${config.name}": ${error instanceof Error ? error.message : String(error)}`)
       }
+    }
+    // The LLM-facing manager tools (external_tool_add/update/delete) edit
+    // the archive through the registry; register them alongside the tools
+    // they manage.
+    for (const tool of createExternalManagerTools(recordsHome)) {
+      disposers.push(ctx.tools.register(tool))
     }
     // Registration just ran with the current file: the restart dirty bit is
     // stale now and clears until the next change.

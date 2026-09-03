@@ -1,0 +1,125 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
+import type { JsonValue } from '@deepseek-ai/dsh-tools'
+import { createExternalManagerTools } from '../../src/external-tool/manager-tools.ts'
+import { readExternalTools, restartRequired } from '../../src/external-tool/registry.ts'
+import { ExternalHttpMethod, ExternalParamType, ExternalTransport, type ExternalToolConfig } from '../../src/external-tool/types.ts'
+
+const TOOL: ExternalToolConfig = {
+  name: 'sample_echo',
+  description: 'Echoes its input over http',
+  enabled: true,
+  parameters: {
+    gain: { type: ExternalParamType.Quantity, kind: 'log', description: 'the gain' },
+  },
+  transport: ExternalTransport.Http,
+  transportOptions: { url: 'https://example.test/calc', method: ExternalHttpMethod.Post },
+}
+
+function fakeExec(): ToolRunContext {
+  return {
+    callId: 'call-manager' as ToolRunContext['callId'],
+    token: Symbol('token') as ToolRunContext['token'],
+    signal: new AbortController().signal,
+  } as ToolRunContext
+}
+
+/** Execute one manager tool by name and return its JSON result. */
+async function run(name: string, args: unknown, home: string): Promise<Record<string, JsonValue>> {
+  const tools = createExternalManagerTools(home)
+  const tool = tools.find((item) => item.name === name)
+  expect(tool).toBeDefined()
+  const result = await tool!.execute(args as never, fakeExec())
+  expect(typeof result).toBe('object')
+  expect(result).not.toBeNull()
+  return result as Record<string, JsonValue>
+}
+
+let home = ''
+
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), 'elab-manager-'))
+})
+
+afterEach(() => {
+  rmSync(home, { recursive: true, force: true })
+})
+
+describe('external_tool_add', () => {
+  it('stores a new declaration and reports the pending restart', async () => {
+    const result = await run('external_tool_add', { declaration: TOOL }, home)
+    expect(result).toEqual({ ok: true, name: 'sample_echo', changed: 'added', restartRequired: true })
+    expect(readExternalTools(home).map((tool) => tool.name)).toEqual(['sample_echo'])
+    expect(restartRequired(home)).toBe(true)
+  })
+
+  it('fails when the name already exists', async () => {
+    await run('external_tool_add', { declaration: TOOL }, home)
+    const result = await run('external_tool_add', { declaration: { ...TOOL, description: 'again' } }, home)
+    expect(result.ok).toBe(false)
+    expect(String(result.error)).toContain('external_tool_update')
+    expect(readExternalTools(home)).toHaveLength(1)
+  })
+
+  it('fails on an invalid declaration without touching the archive', async () => {
+    const result = await run('external_tool_add', { declaration: { ...TOOL, parameters: { x: { type: 'float' } } } }, home)
+    expect(result.ok).toBe(false)
+    expect(Array.isArray(result.errors)).toBe(true)
+    expect(readExternalTools(home)).toEqual([])
+    expect(restartRequired(home)).toBe(false)
+  })
+
+  it('accepts a declaration without the enabled flag', async () => {
+    const { enabled: _enabled, ...noFlag } = TOOL
+    const result = await run('external_tool_add', { declaration: noFlag }, home)
+    expect(result.ok).toBe(true)
+  })
+})
+
+describe('external_tool_update', () => {
+  it('replaces an existing declaration in place', async () => {
+    await run('external_tool_add', { declaration: TOOL }, home)
+    const result = await run(
+      'external_tool_update',
+      { declaration: { ...TOOL, description: 'updated', enabled: false } },
+      home,
+    )
+    expect(result).toEqual({ ok: true, name: 'sample_echo', changed: 'updated', restartRequired: true })
+    const tools = readExternalTools(home)
+    expect(tools).toHaveLength(1)
+    expect(tools[0]!.description).toBe('updated')
+    expect(tools[0]!.enabled).toBe(false)
+  })
+
+  it('fails when the name is not declared yet', async () => {
+    const result = await run('external_tool_update', { declaration: TOOL }, home)
+    expect(result.ok).toBe(false)
+    expect(String(result.error)).toContain('external_tool_add')
+  })
+
+  it('fails on an invalid declaration', async () => {
+    await run('external_tool_add', { declaration: TOOL }, home)
+    const result = await run('external_tool_update', { declaration: { ...TOOL, enabled: 'yes' } }, home)
+    expect(result.ok).toBe(false)
+    expect(Array.isArray(result.errors)).toBe(true)
+  })
+})
+
+describe('external_tool_delete', () => {
+  it('removes a declared tool and reports the pending restart', async () => {
+    await run('external_tool_add', { declaration: TOOL }, home)
+    const result = await run('external_tool_delete', { name: 'sample_echo' }, home)
+    expect(result).toEqual({ ok: true, name: 'sample_echo', changed: 'deleted', restartRequired: true })
+    expect(readExternalTools(home)).toEqual([])
+  })
+
+  it('fails when the name is not declared', async () => {
+    const result = await run('external_tool_delete', { name: 'ghost' }, home)
+    expect(result.ok).toBe(false)
+    expect(String(result.error)).toContain('ghost')
+    expect(readExternalTools(home)).toEqual([])
+  })
+})
