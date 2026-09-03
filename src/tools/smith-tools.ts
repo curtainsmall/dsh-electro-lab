@@ -24,7 +24,7 @@ export const smithTools = [
   defineJsonTool({
     name: 'impedance_to_reflection',
     description: 'Reflection coefficient Γ = (Z − Z0) / (Z + Z0) for impedance on a referenceImpedance line (default 50).',
-    returns: { type: 'quantity', kind: QuantityKind.None, complex: true },
+    returns: { type: 'quantity', kind: QuantityKind.None },
     parameters: {
       impedance: { ...createValueParam(QuantityKind.Resistance, 'load impedance'), required: true },
       referenceImpedance: { ...createValueParam(QuantityKind.Resistance, 'reference impedance (default 50)') },
@@ -76,7 +76,7 @@ export const smithTools = [
   defineJsonTool({
     name: 'quarter_wave_transformer',
     description: 'Quarter-wave transformer characteristic impedance: Z1 = √(Z0·ZL), matching a real load impedance to a line impedance.',
-    returns: { type: 'quantity', kind: QuantityKind.Resistance, complex: true },
+    returns: { type: 'quantity', kind: QuantityKind.Resistance },
     parameters: {
       lineImpedance: { ...createValueParam(QuantityKind.Resistance, 'line impedance'), required: true },
       loadImpedance: { ...createValueParam(QuantityKind.Resistance, 'real load impedance'), required: true },

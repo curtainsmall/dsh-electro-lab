@@ -27,8 +27,8 @@ export const electronicsTools = [
       type: 'object',
       fields: {
         configuration: { type: 'scalar' },
-        gain: { type: 'quantity', kind: QuantityKind.None, complex: true },
-        outputVoltage: { type: 'quantity', kind: QuantityKind.Voltage, complex: true },
+        gain: { type: 'quantity', kind: QuantityKind.None },
+        outputVoltage: { type: 'quantity', kind: QuantityKind.Voltage },
       },
     },
     parameters: {

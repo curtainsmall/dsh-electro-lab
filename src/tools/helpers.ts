@@ -19,8 +19,8 @@ export type ToolReturns =
   | { type: 'any' }
   /** A plain number or string/boolean passthrough (echo fields etc.). */
   | { type: 'scalar' }
-  /** A quantity: real number, or a complex {re,im} pair when complex: true. */
-  | { type: 'quantity'; kind: QuantityKind; complex?: boolean }
+  /** A quantity; the stored value form (number vs {re,im}) is read from the value itself. */
+  | { type: 'quantity'; kind: QuantityKind }
   /** A named-fields object; every field declared recursively. */
   | { type: 'object'; fields: Record<string, ToolReturns> }
   /** A homogeneous array; items declared recursively. */

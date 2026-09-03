@@ -36,7 +36,7 @@ export const circuitTools = [
   defineJsonTool({
     name: 'equivalent_impedance',
     description: 'Total impedance of a set of impedances combined in series (Z = Σ Zi) or in parallel (1/Z = Σ 1/Zi). Pass each impedance as a complex value object; earlier step outputs may be referenced with @stepN in solve_steps.',
-    returns: { type: 'quantity', kind: QuantityKind.Resistance, complex: true },
+    returns: { type: 'quantity', kind: QuantityKind.Resistance },
     parameters: {
       topology: { type: 'string', enum: [CircuitMode.Series, CircuitMode.Parallel], description: 'how to combine the impedances', required: true },
       impedances: {
@@ -66,7 +66,7 @@ export const circuitTools = [
   defineJsonTool({
     name: 'circuit_impedance',
     description: 'Total impedance of a (possibly nested) network at a frequency. The network is a tree: a leaf is a complex value object of kind resistance|inductance|capacitance; a group is {"topology": "series"|"parallel", "elements": [node, ...]}. Nested groups are allowed. Returns the driving-point impedance.',
-    returns: { type: 'quantity', kind: QuantityKind.Resistance, complex: true },
+    returns: { type: 'quantity', kind: QuantityKind.Resistance },
     parameters: {
       network: { type: 'json', description: 'network tree, e.g. {"topology":"series","elements":[{"form":"rect","re":10,"im":0,"kind":"resistance"},{"form":"rect","re":0.001,"im":0,"kind":"inductance"}]}', required: true },
       frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency'), required: true },

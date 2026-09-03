@@ -31,7 +31,7 @@ export const dftTools = [
       type: 'object',
       fields: {
         window: { type: 'scalar' },
-        spectrum: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        spectrum: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -58,7 +58,7 @@ export const dftTools = [
     returns: {
       type: 'object',
       fields: {
-        samples: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        samples: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -117,7 +117,7 @@ export const dftTools = [
         peak: { type: 'quantity', kind: QuantityKind.None },
         peakToPeak: { type: 'quantity', kind: QuantityKind.None },
         dc: { type: 'quantity', kind: QuantityKind.None },
-        spectrum: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        spectrum: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
       },
     },
     parameters: {

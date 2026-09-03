@@ -37,13 +37,13 @@ export const transferTools = [
           item: {
             type: 'object',
             fields: {
-              pole: { type: 'quantity', kind: QuantityKind.None, complex: true },
+              pole: { type: 'quantity', kind: QuantityKind.None },
               order: { type: 'scalar' },
-              residue: { type: 'quantity', kind: QuantityKind.None, complex: true },
+              residue: { type: 'quantity', kind: QuantityKind.None },
             },
           },
         },
-        polynomial: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        polynomial: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -74,7 +74,7 @@ export const transferTools = [
       fields: {
         variable: { type: 'scalar' },
         frequencies: { type: 'array', item: { type: 'scalar' } },
-        responses: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        responses: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -113,7 +113,7 @@ export const transferTools = [
     returns: {
       type: 'object',
       fields: {
-        values: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        values: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
       },
     },
     parameters: {
@@ -141,7 +141,7 @@ export const transferTools = [
     returns: {
       type: 'object',
       fields: {
-        output: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        output: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
       },
     },
     parameters: {
