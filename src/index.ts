@@ -12,6 +12,8 @@ import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
 import { RecordManager, readRecordArchive, deleteRecordFromArchive, type Record, type RecordEvent } from './records.ts'
 import { ArticleFormat, ArticleLanguage, GenerationPhase, TemplateLanguage, buildArticlePrompt, buildLatexDocument, normalizeFileName, resolveTemplateLanguage, templateLanguageToArticleLanguage } from './generate.ts'
+import { clearRestartRequired, deleteExternalTool, readExternalTools, restartRequired, upsertExternalTool, validateExternalTool } from './external-tool/registry.ts'
+import { compileExternalTool } from './external-tool/compile.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -851,6 +853,78 @@ export function apply(ctx: Context): void {
       for (const off of disposers) off()
     }
   }, 'dsh-electro-lab: records')
+
+  // External tools: declared over http/file transports, compiled and
+  // registered at plugin start (changes need a restart — see the dirty bit).
+  ctx.effect(() => {
+    const disposers: Array<() => void> = []
+    for (const config of readExternalTools(recordsHome)) {
+      if (!config.enabled) continue
+      try {
+        disposers.push(ctx.tools.register(compileExternalTool(config)))
+      } catch (error) {
+        ctx.logger?.warn(`[dsh-electro-lab] failed to register external tool "${config.name}": ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    // Registration just ran with the current file: the restart dirty bit is
+    // stale now and clears until the next change.
+    clearRestartRequired(recordsHome)
+
+    // Management endpoints: GET lists declarations + dirty bit; PUT
+    // upserts one declaration (base64 JSON in the query, no body parsing);
+    // DELETE ?name= removes one. Every write sets the restart dirty bit.
+    const EXTERNAL_PATH = '/api/dsh-electro-lab/external-tools'
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: EXTERNAL_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        const method = request.method ?? 'GET'
+        res.setHeader('content-type', 'application/json')
+        if (method === 'PUT') {
+          const encoded = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('config')
+          if (encoded === null) {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: 'config parameter is required (base64 JSON)' }))
+            return
+          }
+          let config: unknown
+          try {
+            config = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
+          } catch {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: 'config is not valid base64 JSON' }))
+            return
+          }
+          const errors = validateExternalTool(config)
+          if (errors.length > 0) {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: errors.join('; ') }))
+            return
+          }
+          upsertExternalTool(recordsHome, config as never)
+          res.end(JSON.stringify({ saved: true, restartRequired: true }))
+          return
+        }
+        if (method === 'DELETE') {
+          const name = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('name')
+          const deleted = name !== null && deleteExternalTool(recordsHome, name)
+          res.end(JSON.stringify({ deleted, restartRequired: restartRequired(recordsHome) }))
+          return
+        }
+        if (method !== 'GET') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        res.end(JSON.stringify({ tools: readExternalTools(recordsHome), restartRequired: restartRequired(recordsHome) }))
+      },
+    }))
+
+    return () => {
+      for (const off of disposers) off()
+    }
+  }, 'dsh-electro-lab: external tools')
 
   try {
     const synced = installPresets()
