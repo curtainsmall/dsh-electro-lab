@@ -99,7 +99,7 @@ DeepSeek Harness ElectroLab 插件的全部工具，按领域分组。所有工�
 
 | 工具 | 用途 |
 |---|---|
-| `convert` | 换算到同一族任意单位（°C/°F/K、bar/psi/atm/Pa、cal/kWh/J、hp/W、inch/mile/m、lb/oz/kg、degree→radian、ratio ↔ dB） |
+| `convert_unit` | 换算到同一族任意单位（°C/°F/K、bar/psi/atm/Pa、cal/kWh/J、hp/W、inch/mile/m、lb/oz/kg、degree→radian、ratio ↔ dB） |
 
 ## 编排
 

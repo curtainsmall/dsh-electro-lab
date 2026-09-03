@@ -76,7 +76,7 @@ const FAMILY_OF: Record<ConvertUnit, ConvertFamily> = {
 
 export const unitTools = [
   defineJsonTool({
-    name: 'convert',
+    name: 'convert_unit',
     description: 'Convert a value from one unit to any other unit of the same family: temperature (celsius, fahrenheit, kelvin), pressure (bar, psi, atm, pascal), energy (calorie, kilocalorie, watthour, kilowatthour, joule), power (horsepower, watt), length (inch, foot, yard, mile, metre), mass (pound, ounce, kilogram), angle (degree → radian only; angles are always radians), log scale (ratio ↔ db, requires kind linear|quadratic). The result is returned in the target unit.',
     parameters: {
       value: { ...createValueParam(QuantityKind.None, 'value in the source unit'), required: true },

@@ -73,7 +73,7 @@ describe('record manager (record_question opens, record_answer settles)', () => 
   })
 
   it('recognises every registered tool, the markers and solve_steps/filter_design', () => {
-    for (const name of ['calculate', 'resonance', 'convert', 'transient_response', 'solve_steps', 'filter_design', 'record_question', 'record_analyse', 'record_answer']) {
+    for (const name of ['calculate', 'resonance', 'convert_unit', 'transient_response', 'solve_steps', 'filter_design', 'record_question', 'record_analyse', 'record_answer']) {
       expect(RECORD_TOOL_NAMES.has(name)).toBe(true)
     }
     expect(RECORD_TOOL_NAMES.has('some_foreign_tool')).toBe(false)

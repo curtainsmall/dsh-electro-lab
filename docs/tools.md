@@ -99,7 +99,7 @@ All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every to
 
 | Tool | Purpose |
 |---|---|
-| `convert` | Convert a value to any unit of the same family (°C/°F/K, bar/psi/atm/Pa, cal/kWh/J, hp/W, inch/mile/m, lb/oz/kg, degree→radian, ratio ↔ dB) |
+| `convert_unit` | Convert a value to any unit of the same family (°C/°F/K, bar/psi/atm/Pa, cal/kWh/J, hp/W, inch/mile/m, lb/oz/kg, degree→radian, ratio ↔ dB) |
 
 ## Orchestration
 
