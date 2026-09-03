@@ -31,8 +31,8 @@ export const noiseTools = [
       bandwidth: { ...createValueParam(QuantityKind.Frequency, 'bandwidth in Hz'), required: true },
     },
     execute: (args) => {
-      const temperature = toScalar(args.temperature, QuantityKind.None)
-      const bandwidth = toScalar(args.bandwidth, QuantityKind.Frequency)
+      const temperature = toScalar(args.temperature)
+      const bandwidth = toScalar(args.bandwidth)
       const watts = calcThermalNoisePower(temperature, bandwidth)
       const out: Record<string, JsonValue> = {
         temperature: serializeReal(temperature, QuantityKind.None),
@@ -56,8 +56,8 @@ export const noiseTools = [
       gainDb: { ...dbArrayParam('per-stage gains in dB, first stage first'), required: true },
     },
     execute: (args) => {
-      const noiseFigureDb = args.noiseFigureDb.map((value) => toScalar(value, QuantityKind.Log))
-      const gainDb = args.gainDb.map((value) => toScalar(value, QuantityKind.Log))
+      const noiseFigureDb = args.noiseFigureDb.map((value) => toScalar(value))
+      const gainDb = args.gainDb.map((value) => toScalar(value))
       return {
         totalNoiseFigureDb: serializeReal(calcCascadeNoiseFigure(noiseFigureDb, gainDb), QuantityKind.Log),
       }

@@ -5,7 +5,6 @@
 import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { QuantityKind } from '../math/quantity-kind.ts'
-import { Form } from '../math/convert.ts'
 
 /**
  * Declared return shape of a tool, used by the record layer to tag stored
@@ -34,59 +33,58 @@ export type ToolReturns =
 export const TOOL_RETURNS = new Map<string, ToolReturns>()
 
 /**
- * The one parameter shape: a self-describing value, enum-union of two
- * mutually exclusive forms (rect | polar-radians). The expected kind is
- * baked into each branch as an enum and the form into consts, so mismatches
- * fail framework validation before execute runs. Angles are radians (SI).
+ * The one parameter shape for any value payload: a bare number (a real
+ * value), a compact complex object — {re, im} for the rect form or {mag, ang}
+ * (angles in radians) for the polar form. The payload carries no kind and no
+ * form: the expected quantity kind is pinned per parameter by this factory's
+ * `kind` argument (surfaced in the parameter description). The branches
+ * deliberately allow extra keys, so legacy {form,…} payloads and output
+ * snapshots (re/im plus mag/ang/kind) still match by key presence — the
+ * runtime unwrapper reads re/im or mag/ang and ignores everything else.
+ * Angles are radians (SI).
  */
 export function createValueParam<const U extends QuantityKind>(kind: U, description: string): {
   oneOf: [
+    { type: 'number'; description: string },
     {
       type: 'object'
-      additionalProperties: false
+      additionalProperties: true
       description: string
       properties: {
-        form: { type: 'string'; const: Form.Rect; description: string; required: true }
         re: { type: 'number'; description: string; required: true }
         im: { type: 'number'; description: string; required: true }
-        kind: { type: 'string'; enum: [U]; description: string; required: true }
       }
     },
     {
       type: 'object'
-      additionalProperties: false
+      additionalProperties: true
       description: string
       properties: {
-        form: { type: 'string'; const: Form.Polar; description: string; required: true }
         mag: { type: 'number'; description: string; required: true }
         ang: { type: 'number'; description: string; required: true }
-        kind: { type: 'string'; enum: [U]; description: string; required: true }
       }
     },
   ]
 } {
   return {
     oneOf: [
+      { type: 'number', description },
       {
         type: 'object',
-        additionalProperties: false,
+        additionalProperties: true,
         description,
         properties: {
-          form: { type: 'string', const: Form.Rect, description: 'rectangular form', required: true },
           re: { type: 'number', description: 'real part in base SI units', required: true },
           im: { type: 'number', description: 'imaginary part in base SI units (0 for real values)', required: true },
-          kind: { type: 'string', enum: [kind], description: `kind (fixed): ${kind}`, required: true },
         },
       },
       {
         type: 'object',
-        additionalProperties: false,
+        additionalProperties: true,
         description,
         properties: {
-          form: { type: 'string', const: Form.Polar, description: 'polar form', required: true },
-          mag: { type: 'number', description: 'mag in base SI units', required: true },
+          mag: { type: 'number', description: 'magnitude in base SI units', required: true },
           ang: { type: 'number', description: 'phase angle in radians', required: true },
-          kind: { type: 'string', enum: [kind], description: `kind (fixed): ${kind}`, required: true },
         },
       },
     ],

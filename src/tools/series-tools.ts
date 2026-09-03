@@ -38,8 +38,8 @@ export const seriesTools = [
             throw new Error('arithmetic requires firstTerm, commonDifference and count')
           }
           const { sum, lastTerm } = calcArithmeticSeries(
-            toScalar(args.firstTerm, QuantityKind.None),
-            toScalar(args.commonDifference, QuantityKind.None),
+            toScalar(args.firstTerm),
+            toScalar(args.commonDifference),
             args.count,
           )
           return { kind: args.kind, sum: serializeReal(sum, QuantityKind.None), lastTerm: serializeReal(lastTerm, QuantityKind.None) }
@@ -48,8 +48,8 @@ export const seriesTools = [
           if (args.firstTerm === undefined || args.commonRatio === undefined) {
             throw new Error('geometric requires firstTerm and commonRatio')
           }
-          const firstTerm = toScalar(args.firstTerm, QuantityKind.None)
-          const commonRatio = toScalar(args.commonRatio, QuantityKind.None)
+          const firstTerm = toScalar(args.firstTerm)
+          const commonRatio = toScalar(args.commonRatio)
           const infinite = args.infinite ?? false
           if (!infinite && args.count === undefined) throw new Error('geometric requires count unless infinite is true')
           const result = calcGeometricSeries(firstTerm, commonRatio, args.count ?? 1, infinite)

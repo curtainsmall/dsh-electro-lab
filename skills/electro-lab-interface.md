@@ -10,9 +10,7 @@ The operational details of the electro-lab toolset. This skill is template-indep
 
 ## Value format
 
-Values are complex value objects in SI base units: rectangular `{"form": "rect", "re": …, "im": 0, "kind": "frequency"}` or polar `{"form": "polar", "mag": …, "ang": …, "kind": "frequency"}`. Angles are always radians (SI). `kind` is the quantity category (`frequency`, `resistance`, `capacitance`, `inductance`, `voltage`, `current`, `power`, `time`, `none`, `angle`, `log`).
-
-Value parameters are OBJECTS, never strings: do not pass a value as a stringified JSON string, a bare number, or an object with the wrong `kind` or a missing field — the tool rejects it ("must match exactly one oneOf branch"). Take `kind` and the exact field names from the tool's schema.
+Values are complex quantities in SI base units. A value parameter takes a bare number (a real value) or a compact complex object — `{"re": …, "im": …}` (rect) or `{"mag": …, "ang": …}` (polar, angles in radians). Every parameter's declaration pins its quantity kind. Take the accepted branches and the exact field names from the tool's schema.
 
 ## Tool-call discipline
 

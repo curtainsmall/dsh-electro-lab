@@ -96,7 +96,7 @@ export const unitTools = [
       kind: { type: 'string', enum: [RatioKind.Linear, RatioKind.Quadratic], description: 'linear (power-like, 10·log10) or quadratic (amplitude-like, 20·log10); required when converting between ratio and db' },
     },
     execute: (args): Record<string, JsonValue> => {
-      const value = toComplex(args.value, QuantityKind.None)
+      const value = toComplex(args.value)
       // One O(1) lookup per unit; the family check runs once, not per branch.
       const fromFamily = FAMILY_OF[args.from as ConvertUnit]
       const toFamily = FAMILY_OF[args.to as ConvertUnit]

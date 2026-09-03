@@ -44,7 +44,7 @@ export const dftTools = [
     },
     execute: (args) => {
       const window = args.window ?? WindowKind.None
-      const samples = args.samples.map((sample) => toComplex(sample, QuantityKind.None))
+      const samples = args.samples.map((sample) => toComplex(sample))
       const weighted = applyWindow(samples, calcWindowSamples(window, samples.length))
       return {
         window,
@@ -65,7 +65,7 @@ export const dftTools = [
       spectrum: { ...createSequenceParam('spectral bins, kind none'), required: true },
     },
     execute: (args) => {
-      const spectrum = args.spectrum.map((bin) => toComplex(bin, QuantityKind.None))
+      const spectrum = args.spectrum.map((bin) => toComplex(bin))
       return {
         samples: calcInvDiscreteFourierTransform(spectrum).map((sample) => serializeComplex(sample, QuantityKind.None)),
       }
@@ -95,7 +95,7 @@ export const dftTools = [
       amplitude: { ...createValueParam(QuantityKind.None, 'peak amplitude (default 1)') },
     },
     execute: (args) => {
-      const amplitude = args.amplitude === undefined ? 1 : toScalar(args.amplitude, QuantityKind.None)
+      const amplitude = args.amplitude === undefined ? 1 : toScalar(args.amplitude)
       const coefficients = calcFourierSeriesCoeffs(args.waveform, args.harmonics, amplitude)
       return {
         waveform: args.waveform,
@@ -130,7 +130,7 @@ export const dftTools = [
     },
     execute: (args) => {
       const window = args.window ?? WindowKind.None
-      const samples = args.samples.map((sample) => toComplex(sample, QuantityKind.None))
+      const samples = args.samples.map((sample) => toComplex(sample))
       const result = calcSignalAnalysis(samples, window)
       return {
         window,

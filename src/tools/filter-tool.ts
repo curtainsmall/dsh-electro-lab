@@ -45,8 +45,8 @@ export const filterTool = defineJsonTool({
   },
   execute: (args) => {
     const order = args.order
-    const cutoffFrequency = toScalar(args.cutoffFrequency, QuantityKind.Frequency)
-    const resistance = toScalar(args.resistance, QuantityKind.Resistance)
+    const cutoffFrequency = toScalar(args.cutoffFrequency)
+    const resistance = toScalar(args.resistance)
     const elements = designButterworthLowpass(order, cutoffFrequency, resistance)
     const out: Record<string, JsonValue> = {
       response: 'lowpass',
@@ -75,7 +75,7 @@ export const filterTool = defineJsonTool({
       attenuationAtCutoffDb: serializeReal(calcButterworthAttenuation(order, cutoffFrequency, cutoffFrequency), QuantityKind.Log),
     }
     if (args.queryFrequency !== undefined) {
-      const queryFrequency = toScalar(args.queryFrequency, QuantityKind.Frequency)
+      const queryFrequency = toScalar(args.queryFrequency)
       out.attenuationAtQueryDb = serializeReal(calcButterworthAttenuation(order, cutoffFrequency, queryFrequency), QuantityKind.Log)
     }
     return out

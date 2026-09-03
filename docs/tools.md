@@ -1,6 +1,6 @@
 # Tool Catalog
 
-All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every tool speaks the same value-object contract: inputs are `{form, re, im, kind}` (rect) or `{form, mag, ang, kind}` (polar) in SI base units, outputs are `{re, im, kind, mag, ang}` snapshots. ✅ marks combination tools that orchestrate several math kernels in one call.
+All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every tool speaks the same value contract: a value parameter is a bare number (a real value) or a compact complex object — `{re, im}` (rectangular) or `{mag, ang}` (polar, angles in radians). Every parameter declaration pins its quantity kind. Outputs are `{re, im, kind, mag, ang}` snapshots in SI base units. ✅ marks combination tools that orchestrate several math kernels in one call.
 
 ## Expression & algebra
 

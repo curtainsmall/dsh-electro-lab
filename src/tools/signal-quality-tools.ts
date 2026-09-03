@@ -31,7 +31,7 @@ export const signalQualityTools = [
       harmonics: { type: 'integer', description: 'harmonics to include, starting at 2nd (default 10)' },
     },
     execute: (args): Record<string, JsonValue> => {
-      const samples = args.samples.map((sample) => toScalar(sample, QuantityKind.None))
+      const samples = args.samples.map((sample) => toScalar(sample))
       const harmonics = args.harmonics ?? 10
       const result = calcThd(samples, harmonics)
       return {
@@ -57,8 +57,8 @@ export const signalQualityTools = [
     },
     execute: (args): Record<string, JsonValue> => {
       const snrDb = calcJitterSnr(
-        toScalar(args.signalFrequency, QuantityKind.Frequency),
-        toScalar(args.jitter, QuantityKind.Time),
+        toScalar(args.signalFrequency),
+        toScalar(args.jitter),
       )
       return { snrDb: serializeReal(snrDb, QuantityKind.Log) }
     },
@@ -85,9 +85,9 @@ export const signalQualityTools = [
     execute: (args): Record<string, JsonValue> => {
       const result = calcAdcBudget(
         args.bits,
-        toScalar(args.signalFrequency, QuantityKind.Frequency),
-        toScalar(args.jitter, QuantityKind.Time),
-        args.thermalSnrDb === undefined ? undefined : toScalar(args.thermalSnrDb, QuantityKind.Log),
+        toScalar(args.signalFrequency),
+        toScalar(args.jitter),
+        args.thermalSnrDb === undefined ? undefined : toScalar(args.thermalSnrDb),
       )
       const out: Record<string, JsonValue> = {
         snrQuantizationDb: serializeReal(result.snrQuantizationDb, QuantityKind.Log),

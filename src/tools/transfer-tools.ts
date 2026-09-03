@@ -51,8 +51,8 @@ export const transferTools = [
       denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
-      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
+      const numerator = args.numerator.map((value) => toComplex(value))
+      const denominator = args.denominator.map((value) => toComplex(value))
       const result = expandPartialFraction(numerator, denominator)
       const terms: JsonValue[] = result.terms.map((term) => ({
         pole: serializeComplex(term.pole, QuantityKind.None),
@@ -95,10 +95,10 @@ export const transferTools = [
       sampleTime: { ...createValueParam(QuantityKind.Time, 'sample time in seconds (required for variable "z")') },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
-      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
-      const frequencies = args.frequencies.map((value) => toScalar(value, QuantityKind.Frequency))
-      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, QuantityKind.Time)
+      const numerator = args.numerator.map((value) => toComplex(value))
+      const denominator = args.denominator.map((value) => toComplex(value))
+      const frequencies = args.frequencies.map((value) => toScalar(value))
+      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime)
       const points = calcFreqPoints(args.variable, frequencies, sampleTime)
       return {
         variable: args.variable,
@@ -127,9 +127,9 @@ export const transferTools = [
       },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
-      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
-      const times = args.times.map((value) => toScalar(value, QuantityKind.Time))
+      const numerator = args.numerator.map((value) => toComplex(value))
+      const denominator = args.denominator.map((value) => toComplex(value))
+      const times = args.times.map((value) => toScalar(value))
       return {
         values: calcStepResponse(numerator, denominator, times).map((value) => serializeComplex(value, QuantityKind.None)),
       }
@@ -150,9 +150,9 @@ export const transferTools = [
       input: { ...createSequenceParam('input samples x[n], kind none'), required: true },
     },
     execute: (args) => {
-      const a = args.a.map((value) => toComplex(value, QuantityKind.None))
-      const b = args.b.map((value) => toComplex(value, QuantityKind.None))
-      const input = args.input.map((value) => toComplex(value, QuantityKind.None))
+      const a = args.a.map((value) => toComplex(value))
+      const b = args.b.map((value) => toComplex(value))
+      const input = args.input.map((value) => toComplex(value))
       return {
         output: solveDifferenceEquation(a, b, input).map((value) => serializeComplex(value, QuantityKind.None)),
       }
@@ -188,13 +188,13 @@ export const transferTools = [
       sampleTime: { ...createValueParam(QuantityKind.Time, 'sample time in seconds (required for variable "z")') },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
-      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
+      const numerator = args.numerator.map((value) => toComplex(value))
+      const denominator = args.denominator.map((value) => toComplex(value))
       const variable = args.variable ?? Variable.S
-      const frequencyStart = toScalar(args.frequencyStart, QuantityKind.Frequency)
-      const frequencyEnd = toScalar(args.frequencyEnd, QuantityKind.Frequency)
+      const frequencyStart = toScalar(args.frequencyStart)
+      const frequencyEnd = toScalar(args.frequencyEnd)
       const pointsPerDecade = args.pointsPerDecade ?? 10
-      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime, QuantityKind.Time)
+      const sampleTime = args.sampleTime === undefined ? undefined : toScalar(args.sampleTime)
       const result = calcBodeResponse(numerator, denominator, variable, frequencyStart, frequencyEnd, pointsPerDecade, sampleTime)
       return {
         variable,

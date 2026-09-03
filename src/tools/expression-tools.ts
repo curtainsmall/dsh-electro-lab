@@ -34,7 +34,7 @@ export const expressionTools = [
     execute: (args) => {
       const variables: Record<string, Complex> = {}
       for (const binding of args.variables ?? []) {
-        variables[binding.name] = toComplex(binding.value, QuantityKind.None)
+        variables[binding.name] = toComplex(binding.value)
       }
       return serializeComplex(calcExpression(args.expression, variables), QuantityKind.None)
     },
@@ -73,7 +73,7 @@ export const expressionTools = [
       const variable = args.variable ?? 'x'
       const parameters: Record<string, Complex> = {}
       for (const binding of args.variables ?? []) {
-        parameters[binding.name] = toComplex(binding.value, QuantityKind.None)
+        parameters[binding.name] = toComplex(binding.value)
       }
       const { numerator, denominator } = reduceRational(args.expression, variable, args.reduce ?? true, parameters)
       return {

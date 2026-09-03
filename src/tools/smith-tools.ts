@@ -30,8 +30,8 @@ export const smithTools = [
       referenceImpedance: { ...createValueParam(QuantityKind.Resistance, 'reference impedance (default 50)') },
     },
     execute: (args) => {
-      const impedance = toComplex(args.impedance, QuantityKind.Resistance)
-      const referenceImpedance = args.referenceImpedance === undefined ? 50 : toScalar(args.referenceImpedance, QuantityKind.Resistance)
+      const impedance = toComplex(args.impedance)
+      const referenceImpedance = args.referenceImpedance === undefined ? 50 : toScalar(args.referenceImpedance)
       return serializeComplex(convertImpedanceToReflection(impedance, referenceImpedance), QuantityKind.None)
     },
   }),
@@ -49,7 +49,7 @@ export const smithTools = [
       reflectionCoefficient: { ...createValueParam(QuantityKind.None, 'reflection coefficient'), required: true },
     },
     execute: (args) => {
-      const reflectionCoefficient = toComplex(args.reflectionCoefficient, QuantityKind.None)
+      const reflectionCoefficient = toComplex(args.reflectionCoefficient)
       const vswr = convertReflectionToVswr(reflectionCoefficient)
       return { vswr: serializeReal(vswr, QuantityKind.None), infinite: vswr === Number.POSITIVE_INFINITY }
     },
@@ -68,7 +68,7 @@ export const smithTools = [
       reflectionCoefficient: { ...createValueParam(QuantityKind.None, 'reflection coefficient'), required: true },
     },
     execute: (args) => {
-      const reflectionCoefficient = toComplex(args.reflectionCoefficient, QuantityKind.None)
+      const reflectionCoefficient = toComplex(args.reflectionCoefficient)
       const db = calcReturnLossDb(reflectionCoefficient)
       return { returnLossDb: serializeReal(db, QuantityKind.Log), infinite: db === Number.POSITIVE_INFINITY }
     },
@@ -82,8 +82,8 @@ export const smithTools = [
       loadImpedance: { ...createValueParam(QuantityKind.Resistance, 'real load impedance'), required: true },
     },
     execute: (args) => {
-      const lineImpedance = toScalar(args.lineImpedance, QuantityKind.Resistance)
-      const loadImpedance = toScalar(args.loadImpedance, QuantityKind.Resistance)
+      const lineImpedance = toScalar(args.lineImpedance)
+      const loadImpedance = toScalar(args.loadImpedance)
       return serializeComplex(new Complex(calcQuarterWaveImpedance(lineImpedance, loadImpedance), 0), QuantityKind.Resistance)
     },
   }),
@@ -144,10 +144,10 @@ export const smithTools = [
       qualityFactor: { ...createValueParam(QuantityKind.None, 'quality factor (required for pi/t; optional for l)') },
     },
     execute: (args) => {
-      const sourceImpedance = toScalar(args.sourceImpedance, QuantityKind.Resistance)
-      const loadImpedance = toScalar(args.loadImpedance, QuantityKind.Resistance)
-      const frequency = toScalar(args.frequency, QuantityKind.Frequency)
-      const qualityFactor = args.qualityFactor === undefined ? undefined : toScalar(args.qualityFactor, QuantityKind.None)
+      const sourceImpedance = toScalar(args.sourceImpedance)
+      const loadImpedance = toScalar(args.loadImpedance)
+      const frequency = toScalar(args.frequency)
+      const qualityFactor = args.qualityFactor === undefined ? undefined : toScalar(args.qualityFactor)
       const design = designMatch(args.topology, sourceImpedance, loadImpedance, frequency, qualityFactor)
       const angularFrequency = 2 * Math.PI * frequency
       const serialize = (elements: MatchElement[]): JsonValue[] =>

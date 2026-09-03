@@ -47,7 +47,7 @@ export const circuitTools = [
       },
     },
     execute: (args) => {
-      const parts = args.impedances.map((item) => toComplex(item, QuantityKind.Resistance))
+      const parts = args.impedances.map((item) => toComplex(item))
       let total: Complex
       switch (args.topology) {
         case CircuitMode.Series:
@@ -72,7 +72,7 @@ export const circuitTools = [
       frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency'), required: true },
     },
     execute: (args) => {
-      const frequency = toScalar(args.frequency, QuantityKind.Frequency)
+      const frequency = toScalar(args.frequency)
       const node = validateNetwork(args.network)
       return serializeComplex(calcNetworkImpedance(node, frequency), QuantityKind.Resistance)
     },
@@ -96,9 +96,9 @@ export const circuitTools = [
       mode: { type: 'string', enum: [CircuitMode.Series, CircuitMode.Parallel], description: 'resonance mode (default series)' },
     },
     execute: (args) => {
-      const inductance = toScalar(args.inductance, QuantityKind.Inductance)
-      const capacitance = toScalar(args.capacitance, QuantityKind.Capacitance)
-      const resistance = args.resistance === undefined ? undefined : toScalar(args.resistance, QuantityKind.Resistance)
+      const inductance = toScalar(args.inductance)
+      const capacitance = toScalar(args.capacitance)
+      const resistance = args.resistance === undefined ? undefined : toScalar(args.resistance)
       const mode = args.mode ?? CircuitMode.Series
       const { resonantFrequency, qualityFactor, bandwidth } = calcResonance(inductance, capacitance, resistance, mode)
       const out: Record<string, JsonValue> = { resonantFrequency: serializeReal(resonantFrequency, QuantityKind.Frequency), mode }
@@ -125,9 +125,9 @@ export const circuitTools = [
       phaseAngle: { ...createValueParam(QuantityKind.Angle, 'phase angle between V and I in radians (default 0)') },
     },
     execute: (args) => {
-      const rmsVoltage = toScalar(args.rmsVoltage, QuantityKind.Voltage)
-      const rmsCurrent = toScalar(args.rmsCurrent, QuantityKind.Current)
-      const phaseAngle = args.phaseAngle === undefined ? 0 : toScalar(args.phaseAngle, QuantityKind.Angle)
+      const rmsVoltage = toScalar(args.rmsVoltage)
+      const rmsCurrent = toScalar(args.rmsCurrent)
+      const phaseAngle = args.phaseAngle === undefined ? 0 : toScalar(args.phaseAngle)
       const { apparent, real, reactive, powerFactor } = calcAcPower(rmsVoltage, rmsCurrent, phaseAngle)
       return {
         apparent: serializeReal(apparent, QuantityKind.Power),
@@ -180,9 +180,9 @@ export const circuitTools = [
     },
     execute: (args): Record<string, JsonValue> => {
       const mode = args.mode
-      const resistance = toScalar(args.resistance, QuantityKind.Resistance)
-      const times = args.times.map((item) => toScalar(item, QuantityKind.Time))
-      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage, QuantityKind.Voltage)
+      const resistance = toScalar(args.resistance)
+      const times = args.times.map((item) => toScalar(item))
+      const sourceVoltage = args.sourceVoltage === undefined ? 0 : toScalar(args.sourceVoltage)
       const serialize = (point: { time: number; voltage: number; current: number }) => ({
         time: serializeReal(point.time, QuantityKind.Time),
         voltage: serializeReal(point.voltage, QuantityKind.Voltage),
@@ -191,8 +191,8 @@ export const circuitTools = [
       switch (args.kind) {
         case 'rl': {
           if (args.inductance === undefined) throw new Error('rl kind requires inductance')
-          const inductance = toScalar(args.inductance, QuantityKind.Inductance)
-          const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent, QuantityKind.Current)
+          const inductance = toScalar(args.inductance)
+          const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent)
           if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
           if (mode === SwitchingMode.Discharge && args.initialCurrent === undefined) throw new Error('discharge mode requires initialCurrent')
           const { points } = calcRlTransientSeries(mode, sourceVoltage, initialCurrent, resistance, inductance, times)
@@ -200,8 +200,8 @@ export const circuitTools = [
         }
         case 'rc': {
           if (args.capacitance === undefined) throw new Error('rc kind requires capacitance')
-          const capacitance = toScalar(args.capacitance, QuantityKind.Capacitance)
-          const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage, QuantityKind.Voltage)
+          const capacitance = toScalar(args.capacitance)
+          const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage)
           if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
           if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined) throw new Error('discharge mode requires initialVoltage')
           const { points } = calcRcTransientSeries(mode, sourceVoltage, initialVoltage, resistance, capacitance, times)
@@ -210,10 +210,10 @@ export const circuitTools = [
         case 'rlc': {
           if (args.capacitance === undefined) throw new Error('rlc kind requires capacitance')
           if (args.inductance === undefined) throw new Error('rlc kind requires inductance')
-          const capacitance = toScalar(args.capacitance, QuantityKind.Capacitance)
-          const inductance = toScalar(args.inductance, QuantityKind.Inductance)
-          const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage, QuantityKind.Voltage)
-          const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent, QuantityKind.Current)
+          const capacitance = toScalar(args.capacitance)
+          const inductance = toScalar(args.inductance)
+          const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage)
+          const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent)
           if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
           if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined && args.initialCurrent === undefined) {
             throw new Error('discharge mode requires initialVoltage or initialCurrent')
@@ -251,7 +251,7 @@ export function validateNetwork(input: unknown): NetworkElement {
     if (expected === undefined) throw new Error(`unknown element kind "${kind}"`)
     let value: number
     try {
-      value = toScalar(node as ComplexValue, expected)
+      value = toScalar(node as ComplexValue)
     } catch (error) {
       throw new Error(`element "${kind}" needs a non-negative real ${kind} value (${error instanceof Error ? error.message : String(error)})`)
     }

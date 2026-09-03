@@ -33,8 +33,8 @@ export const polynomialTools = [
       denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
-      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
+      const numerator = args.numerator.map((value) => toComplex(value))
+      const denominator = args.denominator.map((value) => toComplex(value))
       const { zeros, poles } = findPolesZeros(numerator, denominator)
       return {
         numeratorDegree: numerator.length - 1,
@@ -60,8 +60,8 @@ export const polynomialTools = [
       count: { type: 'integer', description: 'number of leading coefficients h[0]..h[count−1]', required: true },
     },
     execute: (args) => {
-      const numerator = args.numerator.map((value) => toComplex(value, QuantityKind.None))
-      const denominator = args.denominator.map((value) => toComplex(value, QuantityKind.None))
+      const numerator = args.numerator.map((value) => toComplex(value))
+      const denominator = args.denominator.map((value) => toComplex(value))
       return {
         count: args.count,
         coefficients: expandPowerSeries(numerator, denominator, args.count).map((coefficient) => serializeComplex(coefficient, QuantityKind.None)),

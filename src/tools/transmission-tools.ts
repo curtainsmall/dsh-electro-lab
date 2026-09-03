@@ -30,8 +30,8 @@ export const transmissionTools = [
       velocityFactor: { ...createValueParam(QuantityKind.None, 'velocity factor (default 1)') },
     },
     execute: (args) => {
-      const frequency = toScalar(args.frequency, QuantityKind.Frequency)
-      const velocityFactor = args.velocityFactor === undefined ? 1 : toScalar(args.velocityFactor, QuantityKind.None)
+      const frequency = toScalar(args.frequency)
+      const velocityFactor = args.velocityFactor === undefined ? 1 : toScalar(args.velocityFactor)
       return {
         frequency: serializeReal(frequency, QuantityKind.Frequency),
         velocityFactor: serializeReal(velocityFactor, QuantityKind.None),
@@ -57,9 +57,9 @@ export const transmissionTools = [
       relativePermittivity: { ...createValueParam(QuantityKind.None, 'dielectric relative permittivity'), required: true },
     },
     execute: (args) => {
-      const innerDiameter = toScalar(args.innerDiameter, QuantityKind.None)
-      const outerDiameter = toScalar(args.outerDiameter, QuantityKind.None)
-      const relativePermittivity = toScalar(args.relativePermittivity, QuantityKind.None)
+      const innerDiameter = toScalar(args.innerDiameter)
+      const outerDiameter = toScalar(args.outerDiameter)
+      const relativePermittivity = toScalar(args.relativePermittivity)
       const result = calcCoaxialParameters(innerDiameter, outerDiameter, relativePermittivity)
       const out: Record<string, JsonValue> = {
         impedance: serializeReal(result.impedance, QuantityKind.Resistance),
@@ -85,8 +85,8 @@ export const transmissionTools = [
       riseTime: { ...createValueParam(QuantityKind.Time, 'rise time in seconds (10–90 %)') },
     },
     execute: (args) => {
-      const bandwidth = args.bandwidth === undefined ? undefined : toScalar(args.bandwidth, QuantityKind.Frequency)
-      const riseTime = args.riseTime === undefined ? undefined : toScalar(args.riseTime, QuantityKind.Time)
+      const bandwidth = args.bandwidth === undefined ? undefined : toScalar(args.bandwidth)
+      const riseTime = args.riseTime === undefined ? undefined : toScalar(args.riseTime)
       if ((bandwidth === undefined) === (riseTime === undefined)) {
         throw new Error('provide exactly one of bandwidth or riseTime')
       }

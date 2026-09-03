@@ -1,24 +1,21 @@
 /**
  * JSON IO contract for tool values: every quantity crossing the tool
- * boundary is a self-describing value object with a `kind` (a QuantityKind
- * enum value) and re/im in SI base units. A quantity and its SI unit are
- * one-to-one, so the kind IS the unit category — the single term "kind" is
- * used throughout the contract.
+ * boundary is a complex number in SI base units, and a quantity and its SI
+ * unit are one-to-one, so the kind IS the unit category — the single term
+ * "kind" is used throughout the contract. Kinds are pinned by the static
+ * tool definitions (parameter schemas, outputs); an input payload does not
+ * need to repeat its kind and no kind check is applied on unwrap.
  *
- * INPUT — enum-union of two mutually exclusive forms (oneOf in the
- * schema, so exactly one branch matches):
- *   rect  { form: Form.Rect,  re, im, kind }
- *   polar { form: Form.Polar, mag, ang, kind }   (angles are radians — SI)
+ * INPUT — a value parameter accepts a bare number (a real value), a compact
+ * complex object ({re, im} for rect, or {mag, ang} for polar — angles are
+ * radians, SI), or the legacy full forms:
+ *   rect  { form: Form.Rect,  re, im }     (kind optional)
+ *   polar { form: Form.Polar, mag, ang }   (kind optional, angles radians)
  *
  * OUTPUT — a complete snapshot, both projections always present:
  *   { re, im, kind, mag, ang }
- * The output feeds straight back into any input branch (re/im → rect,
- * mag + ang → polar).
- *
- * Validation is layered: the parameter schema bakes the expected kind
- * into an enum and the form into consts (framework-level), and these
- * helpers re-check on every unwrap (tool-level, also covering orchestrator
- * calls that bypass schema validation).
+ * The output feeds straight back into any input (re/im match the rect
+ * branch even with the extra mag/ang/kind keys).
  */
 import { Complex } from 'complex.js'
 import { QuantityKind, isNearlyEqual } from './quantity-kind.ts'
@@ -75,59 +72,29 @@ export type ComplexOutput = {
   ang: number
 }
 
-/** Raise unless the value carries the expected kind. */
-export function expectQuantity(value: ComplexValue, expected: QuantityKind): void {
-  if (value.kind !== expected) {
-    throw new Error(`kind mismatch: expected "${expected}", got "${value.kind}"`)
-  }
+/**
+ * Any payload shape a validated value parameter can carry: a bare number
+ * (real value) or the compact complex forms {re, im} / {mag, ang} with ang in
+ * radians. Output snapshots and legacy {form,…} objects match structurally
+ * (they contain re/im or mag/ang); their extra keys are ignored — the payload
+ * never carries a semantic kind, the schema pins it per parameter.
+ */
+export type ValuePayload = number | { re: number; im: number } | { mag: number; ang: number }
+
+/** Unwrap to a complex.js value from any accepted payload shape. */
+export function toComplex(value: ValuePayload): Complex {
+  if (typeof value === 'number') return new Complex(value, 0)
+  if ('re' in value) return new Complex(value.re, value.im)
+  return new Complex(value.mag * Math.cos(value.ang), value.mag * Math.sin(value.ang))
 }
 
-function polarAngle(value: PolarRadiansValue): number {
-  return value.ang
-}
-
-/** Unwrap to a complex.js value, validating the kind. Output snapshots
- *  (no `form` discriminator) are treated as rect values. */
-export function toComplex(value: ComplexValue, expected: QuantityKind): Complex {
-  expectQuantity(value, expected)
-  if (!('form' in value)) return new Complex(value.re, value.im)
-  switch (value.form) {
-    case Form.Rect:
-      return new Complex(value.re, value.im)
-    case Form.Polar: {
-      const phi = polarAngle(value)
-      return new Complex(value.mag * Math.cos(phi), value.mag * Math.sin(phi))
-    }
+/** Unwrap to a real number: the imaginary part must be negligible. */
+export function toScalar(value: ValuePayload): number {
+  const complex = toComplex(value)
+  if (!isNearlyEqual(complex.im, 0)) {
+    throw new Error(`expected a real value, got imaginary part ${complex.im}`)
   }
-}
-
-/** Unwrap to a real number, validating the kind. A rect value must have
- *  a negligible imaginary part; a polar value must sit on the real axis
- *  (angle ≈ 0° or 180°). */
-export function toScalar(value: ComplexValue, expected: QuantityKind): number {
-  expectQuantity(value, expected)
-  if (!('form' in value)) {
-    if (!isNearlyEqual(value.im, 0)) {
-      throw new Error(`expected a real value for kind "${expected}", got imaginary part ${value.im}`)
-    }
-    return value.re
-  }
-  switch (value.form) {
-    case Form.Rect: {
-      if (!isNearlyEqual(value.im, 0)) {
-        throw new Error(`expected a real value for kind "${expected}", got imaginary part ${value.im}`)
-      }
-      return value.re
-    }
-    case Form.Polar: {
-      const phi = polarAngle(value)
-      const halfTurns = phi / Math.PI
-      if (!isNearlyEqual(Math.abs(halfTurns % 1), 0) && !isNearlyEqual(Math.abs(halfTurns % 1), 1)) {
-        throw new Error(`expected a real value for kind "${expected}", got phase angle ${phi} rad`)
-      }
-      return value.mag * (Math.round(halfTurns) % 2 === 0 ? 1 : -1)
-    }
-  }
+  return complex.re
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Complex } from 'complex.js'
-import { Form, expectQuantity, serializeReal, serializeComplex, toComplex, toScalar, ConvertUnit, RatioKind, convertAngle, convertEnergy, convertLength, convertLogValue, convertMass, convertPower, convertPressure, convertTemperature } from '../../src/math/convert.ts'
+import { Form, serializeReal, serializeComplex, toComplex, toScalar, ConvertUnit, RatioKind, convertAngle, convertEnergy, convertLength, convertLogValue, convertMass, convertPower, convertPressure, convertTemperature } from '../../src/math/convert.ts'
 import { QuantityKind } from '../../src/math/quantity-kind.ts'
 
 function createRectValue(re: number, im: number, kind: QuantityKind): { form: Form.Rect; re: number; im: number; kind: QuantityKind } {
@@ -11,50 +11,84 @@ function createPolarRadiansValue(mag: number, ang: number, kind: QuantityKind): 
   return { form: Form.Polar, mag, ang, kind }
 }
 
-describe('toScalar — unwrap with kind validation', () => {
-  it('returns the real part when the kind matches', () => {
-    expect(toScalar(createRectValue(1000, 0, QuantityKind.Frequency), QuantityKind.Frequency)).toBe(1000)
-    expect(toScalar(createRectValue(1.5e-9, 0, QuantityKind.Capacitance), QuantityKind.Capacitance)).toBe(1.5e-9)
+describe('toScalar — any accepted shape unwraps to a real number', () => {
+  it('passes a bare number straight through (a real value)', () => {
+    expect(toScalar(1000)).toBe(1000)
+    expect(toScalar(1.5e-9)).toBe(1.5e-9)
+    expect(toScalar(-5)).toBe(-5)
   })
 
-  it('accepts polar values sitting on the real axis (0 rad / π rad)', () => {
-    expect(toScalar(createPolarRadiansValue(5, 0, QuantityKind.Voltage), QuantityKind.Voltage)).toBe(5)
-    expect(toScalar(createPolarRadiansValue(5, Math.PI, QuantityKind.Voltage), QuantityKind.Voltage)).toBe(-5)
+  it('accepts compact {re, im} and legacy rect objects (kind ignored)', () => {
+    expect(toScalar({ re: 1000, im: 0 })).toBe(1000)
+    expect(toScalar(createRectValue(1000, 0, QuantityKind.Frequency))).toBe(1000)
+    expect(toScalar(createRectValue(1.5e-9, 0, QuantityKind.Capacitance))).toBe(1.5e-9)
   })
 
-  it('rejects a mismatched kind', () => {
-    expect(() => toScalar(createRectValue(1000, 0, QuantityKind.Resistance), QuantityKind.Frequency)).toThrow(/kind mismatch/)
+  it('accepts polar values on the positive real axis (0 rad), compact and legacy', () => {
+    expect(toScalar({ mag: 5, ang: 0 })).toBe(5)
+    expect(toScalar(createPolarRadiansValue(5, 0, QuantityKind.Voltage))).toBe(5)
   })
 
-  it('rejects non-real values (createRectValue imaginary part, polar off-axis)', () => {
-    expect(() => toScalar(createRectValue(1000, 0.5, QuantityKind.Frequency), QuantityKind.Frequency)).toThrow(/expected a real value/)
-    expect(() => toScalar(createPolarRadiansValue(5, Math.PI / 4, QuantityKind.Voltage), QuantityKind.Voltage)).toThrow(/expected a real value/)
+  it('accepts output snapshots (extra mag/ang/kind keys are ignored)', () => {
+    // A snapshot variable (not a literal) so the extra keys pass structurally.
+    const snapshot: { re: number; im: number; mag: number; ang: number; kind: string } = { re: 1000, im: 0, mag: 1000, ang: 0, kind: 'frequency' }
+    expect(toScalar(snapshot)).toBe(1000)
+    expect(toScalar(createRectValue(1000, 0, QuantityKind.Resistance))).toBe(1000)
   })
+
+  it('rejects non-real values (imaginary part, polar off-axis)', () => {
+    expect(() => toScalar({ re: 1000, im: 0.5 })).toThrow(/expected a real value/)
+    expect(() => toScalar(createRectValue(1000, 0.5, QuantityKind.Frequency))).toThrow(/expected a real value/)
+    expect(() => toScalar({ mag: 5, ang: Math.PI / 4 })).toThrow(/expected a real value/)
+    expect(() => toScalar(createPolarRadiansValue(5, Math.PI / 4, QuantityKind.Voltage))).toThrow(/expected a real value/)
+    // a π-rad polar scalar is not exactly real in floating point: re = mag·cos(π)
+    // is exact but im = mag·sin(π) ≈ 6e-16, and isNearlyEqual is purely relative
+    expect(() => toScalar({ mag: 5, ang: Math.PI })).toThrow(/expected a real value/)
+    expect(() => toScalar(createPolarRadiansValue(5, Math.PI, QuantityKind.Voltage))).toThrow(/expected a real value/)
+  })
+  // Non-payload shapes ('12', null, {}, {re:1}, {form:'rect'}) are rejected by
+  // the schema layer before execute and by the ValuePayload type at compile
+  // time — they are not ValuePayload members and need no runtime test here.
 })
 
-describe('toComplex — unwrap with kind validation', () => {
-  it('returns the complex.js value from createRectValue input', () => {
-    const z = toComplex(createRectValue(50, 50, QuantityKind.Resistance), QuantityKind.Resistance)
+describe('toComplex — any accepted shape unwraps to a complex.js value', () => {
+  it('treats a bare number as a real value', () => {
+    const z = toComplex(5)
+    expect(z.re).toBe(5)
+    expect(z.im).toBe(0)
+  })
+
+  it('unwraps compact {re, im} (rect)', () => {
+    const z = toComplex({ re: 50, im: 50 })
     expect(z.re).toBe(50)
     expect(z.im).toBe(50)
   })
 
-  it('converts polar input (radians)', () => {
-    const z = toComplex(createPolarRadiansValue(5, Math.PI / 2, QuantityKind.Resistance), QuantityKind.Resistance)
-    expect(z.re).toBeCloseTo(0, 10)
-    expect(z.im).toBeCloseTo(5, 10)
+  it('converts legacy rect objects with a kind', () => {
+    const z = toComplex(createRectValue(50, 50, QuantityKind.Resistance))
+    expect(z.re).toBe(50)
+    expect(z.im).toBe(50)
   })
 
-  it('rejects a mismatched kind', () => {
-    expect(() => toComplex(createRectValue(50, 50, QuantityKind.Voltage), QuantityKind.Resistance)).toThrow(/kind mismatch/)
+  it('converts compact {mag, ang} and legacy polar input (radians)', () => {
+    const compact = toComplex({ mag: 5, ang: Math.PI / 2 })
+    expect(compact.re).toBeCloseTo(0, 10)
+    expect(compact.im).toBeCloseTo(5, 10)
+    const legacy = toComplex(createPolarRadiansValue(5, Math.PI / 2, QuantityKind.Resistance))
+    expect(legacy.re).toBeCloseTo(0, 10)
+    expect(legacy.im).toBeCloseTo(5, 10)
   })
-})
 
-describe('expectQuantity', () => {
-  it('passes on match and throws on mismatch', () => {
-    expect(() => expectQuantity(createRectValue(0, 0, QuantityKind.Time), QuantityKind.Time)).not.toThrow()
-    expect(() => expectQuantity(createRectValue(0, 0, QuantityKind.Time), QuantityKind.Frequency)).toThrow(/kind mismatch/)
+  it('accepts output snapshots regardless of their kind (no kind check)', () => {
+    // A snapshot variable (not a literal) so the extra keys pass structurally.
+    const snapshot: { re: number; im: number; kind: string; mag: number; ang: number } = { re: 50, im: 50, kind: 'voltage', mag: 70.7107, ang: Math.PI / 4 }
+    const z = toComplex(snapshot)
+    expect(z.re).toBe(50)
+    expect(z.im).toBe(50)
   })
+  // Non-payload shapes ('12', null, {}, {form:'rect'}) are rejected by the
+  // schema layer before execute and by the ValuePayload type at compile time
+  // — they are not ValuePayload members and need no runtime test here.
 })
 
 describe('serializeComplex — tool output', () => {
@@ -67,12 +101,12 @@ describe('serializeComplex — tool output', () => {
     expect(output.ang).toBeCloseTo(Math.PI / 4, 6)
   })
 
-  it('round-trips: the output feeds straight back into toComplex (createRectValue or polar)', () => {
+  it('round-trips: the output feeds straight back into toComplex', () => {
     const output = serializeComplex(new Complex(50, 50), QuantityKind.Resistance)
-    const backRect = toComplex(output, QuantityKind.Resistance)
+    const backRect = toComplex(output)
     expect(backRect.re).toBe(50)
     expect(backRect.im).toBe(50)
-    const backPolar = toComplex(createPolarRadiansValue(output.mag, output.ang, output.kind), QuantityKind.Resistance)
+    const backPolar = toComplex(createPolarRadiansValue(output.mag, output.ang, output.kind))
     expect(backPolar.re).toBeCloseTo(50, 10)
     expect(backPolar.im).toBeCloseTo(50, 10)
   })
