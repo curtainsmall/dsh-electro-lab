@@ -22,18 +22,21 @@ export const recordTools = [
   defineJsonTool({
     name: RECORD_QUESTION_TOOL,
     description: 'Open a new ElectroLab record and submit the consolidated question (verbatim). Call it FIRST, before any calculation tool — a second record_question while a record is open settles the open record as a duplicate-start error record and opens a new one.',
+    returns: { type: 'any' },
     parameters: { text: textParam },
     execute: () => ({ ok: true }),
   }),
   defineJsonTool({
     name: RECORD_ANALYSE_TOOL,
     description: 'Submit the analysis text of the current record (verbatim). Call it once before the calculation tools — knowns/conditions and the approach only, no computed numbers; it has no effect without an open record.',
+    returns: { type: 'any' },
     parameters: { text: textParam },
     execute: () => ({ ok: true }),
   }),
   defineJsonTool({
     name: RECORD_ANSWER_TOOL,
     description: 'Submit the final answer text (verbatim) and CLOSE the current record: it is settled and stored as-is. Call it LAST, after the tool calls. If you merge the whole template into this text instead of splitting it, the parts are recovered automatically.',
+    returns: { type: 'any' },
     parameters: { text: textParam },
     execute: () => ({ ok: true }),
   }),

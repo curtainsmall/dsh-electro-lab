@@ -78,6 +78,17 @@ export const unitTools = [
   defineJsonTool({
     name: 'convert_unit',
     description: 'Convert a value from one unit to any other unit of the same family: temperature (celsius, fahrenheit, kelvin), pressure (bar, psi, atm, pascal), energy (calorie, kilocalorie, watthour, kilowatthour, joule), power (horsepower, watt), length (inch, foot, yard, mile, metre), mass (pound, ounce, kilogram), angle (degree → radian only; angles are always radians), log scale (ratio ↔ db, requires kind linear|quadratic). The result is returned in the target unit.',
+    returns: {
+      type: 'object',
+      fields: {
+        from: { type: 'scalar' },
+        to: { type: 'scalar' },
+        // value is serializeComplex'd with the kind of the resolved unit family
+        // (temperature|pressure|energy|power|length|mass|angle|log) — no single
+        // QuantityKind covers every family, so the leaf stays untagged.
+        value: { type: 'any' },
+      },
+    },
     parameters: {
       value: { ...createValueParam(QuantityKind.None, 'value in the source unit'), required: true },
       from: { type: 'string', enum: ALL_UNITS, description: 'source unit', required: true },

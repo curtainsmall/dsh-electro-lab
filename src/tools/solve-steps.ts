@@ -63,6 +63,7 @@ export function createSolveStepsTool(ctx: Context): ToolDefinition {
   return defineJsonTool({
     name: 'solve_steps',
     description: 'Execute a deterministic multi-step calculation: each step calls an already-registered tool by name with its arguments; a step argument may be "@stepN" to reference the full output object of step N, or "@stepN.path.to.field" for a nested field (e.g. "@step1.numerator"). Steps run serially and every intermediate result is returned in stepResults (array order = step order). Use when the user asks for a worked calculation with exact numbers; conceptual questions do not need it.',
+    returns: { type: 'any' },
     parameters: {
       steps: {
         type: 'array',

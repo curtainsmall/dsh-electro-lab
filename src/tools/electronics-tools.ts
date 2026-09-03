@@ -23,6 +23,14 @@ export const electronicsTools = [
   defineJsonTool({
     name: 'opamp_configurations',
     description: 'Ideal op-amp gain/output for a configuration. Inverting: −Rf/Rin; non-inverting: 1+Rf/Rin; voltage-follower: 1; summing: −Rf(V₁/R₁+V₂/R₂); difference: (Rf/R1)(V₂−V₁); integrator: H(jω) = −1/(jωRC) at frequency; differentiator: H(jω) = −jωRC. Frequency-domain configurations return complex gain and output.',
+    returns: {
+      type: 'object',
+      fields: {
+        configuration: { type: 'scalar' },
+        gain: { type: 'quantity', kind: QuantityKind.None, complex: true },
+        outputVoltage: { type: 'quantity', kind: QuantityKind.Voltage, complex: true },
+      },
+    },
     parameters: {
       configuration: {
         type: 'string',
@@ -131,6 +139,13 @@ export const electronicsTools = [
   defineJsonTool({
     name: 'time_constant',
     description: 'Time constant and cutoff frequency: τ = RC (give capacitance) or τ = L/R (give inductance); exactly one of capacitance or inductance. cutoffFrequency = 1/(2πτ).',
+    returns: {
+      type: 'object',
+      fields: {
+        timeConstant: { type: 'quantity', kind: QuantityKind.Time },
+        cutoffFrequency: { type: 'quantity', kind: QuantityKind.Frequency },
+      },
+    },
     parameters: {
       resistance: { ...createValueParam(QuantityKind.Resistance, 'resistance'), required: true },
       capacitance: { ...createValueParam(QuantityKind.Capacitance, 'capacitance (RC)') },
@@ -150,6 +165,15 @@ export const electronicsTools = [
   defineJsonTool({
     name: 'voltage_divider',
     description: 'Resistive divider: outputVoltage = Vs·R2/(R1+R2). With a load resistance the divider uses R2∥RL (loaded output, load current returned). outputResistance is the Thévenin source resistance R1∥R2.',
+    returns: {
+      type: 'object',
+      fields: {
+        outputVoltage: { type: 'quantity', kind: QuantityKind.Voltage },
+        outputResistance: { type: 'quantity', kind: QuantityKind.Resistance },
+        unloadedOutputVoltage: { type: 'quantity', kind: QuantityKind.Voltage },
+        loadCurrent: { type: 'quantity', kind: QuantityKind.Current },
+      },
+    },
     parameters: {
       sourceVoltage: { ...createValueParam(QuantityKind.Voltage, 'source voltage'), required: true },
       resistance1: { ...createValueParam(QuantityKind.Resistance, 'top resistor R1'), required: true },
@@ -176,6 +200,13 @@ export const electronicsTools = [
   defineJsonTool({
     name: 'led_resistor',
     description: 'LED series resistor: R = (Vs − Vf)/I and its dissipated power P = I²·R. Requires sourceVoltage > forwardVoltage.',
+    returns: {
+      type: 'object',
+      fields: {
+        resistance: { type: 'quantity', kind: QuantityKind.Resistance },
+        power: { type: 'quantity', kind: QuantityKind.Power },
+      },
+    },
     parameters: {
       sourceVoltage: { ...createValueParam(QuantityKind.Voltage, 'supply voltage'), required: true },
       forwardVoltage: { ...createValueParam(QuantityKind.Voltage, 'LED forward voltage'), required: true },

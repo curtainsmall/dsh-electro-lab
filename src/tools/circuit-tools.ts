@@ -36,6 +36,7 @@ export const circuitTools = [
   defineJsonTool({
     name: 'equivalent_impedance',
     description: 'Total impedance of a set of impedances combined in series (Z = Σ Zi) or in parallel (1/Z = Σ 1/Zi). Pass each impedance as a complex value object; earlier step outputs may be referenced with @stepN in solve_steps.',
+    returns: { type: 'quantity', kind: QuantityKind.Resistance, complex: true },
     parameters: {
       topology: { type: 'string', enum: [CircuitMode.Series, CircuitMode.Parallel], description: 'how to combine the impedances', required: true },
       impedances: {
@@ -65,6 +66,7 @@ export const circuitTools = [
   defineJsonTool({
     name: 'circuit_impedance',
     description: 'Total impedance of a (possibly nested) network at a frequency. The network is a tree: a leaf is a complex value object of kind resistance|inductance|capacitance; a group is {"topology": "series"|"parallel", "elements": [node, ...]}. Nested groups are allowed. Returns the driving-point impedance.',
+    returns: { type: 'quantity', kind: QuantityKind.Resistance, complex: true },
     parameters: {
       network: { type: 'json', description: 'network tree, e.g. {"topology":"series","elements":[{"form":"rect","re":10,"im":0,"kind":"resistance"},{"form":"rect","re":0.001,"im":0,"kind":"inductance"}]}', required: true },
       frequency: { ...createValueParam(QuantityKind.Frequency, 'frequency'), required: true },
@@ -78,6 +80,15 @@ export const circuitTools = [
   defineJsonTool({
     name: 'resonance',
     description: 'Series/parallel LC resonance: resonantFrequency = 1/(2π√(LC)); with resistance also qualityFactor and bandwidth (bandwidth = resonantFrequency / qualityFactor). Series qualityFactor = (1/R)√(L/C); parallel qualityFactor = R√(C/L).',
+    returns: {
+      type: 'object',
+      fields: {
+        resonantFrequency: { type: 'quantity', kind: QuantityKind.Frequency },
+        mode: { type: 'scalar' },
+        qualityFactor: { type: 'quantity', kind: QuantityKind.None },
+        bandwidth: { type: 'quantity', kind: QuantityKind.Frequency },
+      },
+    },
     parameters: {
       inductance: { ...createValueParam(QuantityKind.Inductance, 'inductance'), required: true },
       capacitance: { ...createValueParam(QuantityKind.Capacitance, 'capacitance'), required: true },
@@ -99,6 +110,15 @@ export const circuitTools = [
   defineJsonTool({
     name: 'ac_power',
     description: 'AC power from RMS values: apparent = V·I (power), real = apparent·cosφ (power), reactive = apparent·sinφ (power), powerFactor = cosφ. phaseAngle is the phase angle between voltage and current in radians (positive = inductive load).',
+    returns: {
+      type: 'object',
+      fields: {
+        apparent: { type: 'quantity', kind: QuantityKind.Power },
+        real: { type: 'quantity', kind: QuantityKind.Power },
+        reactive: { type: 'quantity', kind: QuantityKind.Power },
+        powerFactor: { type: 'quantity', kind: QuantityKind.None },
+      },
+    },
     parameters: {
       rmsVoltage: { ...createValueParam(QuantityKind.Voltage, 'RMS voltage'), required: true },
       rmsCurrent: { ...createValueParam(QuantityKind.Current, 'RMS current'), required: true },
@@ -120,6 +140,28 @@ export const circuitTools = [
   defineJsonTool({
     name: 'transient_response',
     description: 'First- or second-order transient evaluated at a list of time points in one call — the full charge/discharge curve. kind selects rc (resistance + capacitance), rl (resistance + inductance) or rlc (series resistance + inductance + capacitance); charge requires sourceVoltage, discharge requires initialVoltage (rc/rlc) or initialCurrent (rl/rlc). Returns one point per time with voltage and current; rlc also reports alpha, omega0, dampingRatio and the damping regime.',
+    returns: {
+      type: 'object',
+      fields: {
+        kind: { type: 'scalar' },
+        mode: { type: 'scalar' },
+        points: {
+          type: 'array',
+          item: {
+            type: 'object',
+            fields: {
+              time: { type: 'quantity', kind: QuantityKind.Time },
+              voltage: { type: 'quantity', kind: QuantityKind.Voltage },
+              current: { type: 'quantity', kind: QuantityKind.Current },
+            },
+          },
+        },
+        alpha: { type: 'quantity', kind: QuantityKind.Frequency },
+        omega0: { type: 'quantity', kind: QuantityKind.Frequency },
+        dampingRatio: { type: 'quantity', kind: QuantityKind.None },
+        damping: { type: 'scalar' },
+      },
+    },
     parameters: {
       kind: { type: 'string', enum: ['rc', 'rl', 'rlc'], description: 'circuit kind', required: true },
       mode: { type: 'string', enum: [SwitchingMode.Charge, SwitchingMode.Discharge], description: 'charge or discharge', required: true },

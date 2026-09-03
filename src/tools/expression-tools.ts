@@ -15,6 +15,7 @@ export const expressionTools = [
   defineJsonTool({
     name: 'calculate',
     description: 'Evaluate a string math expression and return the complex result. Expression language: + - * / ^ (^ is right-associative, -2^2 = -4), parentheses, unary minus, scientific notation (1e6, 2.5e-3), complex literals with j or i suffix (3+4j, 2i; j/i alone is the imaginary unit), constants pi and e, and functions sin cos tan asin acos atan atan2 exp ln log10 sqrt abs arg conjugate real imag. atan2(y, x) is the angle of x + j·y — for real inputs the standard two-argument arctangent. Variables are bound via the variables array; every bound value must have kind "none". Use this for ALL arithmetic — never compute by hand.',
+    returns: { type: 'quantity', kind: QuantityKind.None, complex: true },
     parameters: {
       expression: { type: 'string', description: 'math expression to evaluate', required: true },
       variables: {
@@ -41,6 +42,16 @@ export const expressionTools = [
   defineJsonTool({
     name: 'rational_coefficients',
     description: 'Reduce an expression built from + - * / and integer powers in one variable to a single rational function and return numerator/denominator coefficients in descending power order. Pure polynomials come back with denominator [1]; negative powers (s^-1), nested divisions and sums of rationals are normalized automatically. Common factors are canceled by default (reduce: false keeps the unreduced pair). Symbols other than the variable (e.g. RC in 1/(1+s*RC)) must be bound via the variables array with kind "none". Functions of the variable (sin(x)) and non-integer powers are rejected. This is the entry point for poles_zeros, transfer_function_response, step_response and partial_fraction.',
+    returns: {
+      type: 'object',
+      fields: {
+        variable: { type: 'scalar' },
+        numeratorDegree: { type: 'scalar' },
+        denominatorDegree: { type: 'scalar' },
+        numerator: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        denominator: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+      },
+    },
     parameters: {
       expression: { type: 'string', description: 'rational expression in one variable', required: true },
       variable: { type: 'string', description: 'the single variable (default "x")' },

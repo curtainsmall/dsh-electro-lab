@@ -12,6 +12,16 @@ export const seriesTools = [
   defineJsonTool({
     name: 'series_sum',
     description: 'Sum of a number sequence by kind. arithmetic: a₁, commonDifference and count → sum n·(a₁+aₙ)/2 plus lastTerm. geometric: a₁, commonRatio and count → sum a₁(1−rⁿ)/(1−r) plus lastTerm; with infinite: true the convergent infinite sum a₁/(1−r) (requires |r| < 1, diverging input errors). power: power (linear|square|cube) and count → Σk, Σk² or Σk³ over the first n natural numbers.',
+    returns: {
+      type: 'object',
+      fields: {
+        kind: { type: 'scalar' },
+        power: { type: 'scalar' },
+        sum: { type: 'quantity', kind: QuantityKind.None },
+        lastTerm: { type: 'quantity', kind: QuantityKind.None },
+        converges: { type: 'scalar' },
+      },
+    },
     parameters: {
       kind: { type: 'string', enum: ['arithmetic', 'geometric', 'power'], description: 'series kind', required: true },
       firstTerm: { ...createValueParam(QuantityKind.None, 'first term a₁ (arithmetic, geometric)') },

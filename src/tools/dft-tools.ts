@@ -27,6 +27,13 @@ export const dftTools = [
   defineJsonTool({
     name: 'discrete_fourier_transform',
     description: 'DFT of a complex sample sequence: X[k] = Σ x[n]·e^(−j2πkn/N). Bin k corresponds to frequency k·fs/N with sample rate fs. Returns the complex spectrum (magnitude/phase per bin via the value snapshots).',
+    returns: {
+      type: 'object',
+      fields: {
+        window: { type: 'scalar' },
+        spectrum: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+      },
+    },
     parameters: {
       samples: { ...createSequenceParam('time-domain samples, kind none'), required: true },
       window: {
@@ -48,6 +55,12 @@ export const dftTools = [
   defineJsonTool({
     name: 'inverse_discrete_fourier_transform',
     description: 'IDFT of a spectrum: x[n] = (1/N)·Σ X[k]·e^(+j2πkn/N). Recovers the time-domain sequence (round-trip of discrete_fourier_transform).',
+    returns: {
+      type: 'object',
+      fields: {
+        samples: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+      },
+    },
     parameters: {
       spectrum: { ...createSequenceParam('spectral bins, kind none'), required: true },
     },
@@ -61,6 +74,16 @@ export const dftTools = [
   defineJsonTool({
     name: 'fourier_series_coefficients',
     description: 'Fourier series coefficients (a₀, aₙ, bₙ for n = 1..harmonics) of a standard odd-symmetric periodic waveform with a peak amplitude (default 1). Square: bₙ = 4A/(nπ) odd n; triangle: bₙ = 8A·sin(nπ/2)/(n²π²); sawtooth: bₙ = 2A·(−1)ⁿ⁺¹/(nπ). All cosine terms and the DC are 0.',
+    returns: {
+      type: 'object',
+      fields: {
+        waveform: { type: 'scalar' },
+        harmonics: { type: 'scalar' },
+        dc: { type: 'quantity', kind: QuantityKind.None },
+        cosine: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+        sine: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+      },
+    },
     parameters: {
       waveform: {
         type: 'string',
@@ -86,6 +109,17 @@ export const dftTools = [
   defineJsonTool({
     name: 'signal_analysis',
     description: 'Signal statistics plus the windowed spectrum in one call: RMS, peak, peak-to-peak, DC component, and the DFT spectrum of the windowed samples (magnitude/phase per bin via the value snapshots).',
+    returns: {
+      type: 'object',
+      fields: {
+        window: { type: 'scalar' },
+        rms: { type: 'quantity', kind: QuantityKind.None },
+        peak: { type: 'quantity', kind: QuantityKind.None },
+        peakToPeak: { type: 'quantity', kind: QuantityKind.None },
+        dc: { type: 'quantity', kind: QuantityKind.None },
+        spectrum: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+      },
+    },
     parameters: {
       samples: { ...createSequenceParam('time-domain samples, kind none'), required: true },
       window: {

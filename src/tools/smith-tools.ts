@@ -24,6 +24,7 @@ export const smithTools = [
   defineJsonTool({
     name: 'impedance_to_reflection',
     description: 'Reflection coefficient Γ = (Z − Z0) / (Z + Z0) for impedance on a referenceImpedance line (default 50).',
+    returns: { type: 'quantity', kind: QuantityKind.None, complex: true },
     parameters: {
       impedance: { ...createValueParam(QuantityKind.Resistance, 'load impedance'), required: true },
       referenceImpedance: { ...createValueParam(QuantityKind.Resistance, 'reference impedance (default 50)') },
@@ -37,6 +38,13 @@ export const smithTools = [
   defineJsonTool({
     name: 'reflection_to_vswr',
     description: 'Voltage standing wave ratio from reflection coefficient: vswr = (1+|Γ|)/(1−|Γ|). |Γ| = 1 (open/short) yields infinity.',
+    returns: {
+      type: 'object',
+      fields: {
+        vswr: { type: 'quantity', kind: QuantityKind.None },
+        infinite: { type: 'scalar' },
+      },
+    },
     parameters: {
       reflectionCoefficient: { ...createValueParam(QuantityKind.None, 'reflection coefficient'), required: true },
     },
@@ -49,6 +57,13 @@ export const smithTools = [
   defineJsonTool({
     name: 'return_loss',
     description: 'Return loss in dB: −20·log10(|Γ|). |Γ| = 0 (perfect match) yields infinity.',
+    returns: {
+      type: 'object',
+      fields: {
+        returnLossDb: { type: 'quantity', kind: QuantityKind.Log },
+        infinite: { type: 'scalar' },
+      },
+    },
     parameters: {
       reflectionCoefficient: { ...createValueParam(QuantityKind.None, 'reflection coefficient'), required: true },
     },
@@ -61,6 +76,7 @@ export const smithTools = [
   defineJsonTool({
     name: 'quarter_wave_transformer',
     description: 'Quarter-wave transformer characteristic impedance: Z1 = √(Z0·ZL), matching a real load impedance to a line impedance.',
+    returns: { type: 'quantity', kind: QuantityKind.Resistance, complex: true },
     parameters: {
       lineImpedance: { ...createValueParam(QuantityKind.Resistance, 'line impedance'), required: true },
       loadImpedance: { ...createValueParam(QuantityKind.Resistance, 'real load impedance'), required: true },
@@ -74,6 +90,52 @@ export const smithTools = [
   defineJsonTool({
     name: 'matched_network',
     description: 'Design a matching network between two real resistances at a frequency. topology "l" uses the implied quality factor (√(Rl/Rs − 1)); "pi" and "t" need a specified qualityFactor greater than that minimum. Returns both conjugate solutions under "low-pass" / "high-pass" keys as ordered element lists with reactances and L/C values; the role of each element (e.g. "series-source") tells which side it sits on.',
+    returns: {
+      type: 'object',
+      fields: {
+        topology: { type: 'scalar' },
+        qualityFactor: { type: 'quantity', kind: QuantityKind.None },
+        solutions: {
+          type: 'object',
+          fields: {
+            'low-pass': {
+              type: 'object',
+              fields: {
+                elements: {
+                  type: 'array',
+                  item: {
+                    type: 'object',
+                    fields: {
+                      role: { type: 'scalar' },
+                      reactance: { type: 'quantity', kind: QuantityKind.Resistance },
+                      inductance: { type: 'quantity', kind: QuantityKind.Inductance },
+                      capacitance: { type: 'quantity', kind: QuantityKind.Capacitance },
+                    },
+                  },
+                },
+              },
+            },
+            'high-pass': {
+              type: 'object',
+              fields: {
+                elements: {
+                  type: 'array',
+                  item: {
+                    type: 'object',
+                    fields: {
+                      role: { type: 'scalar' },
+                      reactance: { type: 'quantity', kind: QuantityKind.Resistance },
+                      inductance: { type: 'quantity', kind: QuantityKind.Inductance },
+                      capacitance: { type: 'quantity', kind: QuantityKind.Capacitance },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     parameters: {
       topology: { type: 'string', enum: [MatchTopology.L, MatchTopology.Pi, MatchTopology.T], description: 'network topology', required: true },
       sourceImpedance: { ...createValueParam(QuantityKind.Resistance, 'source impedance'), required: true },

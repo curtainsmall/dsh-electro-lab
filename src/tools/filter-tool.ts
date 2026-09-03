@@ -11,6 +11,32 @@ import type { JsonValue } from '@deepseek-ai/dsh-tools'
 export const filterTool = defineJsonTool({
   name: 'filter_design',
   description: 'Design a Butterworth low-pass ladder filter: order, cutoffFrequency, and equal source/load resistance give the element list (series inductors, shunt capacitors) plus attenuation checks. queryFrequency (optional) returns the attenuation at that frequency.',
+  returns: {
+    type: 'object',
+    fields: {
+      response: { type: 'scalar' },
+      kind: { type: 'scalar' },
+      order: { type: 'scalar' },
+      cutoffFrequency: { type: 'quantity', kind: QuantityKind.Frequency },
+      resistance: { type: 'quantity', kind: QuantityKind.Resistance },
+      elements: {
+        type: 'array',
+        item: {
+          type: 'object',
+          fields: {
+            role: { type: 'scalar' },
+            kind: { type: 'scalar' },
+            // element.value is serializeReal'd with the element's own kind
+            // (inductance for series L, capacitance for shunt C) — no single
+            // QuantityKind covers both, so the leaf stays untagged.
+            value: { type: 'any' },
+          },
+        },
+      },
+      attenuationAtCutoffDb: { type: 'quantity', kind: QuantityKind.Log },
+      attenuationAtQueryDb: { type: 'quantity', kind: QuantityKind.Log },
+    },
+  },
   parameters: {
     order: { type: 'integer', description: 'filter order (≥ 1)', required: true },
     cutoffFrequency: { ...createValueParam(QuantityKind.Frequency, 'cutoff frequency (−3 dB point)'), required: true },

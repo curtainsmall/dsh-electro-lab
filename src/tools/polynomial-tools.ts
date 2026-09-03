@@ -19,6 +19,15 @@ export const polynomialTools = [
   defineJsonTool({
     name: 'poles_zeros',
     description: 'Poles (denominator roots) and zeros (numerator roots) of a transfer function in ratio form. Stability: continuous-time (s) poles must lie in the left half-plane; discrete-time (z) poles inside the unit circle. The variable is inferred from your context; roots are complex.',
+    returns: {
+      type: 'object',
+      fields: {
+        numeratorDegree: { type: 'scalar' },
+        denominatorDegree: { type: 'scalar' },
+        zeros: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+        poles: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+      },
+    },
     parameters: {
       numerator: { ...createCoeffArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
       denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients)'), required: true },
@@ -38,6 +47,13 @@ export const polynomialTools = [
   defineJsonTool({
     name: 'power_series_expansion',
     description: 'Power-series expansion of a z-domain transfer function about z⁻¹: the first `count` coefficients of H(z) = Σ h[n]·z⁻ⁿ ARE the impulse response h[n] (z⁻¹ is the unit delay). Example: H(z) = 0.5/(1 − 0.5·z⁻¹) → numerator [0.5, 0], denominator [1, −0.5] → [0.5, 0.25, 0.125, …].',
+    returns: {
+      type: 'object',
+      fields: {
+        count: { type: 'scalar' },
+        coefficients: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None, complex: true } },
+      },
+    },
     parameters: {
       numerator: { ...createCoeffArrayParam('numerator coefficients, descending power order (from rational_coefficients)'), required: true },
       denominator: { ...createCoeffArrayParam('denominator coefficients, descending power order (from rational_coefficients); constant term must be non-zero'), required: true },

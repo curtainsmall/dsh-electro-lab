@@ -12,6 +12,15 @@ export const signalQualityTools = [
   defineJsonTool({
     name: 'thd',
     description: 'Total harmonic distortion of a sampled signal: √(Σ harmonic²)/fundamental, with the fundamental taken as the dominant non-DC DFT bin and harmonics at 2f₀..harmonics·f₀ (harmonics alias back via spectral folding, so the result is independent of which mirror peak is picked). thd is a fraction (0.05 = 5 %); thdDb is 20·log10(thd), floored at −300 dB when no harmonics are present (JSON cannot carry −Infinity).',
+    returns: {
+      type: 'object',
+      fields: {
+        thd: { type: 'quantity', kind: QuantityKind.None },
+        thdDb: { type: 'quantity', kind: QuantityKind.Log },
+        fundamental: { type: 'quantity', kind: QuantityKind.None },
+        harmonicAmplitudes: { type: 'array', item: { type: 'quantity', kind: QuantityKind.None } },
+      },
+    },
     parameters: {
       samples: {
         type: 'array',
@@ -36,6 +45,12 @@ export const signalQualityTools = [
   defineJsonTool({
     name: 'jitter_snr',
     description: 'SNR ceiling set by sampling-clock jitter: SNR = −20·log10(2π·f·tⱼ) dB, with signal frequency f and RMS jitter tⱼ. Higher frequency or jitter lowers the ceiling; independent of the quantizer.',
+    returns: {
+      type: 'object',
+      fields: {
+        snrDb: { type: 'quantity', kind: QuantityKind.Log },
+      },
+    },
     parameters: {
       signalFrequency: { ...createValueParam(QuantityKind.Frequency, 'signal frequency'), required: true },
       jitter: { ...createValueParam(QuantityKind.Time, 'RMS clock jitter'), required: true },
@@ -51,6 +66,16 @@ export const signalQualityTools = [
   defineJsonTool({
     name: 'adc_budget',
     description: 'Complete ADC noise budget in one call: quantization SNR (6.02·N + 1.76 dB), jitter SNR (−20·log10(2π·f·tⱼ)) and an optional thermal SNR (signal-dependent, supply it from thermal_noise against your signal level). Noise powers add linearly and the total is reported as snrTotalDb with ENOB = (snrTotalDb − 1.76)/6.02.',
+    returns: {
+      type: 'object',
+      fields: {
+        snrQuantizationDb: { type: 'quantity', kind: QuantityKind.Log },
+        snrJitterDb: { type: 'quantity', kind: QuantityKind.Log },
+        snrTotalDb: { type: 'quantity', kind: QuantityKind.Log },
+        enob: { type: 'quantity', kind: QuantityKind.None },
+        snrThermalDb: { type: 'quantity', kind: QuantityKind.Log },
+      },
+    },
     parameters: {
       bits: { type: 'integer', description: 'quantizer resolution in bits', required: true },
       signalFrequency: { ...createValueParam(QuantityKind.Frequency, 'signal frequency'), required: true },
