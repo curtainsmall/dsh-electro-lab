@@ -311,16 +311,18 @@ const tabBarStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--dsw-alias-border-l1)',
 }
 
-/** Active tab button, styled exactly like the dsh-ssh panel tabs (panel.module.css .tab + .tab[data-active]). */
-function tabButtonStyle(hovered: boolean): React.CSSProperties {
+/** Active tab button, styled exactly like the dsh-ssh panel tabs (panel.module.css .tab + .tab[data-active]);
+ *  only the selected tab carries the accent underline. */
+function tabButtonStyle(hovered: boolean, active: boolean): React.CSSProperties {
   return {
     padding: '7px 14px',
     fontSize: 13,
-    color: 'var(--dsw-alias-label-primary)',
-    fontWeight: 600,
+    color: active ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)',
+    fontWeight: active ? 600 : 400,
     background: hovered ? 'var(--dsw-alias-interactive-bg-hover)' : 'transparent',
     border: 'none',
-    borderBottom: '2px solid var(--dsw-alias-state-business-primary)',
+    borderBottom: '2px solid',
+    borderBottomColor: active ? 'var(--dsw-alias-state-business-primary)' : 'transparent',
     borderRadius: '6px 6px 0 0',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
@@ -340,7 +342,7 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={tabButtonStyle(hovered)}
+      style={tabButtonStyle(hovered, active)}
     >
       {label}
     </button>
