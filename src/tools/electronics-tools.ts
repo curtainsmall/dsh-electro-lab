@@ -2,6 +2,7 @@
  * Electronics tools: op-amp configurations, time constants, voltage
  * dividers and LED series resistors. IO is JSON-and-complex-only.
  */
+import { ToolError } from './helpers.ts'
 import {
   calcDifferentiatorOpamp,
   calcDifferenceOpamp,
@@ -50,7 +51,7 @@ export const electronicsTools = [
       switch (args.configuration) {
         case 'inverting': {
           if (args.inputVoltage === undefined || args.feedbackResistance === undefined || args.inputResistance === undefined) {
-            throw new Error('inverting requires inputVoltage, feedbackResistance and inputResistance')
+            throw new ToolError('inverting requires inputVoltage, feedbackResistance and inputResistance')
           }
           const { gain, outputVoltage } = calcInvertingOpamp(
             toScalar(args.inputVoltage),
@@ -61,7 +62,7 @@ export const electronicsTools = [
         }
         case 'non-inverting': {
           if (args.inputVoltage === undefined || args.feedbackResistance === undefined || args.inputResistance === undefined) {
-            throw new Error('non-inverting requires inputVoltage, feedbackResistance and inputResistance')
+            throw new ToolError('non-inverting requires inputVoltage, feedbackResistance and inputResistance')
           }
           const { gain, outputVoltage } = calcNonInvertingOpamp(
             toScalar(args.inputVoltage),
@@ -71,7 +72,7 @@ export const electronicsTools = [
           return { configuration: args.configuration, gain: serializeComplex(gain, QuantityKind.None), outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
         }
         case 'voltage-follower': {
-          if (args.inputVoltage === undefined) throw new Error('voltage-follower requires inputVoltage')
+          if (args.inputVoltage === undefined) throw new ToolError('voltage-follower requires inputVoltage')
           const { gain, outputVoltage } = calcVoltageFollowerOpamp(toScalar(args.inputVoltage))
           return { configuration: args.configuration, gain: serializeComplex(gain, QuantityKind.None), outputVoltage: serializeComplex(outputVoltage, QuantityKind.Voltage) }
         }
@@ -83,7 +84,7 @@ export const electronicsTools = [
             args.inputResistance === undefined ||
             args.secondInputResistance === undefined
           ) {
-            throw new Error('summing requires inputVoltage, secondInputVoltage, feedbackResistance, inputResistance and secondInputResistance')
+            throw new ToolError('summing requires inputVoltage, secondInputVoltage, feedbackResistance, inputResistance and secondInputResistance')
           }
           const { outputVoltage } = calcSummingOpamp(
             toScalar(args.inputVoltage),
@@ -96,7 +97,7 @@ export const electronicsTools = [
         }
         case 'difference': {
           if (args.inputVoltage === undefined || args.secondInputVoltage === undefined || args.feedbackResistance === undefined || args.inputResistance === undefined) {
-            throw new Error('difference requires inputVoltage, secondInputVoltage, feedbackResistance and inputResistance')
+            throw new ToolError('difference requires inputVoltage, secondInputVoltage, feedbackResistance and inputResistance')
           }
           const { gain, outputVoltage } = calcDifferenceOpamp(
             toScalar(args.inputVoltage),
@@ -108,7 +109,7 @@ export const electronicsTools = [
         }
         case 'integrator': {
           if (args.inputVoltage === undefined || args.inputResistance === undefined || args.capacitance === undefined || args.frequency === undefined) {
-            throw new Error('integrator requires inputVoltage, inputResistance, capacitance and frequency')
+            throw new ToolError('integrator requires inputVoltage, inputResistance, capacitance and frequency')
           }
           const { gain, outputVoltage } = calcIntegratorOpamp(
             toScalar(args.inputVoltage),
@@ -120,7 +121,7 @@ export const electronicsTools = [
         }
         case 'differentiator': {
           if (args.inputVoltage === undefined || args.feedbackResistance === undefined || args.capacitance === undefined || args.frequency === undefined) {
-            throw new Error('differentiator requires inputVoltage, feedbackResistance, capacitance and frequency')
+            throw new ToolError('differentiator requires inputVoltage, feedbackResistance, capacitance and frequency')
           }
           const { gain, outputVoltage } = calcDifferentiatorOpamp(
             toScalar(args.inputVoltage),
@@ -132,7 +133,7 @@ export const electronicsTools = [
         }
         default:
           // unreachable: the framework schema restricts configuration to the seven values above
-          throw new Error(`unknown op-amp configuration "${args.configuration}"`)
+          throw new ToolError(`unknown op-amp configuration "${args.configuration}"`)
       }
     },
   }),

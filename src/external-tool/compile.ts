@@ -4,7 +4,7 @@
  * output), returns pass through unchanged (ToolReturns), and the execute is
  * the transport executor for the declaration's transport.
  */
-import { createValueParam, defineJsonTool } from '../tools/helpers.ts'
+import { createValueParam, defineJsonTool, ToolError } from '../tools/helpers.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
 import { makeExecutor } from './transports.ts'
 import { ExternalParamType, QUANTITY_KIND_NAMES, type ExternalParamSpec, type ExternalToolConfig } from './types.ts'
@@ -12,7 +12,7 @@ import { ExternalParamType, QUANTITY_KIND_NAMES, type ExternalParamSpec, type Ex
 /** Resolve a lowercase kind name to its QuantityKind member. */
 export function kindByName(name: string): QuantityKind {
   const index = QUANTITY_KIND_NAMES.indexOf(name)
-  if (index === -1) throw new Error(`unknown kind "${name}"`)
+  if (index === -1) throw new ToolError(`unknown kind "${name}"`)
   return Object.values(QuantityKind)[index] as QuantityKind
 }
 

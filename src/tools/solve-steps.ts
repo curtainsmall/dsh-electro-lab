@@ -9,6 +9,7 @@
  * cancellation), so nested calls are first-class executions, and every
  * intermediate result is returned in stepResults (array order = step order).
  */
+import { ToolError } from './helpers.ts'
 import type { Context } from 'cordis'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
@@ -33,7 +34,7 @@ export function resolveReferences(value: JsonValue, outputs: JsonValue[]): JsonV
     if (match !== null) {
       const index = Number(match[1])
       if (index >= outputs.length) {
-        throw new Error(`reference "@step${index}" points beyond the last computed step (${outputs.length - 1})`)
+        throw new ToolError(`reference "@step${index}" points beyond the last computed step (${outputs.length - 1})`)
       }
       let result: JsonValue = outputs[index] as JsonValue
       const path = match[2]!
@@ -41,7 +42,7 @@ export function resolveReferences(value: JsonValue, outputs: JsonValue[]): JsonV
         .filter((segment) => segment.length > 0)
       for (const segment of path) {
         if (typeof result !== 'object' || result === null || !(segment in result)) {
-          throw new Error(`reference "@step${index}.${path.join('.')}" has no field "${segment}"`)
+          throw new ToolError(`reference "@step${index}.${path.join('.')}" has no field "${segment}"`)
         }
         result = (result as Record<string, JsonValue>)[segment]!
       }
@@ -84,7 +85,7 @@ export function createSolveStepsTool(ctx: Context): ToolDefinition {
       const stepResults: JsonValue[] = []
       const steps = args.steps as readonly StepSpec[]
       for (const [index, step] of steps.entries()) {
-        if (step.tool === 'solve_steps') throw new Error(`step ${index}: nested solve_steps is not allowed`)
+        if (step.tool === 'solve_steps') throw new ToolError(`step ${index}: nested solve_steps is not allowed`)
         const resolved = resolveReferences(step.args, outputs)
         const result = await ctx.tools.execute({
           callId: `${exec.callId}:solve:${index}` as unknown as CallId,
@@ -94,7 +95,7 @@ export function createSolveStepsTool(ctx: Context): ToolDefinition {
           signal: exec.signal,
         })
         if (result.isError) {
-          throw new Error(`step ${index} (${step.tool}) failed: ${result.error.message}`)
+          throw new ToolError(`step ${index} (${step.tool}) failed: ${result.error.message}`)
         }
         const output = result.value
         outputs.push(output)

@@ -5,6 +5,7 @@
  * check runs once, then the tool dispatches to the per-family math function.
  * IO is JSON-and-complex-only.
  */
+import { ToolError } from './helpers.ts'
 import {
   ConvertUnit,
   convertAngle,
@@ -101,7 +102,7 @@ export const unitTools = [
       const fromFamily = FAMILY_OF[args.from as ConvertUnit]
       const toFamily = FAMILY_OF[args.to as ConvertUnit]
       if (fromFamily !== toFamily) {
-        throw new Error(`cannot convert from ${args.from} to ${args.to} — different unit families`)
+        throw new ToolError(`cannot convert from ${args.from} to ${args.to} — different unit families`)
       }
       // The casts below are safe: FAMILY_OF already verified membership.
       switch (fromFamily) {
@@ -139,19 +140,19 @@ export const unitTools = [
           // angles are radians everywhere: degree is the only source unit,
           // radian the only (identity) target unit
           if (args.from !== ConvertUnit.Degree || args.to !== ConvertUnit.Radian) {
-            throw new Error('angles are always radians: only degree → radian is supported')
+            throw new ToolError('angles are always radians: only degree → radian is supported')
           }
           return { from: args.from, to: args.to, value: serializeComplex(convertAngle(value), QuantityKind.Angle) }
         }
         case ConvertFamily.Log: {
           const from = args.from as LogUnit
           const to = args.to as LogUnit
-          if (args.kind === undefined) throw new Error('log conversion (ratio ↔ db) requires kind (power | voltage)')
+          if (args.kind === undefined) throw new ToolError('log conversion (ratio ↔ db) requires kind (power | voltage)')
           return { from: args.from, to: args.to, value: serializeComplex(convertLogValue(value, from, to, args.kind), QuantityKind.Log) }
         }
         default:
           // unreachable: FAMILY_OF covers every ConvertUnit member
-          throw new Error(`unknown unit ${args.from}`)
+          throw new ToolError(`unknown unit ${args.from}`)
       }
     },
   }),

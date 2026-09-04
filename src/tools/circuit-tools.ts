@@ -2,6 +2,7 @@
  * Concept-level circuit tools: primitives (element/series/parallel/circuit
  * impedance) plus scalar concepts. IO is JSON-and-complex-only.
  */
+import { ToolError } from './helpers.ts'
 import { Complex } from 'complex.js'
 import {
   CircuitMode,
@@ -58,7 +59,7 @@ export const circuitTools = [
           break
         default:
           // unreachable: the framework schema restricts topology to series/parallel
-          throw new Error(`unknown topology "${args.topology}"`)
+          throw new ToolError(`unknown topology "${args.topology}"`)
       }
       return serializeComplex(total, QuantityKind.Resistance)
     },
@@ -190,33 +191,33 @@ export const circuitTools = [
       })
       switch (args.kind) {
         case 'rl': {
-          if (args.inductance === undefined) throw new Error('rl kind requires inductance')
+          if (args.inductance === undefined) throw new ToolError('rl kind requires inductance')
           const inductance = toScalar(args.inductance)
           const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent)
-          if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
-          if (mode === SwitchingMode.Discharge && args.initialCurrent === undefined) throw new Error('discharge mode requires initialCurrent')
+          if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new ToolError('charge mode requires sourceVoltage')
+          if (mode === SwitchingMode.Discharge && args.initialCurrent === undefined) throw new ToolError('discharge mode requires initialCurrent')
           const { points } = calcRlTransientSeries(mode, sourceVoltage, initialCurrent, resistance, inductance, times)
           return { kind: args.kind, mode, points: points.map(serialize) }
         }
         case 'rc': {
-          if (args.capacitance === undefined) throw new Error('rc kind requires capacitance')
+          if (args.capacitance === undefined) throw new ToolError('rc kind requires capacitance')
           const capacitance = toScalar(args.capacitance)
           const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage)
-          if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
-          if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined) throw new Error('discharge mode requires initialVoltage')
+          if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new ToolError('charge mode requires sourceVoltage')
+          if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined) throw new ToolError('discharge mode requires initialVoltage')
           const { points } = calcRcTransientSeries(mode, sourceVoltage, initialVoltage, resistance, capacitance, times)
           return { kind: args.kind, mode, points: points.map(serialize) }
         }
         case 'rlc': {
-          if (args.capacitance === undefined) throw new Error('rlc kind requires capacitance')
-          if (args.inductance === undefined) throw new Error('rlc kind requires inductance')
+          if (args.capacitance === undefined) throw new ToolError('rlc kind requires capacitance')
+          if (args.inductance === undefined) throw new ToolError('rlc kind requires inductance')
           const capacitance = toScalar(args.capacitance)
           const inductance = toScalar(args.inductance)
           const initialVoltage = args.initialVoltage === undefined ? 0 : toScalar(args.initialVoltage)
           const initialCurrent = args.initialCurrent === undefined ? 0 : toScalar(args.initialCurrent)
-          if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new Error('charge mode requires sourceVoltage')
+          if (mode === SwitchingMode.Charge && args.sourceVoltage === undefined) throw new ToolError('charge mode requires sourceVoltage')
           if (mode === SwitchingMode.Discharge && args.initialVoltage === undefined && args.initialCurrent === undefined) {
-            throw new Error('discharge mode requires initialVoltage or initialCurrent')
+            throw new ToolError('discharge mode requires initialVoltage or initialCurrent')
           }
           const result = calcRlcTransientSeries(mode, sourceVoltage, initialVoltage, initialCurrent, resistance, capacitance, inductance, times)
           return {
@@ -231,7 +232,7 @@ export const circuitTools = [
         }
         default:
           // unreachable: the framework schema restricts kind to rc/rl/rlc
-          throw new Error(`unknown transient kind "${args.kind}"`)
+          throw new ToolError(`unknown transient kind "${args.kind}"`)
       }
     },
   }),
@@ -239,30 +240,30 @@ export const circuitTools = [
 
 /** Validate a raw JSON network tree into a typed NetworkElement; leaves are complex value objects. */
 export function validateNetwork(input: unknown): NetworkElement {
-  if (typeof input !== 'object' || input === null) throw new Error('network must be an object')
+  if (typeof input !== 'object' || input === null) throw new ToolError('network must be an object')
   const node = input as Record<string, unknown>
   if (typeof node['topology'] !== 'string') {
     // leaf: a complex value object whose kind selects the element
     const kind = node['kind']
     if (typeof kind !== 'string' || !ELEMENT_KINDS.has(kind)) {
-      throw new Error(`unknown element kind "${String(kind)}"`)
+      throw new ToolError(`unknown element kind "${String(kind)}"`)
     }
     const expected = ELEMENT_QUANTITY_KINDS[kind as ElementKind]
-    if (expected === undefined) throw new Error(`unknown element kind "${kind}"`)
+    if (expected === undefined) throw new ToolError(`unknown element kind "${kind}"`)
     let value: number
     try {
       value = toScalar(node as ComplexValue)
     } catch (error) {
-      throw new Error(`element "${kind}" needs a non-negative real ${kind} value (${error instanceof Error ? error.message : String(error)})`)
+      throw new ToolError(`element "${kind}" needs a non-negative real ${kind} value (${error instanceof Error ? error.message : String(error)})`)
     }
     if (!Number.isFinite(value) || value < 0) {
-      throw new Error(`element "${kind}" needs a non-negative real value`)
+      throw new ToolError(`element "${kind}" needs a non-negative real value`)
     }
     return { kind: kind as ElementKind, value }
   }
   const elements = node['elements']
   if (!Array.isArray(elements) || elements.length === 0) {
-    throw new Error('a group needs a non-empty elements array')
+    throw new ToolError('a group needs a non-empty elements array')
   }
   return { topology: node['topology'] as CircuitMode, elements: elements.map((child) => validateNetwork(child)) }
 }

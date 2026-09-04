@@ -1,6 +1,7 @@
 /**
  * filter_design — Butterworth low-pass ladder design in one call.
  */
+import { ToolError } from './helpers.ts'
 import { calcButterworthAttenuation, designButterworthLowpass } from '../math/filter.ts'
 import { ElementKind } from '../math/circuits.ts'
 import { toScalar, serializeReal } from '../math/convert.ts'
@@ -64,7 +65,7 @@ export const filterTool = defineJsonTool({
             kind = QuantityKind.Capacitance
             break
           default:
-            throw new Error(`unexpected filter element kind "${element.kind}"`)
+            throw new ToolError(`unexpected filter element kind "${element.kind}"`)
         }
         return {
           role: element.role,

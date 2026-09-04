@@ -2,6 +2,7 @@
  * Transmission-line tools: wavelength, coaxial characterization, and
  * rise-time/bandwidth conversion. IO is JSON-and-complex-only.
  */
+import { ToolError } from './helpers.ts'
 import {
   calcBandwidthFromRiseTime,
   calcCoaxialParameters,
@@ -88,7 +89,7 @@ export const transmissionTools = [
       const bandwidth = args.bandwidth === undefined ? undefined : toScalar(args.bandwidth)
       const riseTime = args.riseTime === undefined ? undefined : toScalar(args.riseTime)
       if ((bandwidth === undefined) === (riseTime === undefined)) {
-        throw new Error('provide exactly one of bandwidth or riseTime')
+        throw new ToolError('provide exactly one of bandwidth or riseTime')
       }
       const out: Record<string, JsonValue> = {}
       if (bandwidth !== undefined) {

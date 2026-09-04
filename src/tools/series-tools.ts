@@ -2,6 +2,7 @@
  * Series tools: arithmetic, geometric and power sums in one tool with a
  * kind discriminator. IO is JSON-and-complex-only.
  */
+import { ToolError } from './helpers.ts'
 import { PowerSumKind, calcArithmeticSeries, calcGeometricSeries, calcPowerSum } from '../math/series.ts'
 import { toScalar, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
@@ -35,7 +36,7 @@ export const seriesTools = [
       switch (args.kind) {
         case 'arithmetic': {
           if (args.firstTerm === undefined || args.commonDifference === undefined || args.count === undefined) {
-            throw new Error('arithmetic requires firstTerm, commonDifference and count')
+            throw new ToolError('arithmetic requires firstTerm, commonDifference and count')
           }
           const { sum, lastTerm } = calcArithmeticSeries(
             toScalar(args.firstTerm),
@@ -46,12 +47,12 @@ export const seriesTools = [
         }
         case 'geometric': {
           if (args.firstTerm === undefined || args.commonRatio === undefined) {
-            throw new Error('geometric requires firstTerm and commonRatio')
+            throw new ToolError('geometric requires firstTerm and commonRatio')
           }
           const firstTerm = toScalar(args.firstTerm)
           const commonRatio = toScalar(args.commonRatio)
           const infinite = args.infinite ?? false
-          if (!infinite && args.count === undefined) throw new Error('geometric requires count unless infinite is true')
+          if (!infinite && args.count === undefined) throw new ToolError('geometric requires count unless infinite is true')
           const result = calcGeometricSeries(firstTerm, commonRatio, args.count ?? 1, infinite)
           const out: Record<string, JsonValue> = { kind: args.kind, sum: serializeReal(result.sum, QuantityKind.None) }
           if (result.lastTerm !== undefined) out.lastTerm = serializeReal(result.lastTerm, QuantityKind.None)
@@ -60,14 +61,14 @@ export const seriesTools = [
         }
         case 'power': {
           if (args.power === undefined || args.count === undefined) {
-            throw new Error('power requires power and count')
+            throw new ToolError('power requires power and count')
           }
           const { sum } = calcPowerSum(args.power, args.count)
           return { kind: args.kind, power: args.power, sum: serializeReal(sum, QuantityKind.None) }
         }
         default:
           // unreachable: the framework schema restricts kind to the three values above
-          throw new Error(`unknown series kind "${args.kind}"`)
+          throw new ToolError(`unknown series kind "${args.kind}"`)
       }
     },
   }),
