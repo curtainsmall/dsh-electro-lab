@@ -9,6 +9,7 @@ import {
   RecordManager,
   SETTLE_WINDOW_MS,
   deleteRecordFromArchive,
+  setExternalToolNames,
   type Record as SettledRecord,
   type RecordEvent,
 } from '../src/records.ts'
@@ -255,6 +256,43 @@ describe('record manager (record_question opens, record_answer settles)', () => 
     expect(settled!.settledAt).toBe(1100)
     manager.feed(calculateCall(3, 1200))
     expect(manager.view()).not.toBeNull()
+  })
+
+  it('records calls to mounted declaration tools and marks them external without settling', () => {
+    const { manager } = makeEnv()
+    setExternalToolNames(new Set(['echo_http', 'coil_q']))
+    try {
+      manager.feed(questionCall(1, 1000, 'q'))
+      manager.feed(event(RecordEventType.ToolCall, 2, 1100, { name: 'echo_http', callId: 'e2', arguments: '{"message":"hi"}' }))
+      manager.feed(event(RecordEventType.ToolCall, 3, 1200, { name: 'coil_q', callId: 'e3', arguments: '{"f": 1000}' }))
+      // An external call inside the brackets does NOT settle the record.
+      expect(manager.view()).not.toBeNull()
+      expect(manager.view()!.calls).toEqual([
+        { callId: 'e2', name: 'echo_http', arguments: '{"message":"hi"}', external: true },
+        { callId: 'e3', name: 'coil_q', arguments: '{"f": 1000}', external: true },
+      ])
+      const settled = manager.feed(answerCall(4, 1300, '答案'))
+      expect(settled!.calls).toEqual([
+        { callId: 'e2', name: 'echo_http', arguments: '{"message":"hi"}', external: true },
+        { callId: 'e3', name: 'coil_q', arguments: '{"f": 1000}', external: true },
+      ])
+      // The archive line carries the marker; internal calls stay unmarked.
+      expect(manager.records()[0]!.calls[0]!.external).toBe(true)
+    } finally {
+      setExternalToolNames(new Set())
+    }
+  })
+
+  it('treats an unregistered name as foreign even after other declarations were mounted', () => {
+    const { manager } = makeEnv()
+    setExternalToolNames(new Set(['echo_http']))
+    try {
+      manager.feed(questionCall(1, 1000, 'q'))
+      const settled = manager.feed(event(RecordEventType.ToolCall, 2, 1100, { name: 'other_foreign', callId: 'x' }))
+      expect(settled).not.toBeNull()
+    } finally {
+      setExternalToolNames(new Set())
+    }
   })
 
   it('settles a stale record on the idle gap and opens a new one', () => {

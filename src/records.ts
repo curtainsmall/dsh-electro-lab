@@ -80,6 +80,14 @@ export const RECORD_TOOL_NAMES: ReadonlySet<string> = new Set([
   RECORD_ANSWER_TOOL,
 ])
 
+/** Archive-declared (external) tool names currently mounted — mutable because the declarations register at plugin start. */
+let externalToolNames: ReadonlySet<string> = new Set()
+
+/** Point the record layer at the mounted declaration tools; their calls are recorded and marked external. */
+export function setExternalToolNames(names: ReadonlySet<string>): void {
+  externalToolNames = names
+}
+
 /** Why a record is an error record. */
 export enum RecordErrorType {
   /** `record_question` fired while a record was already open: the old one was settled with its data and a new one opened. */
@@ -105,6 +113,8 @@ export interface RecordCall {
   name: string
   /** Raw arguments JSON string exactly as the model produced it. */
   arguments: string
+  /** True when the call targeted an archive-declared (external) tool. */
+  external?: boolean
 }
 
 /** One structured tool result, keeping the full output and error identity. */
@@ -521,17 +531,19 @@ export class RecordManager {
           }
           break
         }
-        if (name === undefined || !RECORD_TOOL_NAMES.has(name)) {
+        const isRecordTool = name !== undefined && RECORD_TOOL_NAMES.has(name)
+        const isExternal = name !== undefined && externalToolNames.has(name)
+        if (!isRecordTool && !isExternal) {
           // A foreign tool between electro-lab calls settles the record.
           if (this.open !== null) settled = this.settle(event.time)
           break
         }
         if (this.open !== null) {
-          this.extendRecord(event.time, event.data.callId, name, event.data.arguments)
+          this.extendRecord(event.time, event.data.callId, name, event.data.arguments, isExternal)
         } else {
           // Stray electro-lab call: open a record to preserve the data.
           this.openRecord(event.time)
-          this.extendRecord(event.time, event.data.callId, name, event.data.arguments)
+          this.extendRecord(event.time, event.data.callId, name, event.data.arguments, isExternal)
         }
         break
       }
@@ -662,13 +674,15 @@ export class RecordManager {
     }
   }
 
-  private extendRecord(time: number, callId: string | undefined, name: string, argumentsRaw: string | undefined): void {
+  private extendRecord(time: number, callId: string | undefined, name: string, argumentsRaw: string | undefined, external = false): void {
     const open = this.open
     if (open === null) return
+    const call: RecordCall = { callId: callId ?? '', name, arguments: argumentsRaw ?? '' }
+    if (external) call.external = true
     this.open = {
       ...open,
       lastAt: time,
-      calls: pushCapped(open.calls, { callId: callId ?? '', name, arguments: argumentsRaw ?? '' }, MAX_CALLS),
+      calls: pushCapped(open.calls, call, MAX_CALLS),
       pending: callId === undefined ? open.pending : [...open.pending, callId],
     }
   }

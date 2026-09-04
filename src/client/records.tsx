@@ -182,6 +182,8 @@ interface Call {
   callId: string
   name: string
   arguments: string
+  /** True when the call targeted an archive-declared (external) tool. */
+  external?: boolean
 }
 
 interface Result {
@@ -490,6 +492,21 @@ function CallResultPanel({ call, result }: { call: Call; result: Result | undefi
       >
         <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{open ? '▾' : '▸'}</span>
         <span style={{ fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>{call.name}</span>
+        {call.external === true && (
+          <span
+            style={{
+              padding: '0 5px',
+              fontSize: 10,
+              lineHeight: '15px',
+              borderRadius: 4,
+              border: '1px solid var(--dsw-alias-border-l2)',
+              color: 'var(--dsw-alias-label-secondary)',
+              fontFamily: 'ui-monospace, monospace',
+            }}
+          >
+            {t('externalToolMark')}
+          </span>
+        )}
       </div>
       {open && (
         <div style={{ padding: '8px 10px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
@@ -620,7 +637,7 @@ function buildRecordMarkdown(record: DetailRecord): string {
   }
   lines.push(`## ${t('stepCalls')}`, '')
   for (const call of record.calls) {
-    lines.push(`### ${call.name}`, '')
+    lines.push(`### ${call.name}${call.external === true ? ` (${t('externalToolMark')})` : ''}`, '')
     if (call.arguments.length > 0) {
       lines.push(`#### ${t('params')}`, '', '```text', formatJson(call.arguments), '```', '')
     }

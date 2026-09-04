@@ -11,7 +11,7 @@ import { ALL_TOOLS, STATIC_TOOLS } from './tools/index.ts'
 import { createSolveStepsTool } from './tools/solve-steps.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
-import { RecordManager, readRecordArchive, deleteRecordFromArchive, type Record, type RecordEvent } from './records.ts'
+import { RecordManager, readRecordArchive, deleteRecordFromArchive, setExternalToolNames, type Record, type RecordEvent } from './records.ts'
 import { ArticleFormat, ArticleLanguage, GenerationPhase, TemplateLanguage, buildArticlePrompt, buildLatexDocument, normalizeFileName, resolveTemplateLanguage, templateLanguageToArticleLanguage } from './generate.ts'
 import { clearRestartRequired, compileDeclaration, deleteDeclaration, readDeclarations, restartRequired, upsertDeclaration, validateDeclaration } from './tool-declarations.ts'
 import { createDeclarationTools } from './tools/declaration-tools.ts'
@@ -600,7 +600,8 @@ export function apply(ctx: Context): void {
       disposers.push(ctx.tools.register(tool))
     }
     disposers.push(ctx.tools.register(createSolveStepsTool(ctx)))
-    for (const declaration of readDeclarations(recordsHome)) {
+    const declarations = readDeclarations(recordsHome)
+    for (const declaration of declarations) {
       // A declaration without the flag registers (enabled is the default);
       // only an explicit false disables the tool.
       if (declaration.enabled === false) continue
@@ -610,6 +611,9 @@ export function apply(ctx: Context): void {
         ctx.logger?.warn(`[dsh-electro-lab] failed to register declaration tool "${declaration.name}": ${error instanceof Error ? error.message : String(error)}`)
       }
     }
+    // Record the mounted declaration tools so their calls land in records
+    // marked as external (a fresh declaration set applies on restart).
+    setExternalToolNames(new Set(declarations.filter((declaration) => declaration.enabled !== false).map((declaration) => declaration.name)))
     // The LLM-facing manager tools (external_tool_add/update/delete) edit
     // the archive; register them alongside the tools they manage.
     for (const tool of createDeclarationTools(recordsHome)) {
@@ -671,6 +675,7 @@ export function apply(ctx: Context): void {
     }))
 
     return () => {
+      setExternalToolNames(new Set())
       for (const off of disposers) off()
     }
   }, 'dsh-electro-lab: tools')
