@@ -5,6 +5,10 @@
 import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { QuantityKind } from '../math/quantity-kind.ts'
+import { ToolError } from '../errors.ts'
+
+/** Re-exported so every tool file imports the failure type from one place. */
+export { ToolError }
 
 /**
  * Declared return shape of a tool, used by the record layer to tag stored
@@ -31,43 +35,6 @@ export type ToolReturns =
 
 /** Declared return shapes keyed by tool name — the record layer reads these when settling a result. */
 export const TOOL_RETURNS = new Map<string, ToolReturns>()
-
-/**
- * The one tool-failure error. Every plugin tool fails through this channel:
- * built-in math tools raise ordinary errors, manager tools express failures
- * as `{ok:false, error|errors}` result boxes, and external endpoints return
- * an envelope `error` field — whatever the source, the call surfaces as ONE
- * structured error result to the agent and is recorded with its name/code in
- * the record. Codes: `TOOL_ERROR` (default), `EXTERNAL_ERROR` (endpoint
- * reported), `EXTERNAL_HTTP`, `EXTERNAL_TIMEOUT`, `EXTERNAL_RESPONSE`.
- */
-export class ToolError extends Error {
-  readonly code: string
-  constructor(message: string, code = 'TOOL_ERROR') {
-    super(message)
-    this.name = 'ToolError'
-    this.code = code
-  }
-}
-
-/**
- * Extract the message of one failure box — a result value shaped
- * `{ok: false, error: "…"}` or `{ok: false, errors: ["…", …]}` — or
- * undefined when the value is not a failure box. Any tool that returns such
- * a box (an external endpoint signalling a failed computation, a manager
- * tool refusing a request) is turned into a thrown ToolError by
- * defineJsonTool, so errors never travel as plain values.
- */
-export function failureBoxMessage(value: JsonValue): string | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
-  const box = value as Record<string, unknown>
-  if (box.ok !== false) return undefined
-  if (typeof box.error === 'string' && box.error.length > 0) return box.error
-  if (Array.isArray(box.errors) && box.errors.length > 0 && box.errors.every((item) => typeof item === 'string')) {
-    return (box.errors as string[]).join('; ')
-  }
-  return undefined
-}
 
 /**
  * The one parameter shape for any value payload: a bare number (a real
@@ -153,13 +120,16 @@ export function defineJsonTool<S extends ParameterSchemaSpec>(
   return defineTool({
     ...rest,
     execute: async (args, exec) => {
-      // One unified failure path: a returned failure box is raised as a
-      // ToolError so every tool — built-in, external or manager — fails
-      // through the same structured error channel as a thrown error.
-      const value = await options.execute(args, exec)
-      const message = failureBoxMessage(value)
-      if (message !== undefined) throw new ToolError(message)
-      return value
+      // One unified failure path at the tool boundary: every failure inside
+      // TypeScript is a throw — math kernels and lower layers throw whatever
+      // they want, and any non-ToolError is re-wrapped here so every tool
+      // call fails through the same structured channel.
+      try {
+        return await options.execute(args, exec)
+      } catch (error) {
+        if (error instanceof ToolError) throw error
+        throw new ToolError(error instanceof Error ? error.message : String(error))
+      }
     },
     output: {
       schema: { type: 'json' },

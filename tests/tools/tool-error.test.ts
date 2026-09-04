@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { ToolError, defineJsonTool, failureBoxMessage } from '../../src/tools/helpers.ts'
+import { ToolError, defineJsonTool } from '../../src/tools/helpers.ts'
 
 function fakeExec(): ToolRunContext {
   return {
@@ -30,47 +30,34 @@ describe('ToolError', () => {
   })
 })
 
-describe('failureBoxMessage', () => {
-  it('extracts the message of an {ok:false, error} box', () => {
-    expect(failureBoxMessage({ ok: false, error: 'boom' })).toBe('boom')
-  })
-
-  it('joins an {ok:false, errors} list', () => {
-    expect(failureBoxMessage({ ok: false, errors: ['a', 'b'] })).toBe('a; b')
-  })
-
-  it('ignores non-box values', () => {
-    expect(failureBoxMessage({ ok: true, error: 'fine' })).toBeUndefined()
-    expect(failureBoxMessage({ error: 'not ok flagged' })).toBeUndefined()
-    expect(failureBoxMessage(42)).toBeUndefined()
-    expect(failureBoxMessage(null)).toBeUndefined()
-    expect(failureBoxMessage('text')).toBeUndefined()
-    expect(failureBoxMessage([{ ok: false, error: 'x' }])).toBeUndefined()
-  })
-})
-
 describe('defineJsonTool unified failure path', () => {
-  it('raises a returned {ok:false, error} box as a ToolError', async () => {
-    await expect(valueTool({ ok: false, error: 'boom' }).execute({}, fakeExec())).rejects.toMatchObject({
-      name: 'ToolError',
-      code: 'TOOL_ERROR',
-      message: 'boom',
-    })
-  })
-
-  it('raises a returned {ok:false, errors} box with the joined messages', async () => {
-    await expect(valueTool({ ok: false, errors: ['a', 'b'] }).execute({}, fakeExec())).rejects.toThrow('a; b')
-  })
-
-  it('passes success values and thrown errors through unchanged', async () => {
+  it('passes plain success values through unchanged', async () => {
     await expect(valueTool({ ok: true, value: 1 }).execute({}, fakeExec())).resolves.toEqual({ ok: true, value: 1 })
-    await expect(valueTool({ error: 'no ok flag' }).execute({}, fakeExec())).resolves.toEqual({ error: 'no ok flag' })
-    const throwing = defineJsonTool({
-      name: 'error_test_throwing',
+    await expect(valueTool({ error: 'a plain field' }).execute({}, fakeExec())).resolves.toEqual({ error: 'a plain field' })
+  })
+
+  it('re-wraps a plain error from a lower layer (math kernel) at the tool boundary', async () => {
+    const kernel = (): never => { throw new Error('inductance must be a finite positive number (H)') }
+    const tool = defineJsonTool({
+      name: 'error_test_kernel',
       description: 'test tool',
       parameters: {},
-      execute: () => { throw new ToolError('timeout', 'EXTERNAL_TIMEOUT') },
+      execute: () => kernel(),
     })
-    await expect(throwing.execute({}, fakeExec())).rejects.toMatchObject({ name: 'ToolError', code: 'EXTERNAL_TIMEOUT', message: 'timeout' })
+    await expect(tool.execute({}, fakeExec())).rejects.toMatchObject({
+      name: 'ToolError',
+      code: 'TOOL_ERROR',
+      message: 'inductance must be a finite positive number (H)',
+    })
+  })
+
+  it('keeps an already-wrapped ToolError untouched (code preserved)', async () => {
+    const tool = defineJsonTool({
+      name: 'error_test_passthrough',
+      description: 'test tool',
+      parameters: {},
+      execute: () => { throw new ToolError('denied', 'EXTERNAL_ERROR') },
+    })
+    await expect(tool.execute({}, fakeExec())).rejects.toMatchObject({ name: 'ToolError', code: 'EXTERNAL_ERROR', message: 'denied' })
   })
 })

@@ -63,7 +63,7 @@ afterEach(() => {
 describe('external_tool_add', () => {
   it('stores a new declaration and reports the pending restart', async () => {
     const result = await run('external_tool_add', { declaration: TOOL }, home)
-    expect(result).toEqual({ ok: true, name: 'sample_echo', changed: 'added', restartRequired: true })
+    expect(result).toEqual({ name: 'sample_echo', changed: 'added', restartRequired: true })
     expect(readExternalTools(home).map((tool) => tool.name)).toEqual(['sample_echo'])
     expect(restartRequired(home)).toBe(true)
   })
@@ -83,7 +83,7 @@ describe('external_tool_add', () => {
   it('accepts a declaration without the enabled flag', async () => {
     const { enabled: _enabled, ...noFlag } = TOOL
     const result = await run('external_tool_add', { declaration: noFlag }, home)
-    expect(result.ok).toBe(true)
+    expect(result).toEqual({ name: 'sample_echo', changed: 'added', restartRequired: true })
   })
 })
 
@@ -95,7 +95,7 @@ describe('external_tool_update', () => {
       { declaration: { ...TOOL, description: 'updated', enabled: false } },
       home,
     )
-    expect(result).toEqual({ ok: true, name: 'sample_echo', changed: 'updated', restartRequired: true })
+    expect(result).toEqual({ name: 'sample_echo', changed: 'updated', restartRequired: true })
     const tools = readExternalTools(home)
     expect(tools).toHaveLength(1)
     expect(tools[0]!.description).toBe('updated')
@@ -116,7 +116,7 @@ describe('external_tool_delete', () => {
   it('removes a declared tool and reports the pending restart', async () => {
     await run('external_tool_add', { declaration: TOOL }, home)
     const result = await run('external_tool_delete', { name: 'sample_echo' }, home)
-    expect(result).toEqual({ ok: true, name: 'sample_echo', changed: 'deleted', restartRequired: true })
+    expect(result).toEqual({ name: 'sample_echo', changed: 'deleted', restartRequired: true })
     expect(readExternalTools(home)).toEqual([])
   })
 
