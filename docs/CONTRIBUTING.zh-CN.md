@@ -2,7 +2,7 @@
 
 感谢你对 **DeepSeek Harness ElectroLab** 的关注与贡献。
 
-[English]（../.github/CONTRIBUTING.md） | [简体中文]（CONTRIBUTING.zh-CN.md）
+[English](../.github/CONTRIBUTING.md)
 
 ## 开发流程
 

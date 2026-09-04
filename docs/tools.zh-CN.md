@@ -2,6 +2,8 @@
 
 DeepSeek Harness ElectroLab 插件的全部工具，按领域分组。所有工具遵循同一值契约：值参数是裸数字（实数值）或紧凑复数对象——`{re, im}`（直角坐标）或 `{mag, ang}`（极坐标，ang 为弧度）。每个参数的声明固定其数量 kind。输出为 `{re, im, kind, mag, ang}` 快照，均为 SI 基本单位。✅ 标记组合工具（一次调用编排多个数学内核）。
 
+[English](tools.md)
+
 ## 表达式与代数
 
 | 工具 | 用途 |

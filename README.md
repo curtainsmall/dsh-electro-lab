@@ -2,7 +2,7 @@
 
 An electrical & electronics calculation plugin for the DeepSeek Harness.
 
-[English](README.md) | [简体中文](docs/README.zh-CN.md)
+[简体中文](README.zh-CN.md)
 
 ## Install
 
