@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output (kept clean — this project runs from source, never builds)
+lib/
+dist/
+*.tsbuildinfo
+
+# local test inbox (the file-transport worker's default directory)
+elab-inbox/
+
+# logs & misc
+*.log
+.DS_Store
+Thumbs.db

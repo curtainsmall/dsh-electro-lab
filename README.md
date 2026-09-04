@@ -23,6 +23,12 @@ Every solve is settled to disk and browsable in the client panel: inspect the fu
 | Markdown | plain article text, readable and editable anywhere |
 | LaTeX | XeLaTeX typesetting source, with optional PDF compilation |
 
+## External tools
+
+Beyond the built-in toolset you can register your own calculation tools, reached over an **http** or **file** transport. A declaration (name, description, parameters, transport options) lives in `~/.dsh-electro-lab/external-tools.jsonl`; at plugin start every enabled declaration is compiled into a real tool the agent can call, so changes apply after a host restart. Register through the manager tools (`external_tool_add` / `external_tool_update` / `external_tool_delete`) or the **External tools** tab of the Records panel, which also edits, enables/disables and deletes declarations.
+
+[`external-tool-example/`](external-tool-example/README.md) is an independent npm project with manual test counterparts for this feature — `node src/echo.ts http` / `file` echoes the envelope protocol back end to end.
+
 ## Development
 
 See [Contributing](.github/CONTRIBUTING.md) for the development setup, commit conventions, and release process.
@@ -30,6 +36,7 @@ See [Contributing](.github/CONTRIBUTING.md) for the development setup, commit co
 ## Docs
 
 - [tools.md](docs/tools.md)
+- [external-tool-example](external-tool-example/README.md)
 - [Contributing](.github/CONTRIBUTING.md)
 
 ## License

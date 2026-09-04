@@ -1,0 +1,20 @@
+{
+  "name": "dsh-electro-lab-peer",
+  "version": "0.1.0",
+  "description": "Independent echo peers for DeepSeek Harness ElectroLab external tools (http and file transports)",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "echo:http": "node src/echo.ts http",
+    "echo:file": "node src/echo.ts file --dir ./elab-inbox",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}
