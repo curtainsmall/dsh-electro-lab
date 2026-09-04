@@ -24,6 +24,7 @@ import { unitTools } from './unit-tools.ts'
 import { signalQualityTools } from './signal-quality-tools.ts'
 import { seriesTools } from './series-tools.ts'
 import { recordTools } from './record-tools.ts'
+import { textValueTools } from './text-value-tools.ts'
 
 declare module 'cordis' {
   interface Context {
@@ -32,4 +33,4 @@ declare module 'cordis' {
 }
 
 /** Every tool definition that needs no runtime binding, in registration order. */
-export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools, ...noiseTools, ...transmissionTools, ...electronicsTools, filterTool, ...unitTools, ...signalQualityTools, ...seriesTools, ...recordTools]
+export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools, ...noiseTools, ...transmissionTools, ...electronicsTools, filterTool, ...unitTools, ...textValueTools, ...signalQualityTools, ...seriesTools, ...recordTools]

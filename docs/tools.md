@@ -103,6 +103,13 @@ All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every to
 |---|---|
 | `convert_unit` | Convert a value to any unit of the same family (°C/°F/K, bar/psi/atm/Pa, cal/kWh/J, hp/W, inch/mile/m, lb/oz/kg, degree→radian, ratio ↔ dB) |
 
+## Text ↔ value codec
+
+| Tool | Purpose |
+|---|---|
+| `parse_value` | Parse a text quantity into the canonical value payload in SI base units: SI prefixes p…T, units (Hz, Ω/ohm, F, H, V, A, W, s, rad, °/deg, K, °C, °F, dB), complex `1+2j` and polar `3 ∠ 0.5` |
+| `format_value` | Render a value payload as text: engineering prefix (auto/none/explicit) and unit by kind, e.g. `0.1 F` → `100 mF`, `1 + 2j Ω`, `3 ∠ 0.5 rad V` |
+
 ## Orchestration
 
 | Tool | Purpose |
