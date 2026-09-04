@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { JsonValue, ToolRunContext } from "@deepseek-ai/dsh-tools";
-import { ToolError } from "../tools/helpers.ts";
+import { ToolError, ToolErrorCode } from "../tools/helpers.ts";
 import {
   ExternalHttpMethod,
   ExternalTransport,
@@ -37,25 +37,25 @@ function envelope(
  *  and the error content is raised as the tool failure. */
 function readResult(body: unknown, requestId: string): JsonValue {
   if (typeof body !== "object" || body === null)
-    throw new ToolError("the tool response must be a JSON object", "EXTERNAL_RESPONSE");
+    throw new ToolError("the tool response must be a JSON object", ToolErrorCode.ExternalResponse);
   const box = body as { requestId?: unknown; result?: unknown; error?: unknown };
   if (box.requestId !== requestId)
     throw new ToolError(
       `response requestId mismatch (got ${String(box.requestId)})`,
-      "EXTERNAL_RESPONSE",
+      ToolErrorCode.ExternalResponse,
     );
   if ("error" in box) {
     if (typeof box.error !== "string" || box.error.length === 0)
       throw new ToolError(
         'the tool response "error" field must be a non-empty string',
-        "EXTERNAL_RESPONSE",
+        ToolErrorCode.ExternalResponse,
       );
-    throw new ToolError(box.error, "EXTERNAL_ERROR");
+    throw new ToolError(box.error, ToolErrorCode.ExternalError);
   }
   if (!("result" in box))
     throw new ToolError(
       'the tool response must contain a "result" field',
-      "EXTERNAL_RESPONSE",
+      ToolErrorCode.ExternalResponse,
     );
   return box.result as JsonValue;
 }
@@ -90,7 +90,7 @@ export async function executeHttp(
         : options.url;
     const response = await fetch(url, request);
     if (!response.ok)
-      throw new ToolError(`http ${response.status} from ${options.url}`, "EXTERNAL_HTTP");
+      throw new ToolError(`http ${response.status} from ${options.url}`, ToolErrorCode.ExternalHttp);
     const text = await response.text();
     let parsed: unknown;
     try {
@@ -98,13 +98,13 @@ export async function executeHttp(
     } catch {
       throw new ToolError(
         `the tool returned non-JSON: ${text.slice(0, 120)}`,
-        "EXTERNAL_RESPONSE",
+        ToolErrorCode.ExternalResponse,
       );
     }
     return readResult(parsed, String(body.requestId));
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError")
-      throw new ToolError(`http request timed out after ${timeoutMs} ms`, "EXTERNAL_TIMEOUT");
+      throw new ToolError(`http request timed out after ${timeoutMs} ms`, ToolErrorCode.ExternalTimeout);
     throw error;
   } finally {
     clearTimeout(timer);
@@ -138,7 +138,7 @@ export async function executeFile(
         } catch (error) {
           throw new ToolError(
             `the tool wrote an unreadable out file: ${error instanceof Error ? error.message : String(error)}`,
-            "EXTERNAL_RESPONSE",
+            ToolErrorCode.ExternalResponse,
           );
         }
         return readResult(parsed, requestId);
@@ -146,7 +146,7 @@ export async function executeFile(
       if (Date.now() > deadline)
         throw new ToolError(
           `file transport timed out after ${timeoutMs} ms (no ${outPrefix}.* file appeared)`,
-          "EXTERNAL_TIMEOUT",
+          ToolErrorCode.ExternalTimeout,
         );
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }

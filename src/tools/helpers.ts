@@ -5,10 +5,10 @@
 import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { QuantityKind } from '../math/quantity-kind.ts'
-import { ToolError } from '../errors.ts'
+import { ToolError, ToolErrorCode } from '../errors.ts'
 
-/** Re-exported so every tool file imports the failure type from one place. */
-export { ToolError }
+/** Re-exported so every tool file imports the failure types from one place. */
+export { ToolError, ToolErrorCode }
 
 /**
  * Declared return shape of a tool, used by the record layer to tag stored

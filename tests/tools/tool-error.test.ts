@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { ToolError, defineJsonTool } from '../../src/tools/helpers.ts'
+import { ToolError, ToolErrorCode, defineJsonTool } from '../../src/tools/helpers.ts'
 
 function fakeExec(): ToolRunContext {
   return {
@@ -25,8 +25,9 @@ describe('ToolError', () => {
     const error = new ToolError('boom')
     expect(error).toBeInstanceOf(Error)
     expect(error.name).toBe('ToolError')
-    expect(error.code).toBe('TOOL_ERROR')
-    expect(new ToolError('x', 'EXTERNAL_TIMEOUT').code).toBe('EXTERNAL_TIMEOUT')
+    expect(error.code).toBe(ToolErrorCode.Tool)
+    expect(new ToolError('x', ToolErrorCode.ExternalTimeout).code).toBe('EXTERNAL_TIMEOUT')
+    expect(Object.values(ToolErrorCode)).toEqual(['TOOL_ERROR', 'EXTERNAL_ERROR', 'EXTERNAL_HTTP', 'EXTERNAL_TIMEOUT', 'EXTERNAL_RESPONSE'])
   })
 })
 
@@ -56,7 +57,7 @@ describe('defineJsonTool unified failure path', () => {
       name: 'error_test_passthrough',
       description: 'test tool',
       parameters: {},
-      execute: () => { throw new ToolError('denied', 'EXTERNAL_ERROR') },
+      execute: () => { throw new ToolError('denied', ToolErrorCode.ExternalError) },
     })
     await expect(tool.execute({}, fakeExec())).rejects.toMatchObject({ name: 'ToolError', code: 'EXTERNAL_ERROR', message: 'denied' })
   })
