@@ -69,7 +69,7 @@ curl -s -X POST http://127.0.0.1:8787/echo \
 { "requestId": "manual-1", "result": { "message": "hi", "values": [1, 2], "flag": true } }
 ```
 
-requestId 不匹配的响应会被宿主拒绝；畸形请求返回带 `error` 字段的 `400`。GET 请求同样可用，但所有参数都走查询串，数值会以字符串到达。
+requestId 不匹配的响应会被宿主拒绝；畸形请求返回带 `error` 字段的 `400`。GET 请求同样可用，但所有参数都走查询串，数值会以字符串到达。端点表达「计算失败」时返回 `{ "requestId": "…", "error": "…" }`（若同时带有 `result` 字段则被忽略）——宿主将其提升为工具错误（code `EXTERNAL_ERROR`），与任何抛出的失败呈现为同一种结构化错误。
 
 ## 协议参考
 

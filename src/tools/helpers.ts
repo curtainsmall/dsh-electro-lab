@@ -33,6 +33,43 @@ export type ToolReturns =
 export const TOOL_RETURNS = new Map<string, ToolReturns>()
 
 /**
+ * The one tool-failure error. Every plugin tool fails through this channel:
+ * built-in math tools raise ordinary errors, manager tools express failures
+ * as `{ok:false, error|errors}` result boxes, and external endpoints return
+ * an envelope `error` field — whatever the source, the call surfaces as ONE
+ * structured error result to the agent and is recorded with its name/code in
+ * the record. Codes: `TOOL_ERROR` (default), `EXTERNAL_ERROR` (endpoint
+ * reported), `EXTERNAL_HTTP`, `EXTERNAL_TIMEOUT`, `EXTERNAL_RESPONSE`.
+ */
+export class ToolError extends Error {
+  readonly code: string
+  constructor(message: string, code = 'TOOL_ERROR') {
+    super(message)
+    this.name = 'ToolError'
+    this.code = code
+  }
+}
+
+/**
+ * Extract the message of one failure box — a result value shaped
+ * `{ok: false, error: "…"}` or `{ok: false, errors: ["…", …]}` — or
+ * undefined when the value is not a failure box. Any tool that returns such
+ * a box (an external endpoint signalling a failed computation, a manager
+ * tool refusing a request) is turned into a thrown ToolError by
+ * defineJsonTool, so errors never travel as plain values.
+ */
+export function failureBoxMessage(value: JsonValue): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const box = value as Record<string, unknown>
+  if (box.ok !== false) return undefined
+  if (typeof box.error === 'string' && box.error.length > 0) return box.error
+  if (Array.isArray(box.errors) && box.errors.length > 0 && box.errors.every((item) => typeof item === 'string')) {
+    return (box.errors as string[]).join('; ')
+  }
+  return undefined
+}
+
+/**
  * The one parameter shape for any value payload: a bare number (a real
  * value), a compact complex object — {re, im} for the rect form or {mag, ang}
  * (angles in radians) for the polar form. The payload carries no kind and no
@@ -115,7 +152,15 @@ export function defineJsonTool<S extends ParameterSchemaSpec>(
   if (returns !== undefined) TOOL_RETURNS.set(rest.name, returns)
   return defineTool({
     ...rest,
-    execute: (args, exec) => Promise.resolve(options.execute(args, exec)),
+    execute: async (args, exec) => {
+      // One unified failure path: a returned failure box is raised as a
+      // ToolError so every tool — built-in, external or manager — fails
+      // through the same structured error channel as a thrown error.
+      const value = await options.execute(args, exec)
+      const message = failureBoxMessage(value)
+      if (message !== undefined) throw new ToolError(message)
+      return value
+    },
     output: {
       schema: { type: 'json' },
       render: (_args, value) => renderText(value as JsonValue),

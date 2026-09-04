@@ -97,6 +97,26 @@ describe('file transport', () => {
     }
   })
 
+  it('raises an envelope error field as the tool failure, ignoring result', async () => {
+    const timer = setInterval(() => {
+      const name = readdirSync(home).find((file) => file.startsWith('in.') && file.endsWith('.json'))
+      if (name === undefined) return
+      const parsed = JSON.parse(readFileSync(join(home, name), 'utf8')) as { requestId: string }
+      const out = join(home, `out.${parsed.requestId}.json`)
+      writeFileSync(out, JSON.stringify({ requestId: parsed.requestId, error: 'denied by peer', result: { ignored: true } }), 'utf8')
+    }, 5)
+    try {
+      const execute = makeExecutor(fileTool(home, 10, 2000))
+      await expect(execute({ x: 1 } as never, fakeExec())).rejects.toMatchObject({
+        name: 'ToolError',
+        code: 'EXTERNAL_ERROR',
+        message: 'denied by peer',
+      })
+    } finally {
+      clearInterval(timer)
+    }
+  })
+
   it('times out when no out file appears and still cleans up', async () => {
     const execute = makeExecutor(fileTool(home, 10, 60))
     await expect(execute({ x: 1 } as never, fakeExec())).rejects.toThrow(/file transport timed out after 60 ms/)
@@ -130,6 +150,20 @@ describe('http transport', () => {
       if (req.url?.startsWith('/boom')) {
         res.statusCode = 500
         res.end('nope')
+        return
+      }
+      if (req.url?.startsWith('/fail')) {
+        collect((raw) => {
+          const body = JSON.parse(raw) as { requestId: string }
+          reply(JSON.stringify({ requestId: body.requestId, error: 'denied by peer', result: { ignored: true } }))
+        })
+        return
+      }
+      if (req.url?.startsWith('/baderror')) {
+        collect((raw) => {
+          const body = JSON.parse(raw) as { requestId: string }
+          reply(JSON.stringify({ requestId: body.requestId, error: 42 }))
+        })
         return
       }
       if (req.method === 'POST') {
@@ -186,5 +220,20 @@ describe('http transport', () => {
     await expect(makeExecutor(httpTool('/text', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/non-JSON/)
     await expect(makeExecutor(httpTool('/boom', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/http 500 from/)
     await expect(makeExecutor(httpTool('/hang', ExternalHttpMethod.Post, 60))({ x: 1 } as never, fakeExec())).rejects.toThrow(/timed out after 60 ms/)
+  })
+
+  it('raises an envelope error field as the tool failure, ignoring result', async () => {
+    await expect(makeExecutor(httpTool('/fail', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toMatchObject({
+      name: 'ToolError',
+      code: 'EXTERNAL_ERROR',
+      message: 'denied by peer',
+    })
+  })
+
+  it('rejects a non-string envelope error field as a protocol violation', async () => {
+    await expect(makeExecutor(httpTool('/baderror', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toMatchObject({
+      code: 'EXTERNAL_RESPONSE',
+    })
+    await expect(makeExecutor(httpTool('/baderror', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/error" field must be a non-empty string/)
   })
 })

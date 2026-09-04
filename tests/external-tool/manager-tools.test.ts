@@ -6,6 +6,7 @@ import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 import { createExternalManagerTools } from '../../src/external-tool/manager-tools.ts'
 import { readExternalTools, restartRequired } from '../../src/external-tool/registry.ts'
+import { ToolError } from '../../src/tools/helpers.ts'
 import { ExternalHttpMethod, ExternalParamType, ExternalTransport, type ExternalToolConfig } from '../../src/external-tool/types.ts'
 
 const TOOL: ExternalToolConfig = {
@@ -27,7 +28,7 @@ function fakeExec(): ToolRunContext {
   } as ToolRunContext
 }
 
-/** Execute one manager tool by name and return its JSON result. */
+/** Execute one manager tool by name and return its JSON result on success. */
 async function run(name: string, args: unknown, home: string): Promise<Record<string, JsonValue>> {
   const tools = createExternalManagerTools(home)
   const tool = tools.find((item) => item.name === name)
@@ -36,6 +37,17 @@ async function run(name: string, args: unknown, home: string): Promise<Record<st
   expect(typeof result).toBe('object')
   expect(result).not.toBeNull()
   return result as Record<string, JsonValue>
+}
+
+/** Execute one manager tool and assert the unified failure: a thrown ToolError. */
+async function runFailure(name: string, args: unknown, home: string, message: RegExp): Promise<void> {
+  const tools = createExternalManagerTools(home)
+  const tool = tools.find((item) => item.name === name)
+  expect(tool).toBeDefined()
+  const promise = tool!.execute(args as never, fakeExec())
+  await expect(promise).rejects.toBeInstanceOf(ToolError)
+  await expect(promise).rejects.toThrow(message)
+  await expect(promise).rejects.toMatchObject({ name: 'ToolError', code: 'TOOL_ERROR' })
 }
 
 let home = ''
@@ -58,16 +70,12 @@ describe('external_tool_add', () => {
 
   it('fails when the name already exists', async () => {
     await run('external_tool_add', { declaration: TOOL }, home)
-    const result = await run('external_tool_add', { declaration: { ...TOOL, description: 'again' } }, home)
-    expect(result.ok).toBe(false)
-    expect(String(result.error)).toContain('external_tool_update')
+    await runFailure('external_tool_add', { declaration: { ...TOOL, description: 'again' } }, home, /external_tool_update/)
     expect(readExternalTools(home)).toHaveLength(1)
   })
 
   it('fails on an invalid declaration without touching the archive', async () => {
-    const result = await run('external_tool_add', { declaration: { ...TOOL, parameters: { x: { type: 'float' } } } }, home)
-    expect(result.ok).toBe(false)
-    expect(Array.isArray(result.errors)).toBe(true)
+    await runFailure('external_tool_add', { declaration: { ...TOOL, parameters: { x: { type: 'float' } } } }, home, /parameter "x": unknown type/)
     expect(readExternalTools(home)).toEqual([])
     expect(restartRequired(home)).toBe(false)
   })
@@ -95,16 +103,12 @@ describe('external_tool_update', () => {
   })
 
   it('fails when the name is not declared yet', async () => {
-    const result = await run('external_tool_update', { declaration: TOOL }, home)
-    expect(result.ok).toBe(false)
-    expect(String(result.error)).toContain('external_tool_add')
+    await runFailure('external_tool_update', { declaration: TOOL }, home, /external_tool_add/)
   })
 
   it('fails on an invalid declaration', async () => {
     await run('external_tool_add', { declaration: TOOL }, home)
-    const result = await run('external_tool_update', { declaration: { ...TOOL, enabled: 'yes' } }, home)
-    expect(result.ok).toBe(false)
-    expect(Array.isArray(result.errors)).toBe(true)
+    await runFailure('external_tool_update', { declaration: { ...TOOL, enabled: 'yes' } }, home, /enabled must be a boolean/)
   })
 })
 
@@ -117,9 +121,7 @@ describe('external_tool_delete', () => {
   })
 
   it('fails when the name is not declared', async () => {
-    const result = await run('external_tool_delete', { name: 'ghost' }, home)
-    expect(result.ok).toBe(false)
-    expect(String(result.error)).toContain('ghost')
+    await runFailure('external_tool_delete', { name: 'ghost' }, home, /ghost/)
     expect(readExternalTools(home)).toEqual([])
   })
 })

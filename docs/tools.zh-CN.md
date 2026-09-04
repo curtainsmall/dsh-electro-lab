@@ -121,6 +121,8 @@ DeepSeek Harness ElectroLab 插件的全部工具，按领域分组。所有工�
 
 外部工具是用户自有的计算工具，宿主经 http 或文件传输调用。声明存放于插件主目录（`~/.dsh-electro-lab`）下的 `external-tools.jsonl`；插件启动时，每条未被显式停用的声明都会被编译并注册为工具，因此任何更改都要在重启宿主后生效。声明沿用与内置工具相同的值语法：数量参数接受裸数字或紧凑复数对象——`{re, im}`（直角坐标）或 `{mag, ang}`（极坐标，角度为弧度）；数组参数声明同质 items。保存声明即授权其传输方式。管理工具负责编辑声明档案；记录面板的“外部工具”页提供同样的操作。
 
+失败与内置工具走**同一条错误通道**。外部端点表达「计算失败」时返回 `{requestId, error: "…"}`——若同时带有 `result` 字段则被忽略——宿主把错误内容提升为 code 为 `EXTERNAL_ERROR` 的 `ToolError`。传输类失败由宿主自己抛出：`EXTERNAL_HTTP`（http 状态）、`EXTERNAL_TIMEOUT`（超时）、`EXTERNAL_RESPONSE`（协议违规：requestId 不匹配、缺少 result、error 非字符串）。无论来源是抛出的错误还是上述响应形态之一，调用都会以同一种结构化错误结果呈现给智能体，并以 name/code 记入记录。
+
 | 工具 | 用途 |
 |---|---|
 | `external_tool_add` | 注册新的外部工具声明（名称已存在时报错） |

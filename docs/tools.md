@@ -121,6 +121,8 @@ All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every to
 
 External tools are user-owned calculation tools that the host reaches over an http or file transport. Declarations live in `external-tools.jsonl` under the plugin home (`~/.dsh-electro-lab`); at plugin start every declaration that is not explicitly disabled is compiled and registered as a tool, so a change applies only after a host restart. Declarations use the same value dialect as the built-in tools: a quantity parameter accepts a bare number or a compact complex object — `{re, im}` (rectangular) or `{mag, ang}` (polar, angles in radians) — and an array parameter declares homogeneous items. Saving a declaration is the authorization for its transport. The manager tools edit the declaration archive; the Records panel's External tools tab offers the same actions.
 
+Failures share **one error path** with the built-in tools. An external endpoint reports a failed computation by returning `{requestId, error: "…"}` — a `result` field present alongside is ignored — and the host raises the error content as a `ToolError` with code `EXTERNAL_ERROR`. Transport failures are raised by the host itself with `EXTERNAL_HTTP` (http status), `EXTERNAL_TIMEOUT` and `EXTERNAL_RESPONSE` (protocol violations: a mismatched requestId, a missing result, a non-string error). Whatever the source — a thrown error or one of these response shapes — the call surfaces as the same structured error result to the agent and is recorded with its name/code.
+
 | Tool | Purpose |
 |---|---|
 | `external_tool_add` | Register a new external tool declaration (fails when the name already exists) |

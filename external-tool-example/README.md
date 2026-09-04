@@ -99,7 +99,11 @@ curl -s -X POST http://127.0.0.1:8787/echo \
 
 A response whose requestId does not match is rejected by the host; malformed
 requests get a `400` with an `error` field. GET requests also work, but every
-parameter travels as a query string, so values arrive as strings.
+parameter travels as a query string, so values arrive as strings. An endpoint
+signals a failed computation by returning
+`{ "requestId": "…", "error": "…" }` (a `result` field present alongside is
+ignored) — the host raises it as a tool error (code `EXTERNAL_ERROR`), the
+same structured error any thrown failure produces.
 
 ## Protocol reference
 
