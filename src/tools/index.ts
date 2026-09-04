@@ -1,8 +1,8 @@
 /**
  * Code-authored tool declarations: every module here builds tool definitions
- * through defineJsonTool (see ../define.ts). Archive-authored tools — the
- * declarations in external-tools.jsonl, compiled by ../declarations.ts —
- * produce exactly the same shape; only the author differs. This file only
+ * through defineJsonTool (see ../tool.ts). Archive-authored tools — the
+ * declarations in external-tools.jsonl, compiled by ../tool.ts — produce
+ * exactly the same shape; only the author differs. This file only
  * aggregates the code-authored set; registration itself happens in the host
  * (../index.ts), which mounts this set plus the declarations and the
  * declaration manager tools in one pipeline.

@@ -2,7 +2,7 @@
  * Code-authored declaration manager tools — they live with the other tool
  * modules: `external_tool_add`, `external_tool_update` and
  * `external_tool_delete` edit the declaration archive (external-tools.jsonl)
- * through the tool-declarations module. Every write persists immediately but
+ * through src/tool.ts. Every write persists immediately but
  * only registers after a host restart, so each result carries
  * `restartRequired: true`. Reading/using declared tools needs no manager
  * call — registered tools are visible like any other tool.
@@ -10,9 +10,9 @@
  * The tools are created per home directory (the plugin's records home),
  * because the archive lives there.
  */
-import { defineJsonTool, ToolError } from '../tool-defines.ts'
-import { deleteDeclaration, readDeclarations, upsertDeclaration, validateDeclaration } from '../tool-declarations.ts'
-import type { ToolDeclaration } from '../tool-declarations.ts'
+import { defineJsonTool, ToolError } from '../tool.ts'
+import { deleteDeclaration, readDeclarations, upsertDeclaration, validateDeclaration } from '../tool.ts'
+import type { ToolDeclaration } from '../tool.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 /** The declaration grammar, taught once and shared by add and update. */

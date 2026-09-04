@@ -2,7 +2,7 @@
  * Transmission-line tools: wavelength, coaxial characterization, and
  * rise-time/bandwidth conversion. IO is JSON-and-complex-only.
  */
-import { ToolError } from '../tool-defines.ts'
+import { ToolError } from '../tool.ts'
 import {
   calcBandwidthFromRiseTime,
   calcCoaxialParameters,
@@ -11,7 +11,7 @@ import {
 } from '../math/transmission.ts'
 import { toScalar, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from '../tool-defines.ts'
+import { defineJsonTool, createValueParam } from '../tool.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const transmissionTools = [

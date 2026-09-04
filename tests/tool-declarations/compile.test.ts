@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { compileDeclaration, kindByName } from '../../src/tool-declarations.ts'
-import { TOOL_RETURNS } from '../../src/tool-defines.ts'
+import { compileDeclaration, kindByName } from '../../src/tool.ts'
+import { TOOL_RETURNS } from '../../src/tool.ts'
 import { QuantityKind } from '../../src/math/quantity-kind.ts'
 import {
   DeclarationHttpMethod,
   DeclarationParamType,
   DeclarationTransport,
   type ToolDeclaration,
-} from '../../src/tool-declarations.ts'
+} from '../../src/tool.ts'
 
 /** One http declaration exercising every parameter type plus returns. */
 const CONFIG: ToolDeclaration = {

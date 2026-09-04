@@ -10,13 +10,13 @@ import {
   restartRequired,
   upsertDeclaration,
   validateDeclaration,
-} from '../../src/tool-declarations.ts'
+} from '../../src/tool.ts'
 import {
   DeclarationHttpMethod,
   DeclarationParamType,
   DeclarationTransport,
   type ToolDeclaration,
-} from '../../src/tool-declarations.ts'
+} from '../../src/tool.ts'
 
 /** A valid http declaration exercising every parameter type. */
 const HTTP_TOOL: ToolDeclaration = {

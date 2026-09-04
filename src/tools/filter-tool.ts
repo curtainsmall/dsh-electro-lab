@@ -1,12 +1,12 @@
 /**
  * filter_design — Butterworth low-pass ladder design in one call.
  */
-import { ToolError } from '../tool-defines.ts'
+import { ToolError } from '../tool.ts'
 import { calcButterworthAttenuation, designButterworthLowpass } from '../math/filter.ts'
 import { ElementKind } from '../math/circuits.ts'
 import { toScalar, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from '../tool-defines.ts'
+import { defineJsonTool, createValueParam } from '../tool.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const filterTool = defineJsonTool({

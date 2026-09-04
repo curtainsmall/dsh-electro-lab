@@ -16,7 +16,7 @@ import {
 } from '../math/transfer.ts'
 import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from '../tool-defines.ts'
+import { defineJsonTool, createValueParam } from '../tool.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 const createCoeffArrayParam = (description: string) => ({

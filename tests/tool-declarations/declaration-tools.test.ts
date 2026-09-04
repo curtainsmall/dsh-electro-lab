@@ -5,9 +5,9 @@ import { join } from 'node:path'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 import { createDeclarationTools } from '../../src/tools/declaration-tools.ts'
-import { readDeclarations, restartRequired } from '../../src/tool-declarations.ts'
-import { ToolError } from '../../src/tool-defines.ts'
-import { DeclarationHttpMethod, DeclarationParamType, DeclarationTransport, type ToolDeclaration } from '../../src/tool-declarations.ts'
+import { readDeclarations, restartRequired } from '../../src/tool.ts'
+import { ToolError } from '../../src/tool.ts'
+import { DeclarationHttpMethod, DeclarationParamType, DeclarationTransport, type ToolDeclaration } from '../../src/tool.ts'
 
 const TOOL: ToolDeclaration = {
   name: 'sample_echo',

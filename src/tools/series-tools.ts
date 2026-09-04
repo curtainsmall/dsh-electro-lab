@@ -2,11 +2,11 @@
  * Series tools: arithmetic, geometric and power sums in one tool with a
  * kind discriminator. IO is JSON-and-complex-only.
  */
-import { ToolError } from '../tool-defines.ts'
+import { ToolError } from '../tool.ts'
 import { PowerSumKind, calcArithmeticSeries, calcGeometricSeries, calcPowerSum } from '../math/series.ts'
 import { toScalar, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from '../tool-defines.ts'
+import { defineJsonTool, createValueParam } from '../tool.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const seriesTools = [

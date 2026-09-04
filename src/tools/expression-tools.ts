@@ -9,7 +9,7 @@ import { Complex } from 'complex.js'
 import { calcExpression, reduceRational } from '../math/expression.ts'
 import { toComplex, serializeComplex } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from '../tool-defines.ts'
+import { defineJsonTool, createValueParam } from '../tool.ts'
 
 export const expressionTools = [
   defineJsonTool({

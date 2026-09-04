@@ -17,7 +17,7 @@ import {
   convertImpedanceToReflection,
   type MatchElement,
 } from '../math/smith.ts'
-import { defineJsonTool, createValueParam } from '../tool-defines.ts'
+import { defineJsonTool, createValueParam } from '../tool.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const smithTools = [

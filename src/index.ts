@@ -13,7 +13,7 @@ import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
 import { RecordManager, readRecordArchive, deleteRecordFromArchive, setExternalToolNames, type Record, type RecordEvent } from './records.ts'
 import { ArticleFormat, ArticleLanguage, GenerationPhase, TemplateLanguage, buildArticlePrompt, buildLatexDocument, normalizeFileName, resolveTemplateLanguage, templateLanguageToArticleLanguage } from './generate.ts'
-import { clearRestartRequired, compileDeclaration, deleteDeclaration, readDeclarations, restartRequired, upsertDeclaration, validateDeclaration } from './tool-declarations.ts'
+import { clearRestartRequired, compileDeclaration, deleteDeclaration, readDeclarations, restartRequired, upsertDeclaration, validateDeclaration } from './tool.ts'
 import { createDeclarationTools } from './tools/declaration-tools.ts'
 
 /** Plugin identity for cordis.yml rows. */
