@@ -5,7 +5,7 @@
  * check runs once, then the tool dispatches to the per-family math function.
  * IO is JSON-and-complex-only.
  */
-import { ToolError } from './helpers.ts'
+import { ToolError } from '../tool-defines.ts'
 import {
   ConvertUnit,
   convertAngle,
@@ -28,7 +28,7 @@ import {
 } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
 import { RatioKind } from '../math/convert.ts'
-import { defineJsonTool, createValueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from '../tool-defines.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 const ALL_UNITS = Object.values(ConvertUnit)

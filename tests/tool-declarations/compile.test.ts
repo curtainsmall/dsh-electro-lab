@@ -1,28 +1,28 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { compileExternalTool, kindByName } from '../../src/external-tool/compile.ts'
-import { TOOL_RETURNS } from '../../src/tools/helpers.ts'
+import { compileDeclaration, kindByName } from '../../src/tool-declarations.ts'
+import { TOOL_RETURNS } from '../../src/tool-defines.ts'
 import { QuantityKind } from '../../src/math/quantity-kind.ts'
 import {
-  ExternalHttpMethod,
-  ExternalParamType,
-  ExternalTransport,
-  type ExternalToolConfig,
-} from '../../src/external-tool/types.ts'
+  DeclarationHttpMethod,
+  DeclarationParamType,
+  DeclarationTransport,
+  type ToolDeclaration,
+} from '../../src/tool-declarations.ts'
 
 /** One http declaration exercising every parameter type plus returns. */
-const CONFIG: ExternalToolConfig = {
+const CONFIG: ToolDeclaration = {
   name: 'sample_echo',
   description: 'Echoes its input over http',
   enabled: true,
   parameters: {
-    mode: { type: ExternalParamType.String, enum: ['a', 'b'], description: 'the mode', required: true },
-    gain: { type: ExternalParamType.Quantity, kind: 'log', description: 'the gain' },
-    on: { type: ExternalParamType.Boolean, description: 'a switch' },
-    points: { type: ExternalParamType.Array, items: { type: ExternalParamType.Quantity, kind: 'frequency', description: 'one point' }, description: 'the points' },
-    tags: { type: ExternalParamType.Array, items: { type: ExternalParamType.String }, description: 'the tags' },
+    mode: { type: DeclarationParamType.String, enum: ['a', 'b'], description: 'the mode', required: true },
+    gain: { type: DeclarationParamType.Quantity, kind: 'log', description: 'the gain' },
+    on: { type: DeclarationParamType.Boolean, description: 'a switch' },
+    points: { type: DeclarationParamType.Array, items: { type: DeclarationParamType.Quantity, kind: 'frequency', description: 'one point' }, description: 'the points' },
+    tags: { type: DeclarationParamType.Array, items: { type: DeclarationParamType.String }, description: 'the tags' },
   },
-  transport: ExternalTransport.Http,
-  transportOptions: { url: 'https://example.test/calc', method: ExternalHttpMethod.Post },
+  transport: DeclarationTransport.Http,
+  transportOptions: { url: 'https://example.test/calc', method: DeclarationHttpMethod.Post },
   returns: { type: 'object', fields: { total: { type: 'number', kind: QuantityKind.Power } } },
 }
 
@@ -42,9 +42,9 @@ describe('kindByName', () => {
   })
 })
 
-describe('compileExternalTool', () => {
+describe('compileDeclaration', () => {
   it('emits a tool definition with name, description and object-rooted parameters', () => {
-    const tool = compileExternalTool(CONFIG)
+    const tool = compileDeclaration(CONFIG)
     expect(tool.name).toBe('sample_echo')
     expect(tool.description).toContain('Echoes')
     expect(tool.parameters).toMatchObject({ type: 'object' })
@@ -53,7 +53,7 @@ describe('compileExternalTool', () => {
   })
 
   it('encodes quantity parameters as the three-branch oneOf value shape', () => {
-    const properties = (compileExternalTool(CONFIG).parameters as { properties: Record<string, unknown> }).properties
+    const properties = (compileDeclaration(CONFIG).parameters as { properties: Record<string, unknown> }).properties
     const gain = properties.gain as { oneOf: Array<Record<string, unknown>> }
     expect(gain.oneOf).toHaveLength(3)
     expect(gain.oneOf[0]).toMatchObject({ type: 'number' })
@@ -62,13 +62,13 @@ describe('compileExternalTool', () => {
   })
 
   it('passes string enums and boolean schemas through', () => {
-    const properties = (compileExternalTool(CONFIG).parameters as { properties: Record<string, unknown> }).properties
+    const properties = (compileDeclaration(CONFIG).parameters as { properties: Record<string, unknown> }).properties
     expect(properties.mode).toMatchObject({ type: 'string', enum: ['a', 'b'] })
     expect(properties.on).toMatchObject({ type: 'boolean' })
   })
 
   it('recurses array parameters into array items with the same oneOf shape', () => {
-    const properties = (compileExternalTool(CONFIG).parameters as { properties: Record<string, unknown> }).properties
+    const properties = (compileDeclaration(CONFIG).parameters as { properties: Record<string, unknown> }).properties
     const points = properties.points as { type: string; items: { oneOf: Array<Record<string, unknown>> } }
     expect(points.type).toBe('array')
     expect(points.items.oneOf).toHaveLength(3)
@@ -79,12 +79,12 @@ describe('compileExternalTool', () => {
   })
 
   it('marks required parameters in the root required list', () => {
-    const parameters = compileExternalTool(CONFIG).parameters as { required?: string[] }
+    const parameters = compileDeclaration(CONFIG).parameters as { required?: string[] }
     expect(parameters.required).toContain('mode')
   })
 
   it('stores the returns declaration in TOOL_RETURNS', () => {
-    const tool = compileExternalTool(CONFIG)
+    const tool = compileDeclaration(CONFIG)
     expect(TOOL_RETURNS.get('sample_echo')).toEqual(CONFIG.returns)
     TOOL_RETURNS.delete(tool.name)
   })

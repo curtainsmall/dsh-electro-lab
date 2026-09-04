@@ -17,7 +17,7 @@
 import { useEffect, useState } from 'react'
 import { t, useAppLocale } from './locales.ts'
 import { Dialog, GhostButton, PrimaryButton } from './records.tsx'
-import { QUANTITY_KIND_NAMES } from '../external-tool/types.ts'
+import { QUANTITY_KIND_NAMES } from '../math/quantity-kind.ts'
 
 /* ── Data shapes (mirror of the host declaration + endpoint) ──────────────── */
 

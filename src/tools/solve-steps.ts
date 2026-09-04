@@ -9,12 +9,12 @@
  * cancellation), so nested calls are first-class executions, and every
  * intermediate result is returned in stepResults (array order = step order).
  */
-import { ToolError } from './helpers.ts'
+import { ToolError } from '../tool-defines.ts'
 import type { Context } from 'cordis'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 import type { CallId } from '@deepseek-ai/dsh-llm'
-import { defineJsonTool } from './helpers.ts'
+import { defineJsonTool } from '../tool-defines.ts'
 
 interface StepSpec {
   tool: string

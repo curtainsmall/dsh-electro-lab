@@ -5,7 +5,7 @@
 import { calcCascadeNoiseFigure, calcQuantizationSnr, calcThermalNoisePower } from '../math/noise.ts'
 import { toScalar, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from '../tool-defines.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 const dbArrayParam = (description: string) => ({

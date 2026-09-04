@@ -1,17 +1,18 @@
 /**
- * LLM-facing external-tool manager tools: `external_tool_add`,
- * `external_tool_update` and `external_tool_delete` edit the declaration
- * archive (external-tools.jsonl) through the registry. Every write persists
- * immediately but only registers after a host restart, so each result
- * carries `restartRequired: true`. Reading/using external tools needs no
- * manager call — registered tools are visible like any other tool.
+ * Code-authored declaration manager tools — they live with the other tool
+ * modules: `external_tool_add`, `external_tool_update` and
+ * `external_tool_delete` edit the declaration archive (external-tools.jsonl)
+ * through the tool-declarations module. Every write persists immediately but
+ * only registers after a host restart, so each result carries
+ * `restartRequired: true`. Reading/using declared tools needs no manager
+ * call — registered tools are visible like any other tool.
  *
  * The tools are created per home directory (the plugin's records home),
  * because the archive lives there.
  */
-import { defineJsonTool, ToolError } from '../tools/helpers.ts'
-import { deleteExternalTool, readExternalTools, upsertExternalTool, validateExternalTool } from './registry.ts'
-import type { ExternalToolConfig } from './types.ts'
+import { defineJsonTool, ToolError } from '../tool-defines.ts'
+import { deleteDeclaration, readDeclarations, upsertDeclaration, validateDeclaration } from '../tool-declarations.ts'
+import type { ToolDeclaration } from '../tool-declarations.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 /** The declaration grammar, taught once and shared by add and update. */
@@ -54,38 +55,38 @@ const NAME_PARAM = {
 
 /** Create-only: a name already declared (or pending in the archive) is an error. */
 function addExternalTool(home: string, declaration: unknown): Record<string, JsonValue> {
-  const errors = validateExternalTool(declaration)
+  const errors = validateDeclaration(declaration)
   if (errors.length > 0) throw new ToolError(errors.join('; '))
-  const config = declaration as ExternalToolConfig
-  if (readExternalTools(home).some((tool) => tool.name === config.name)) {
+  const config = declaration as ToolDeclaration
+  if (readDeclarations(home).some((tool) => tool.name === config.name)) {
     throw new ToolError(`an external tool named "${config.name}" already exists — use external_tool_update to replace it`)
   }
-  upsertExternalTool(home, config)
+  upsertDeclaration(home, config)
   return { name: config.name, changed: 'added', restartRequired: true }
 }
 
 /** Replace-only: a missing name (or a name not in the archive yet) is an error. */
 function updateExternalTool(home: string, declaration: unknown): Record<string, JsonValue> {
-  const errors = validateExternalTool(declaration)
+  const errors = validateDeclaration(declaration)
   if (errors.length > 0) throw new ToolError(errors.join('; '))
-  const config = declaration as ExternalToolConfig
-  if (!readExternalTools(home).some((tool) => tool.name === config.name)) {
+  const config = declaration as ToolDeclaration
+  if (!readDeclarations(home).some((tool) => tool.name === config.name)) {
     throw new ToolError(`no external tool named "${config.name}" exists — use external_tool_add to create it`)
   }
-  upsertExternalTool(home, config)
+  upsertDeclaration(home, config)
   return { name: config.name, changed: 'updated', restartRequired: true }
 }
 
-function deleteExternalToolByName(home: string, name: string): Record<string, JsonValue> {
-  if (!readExternalTools(home).some((tool) => tool.name === name)) {
+function deleteDeclarationByName(home: string, name: string): Record<string, JsonValue> {
+  if (!readDeclarations(home).some((tool) => tool.name === name)) {
     throw new ToolError(`no external tool named "${name}" exists`)
   }
-  deleteExternalTool(home, name)
+  deleteDeclaration(home, name)
   return { name, changed: 'deleted', restartRequired: true }
 }
 
 /** The three manager tools, bound to one records home. */
-export function createExternalManagerTools(home: string): Array<ReturnType<typeof defineJsonTool>> {
+export function createDeclarationTools(home: string): Array<ReturnType<typeof defineJsonTool>> {
   return [
     defineJsonTool({
       name: 'external_tool_add',
@@ -106,7 +107,7 @@ export function createExternalManagerTools(home: string): Array<ReturnType<typeo
       description: 'Delete an external tool declaration by its name. The change applies after a host restart (the result reports restartRequired).',
       returns: { type: 'any' },
       parameters: NAME_PARAM,
-      execute: (args) => deleteExternalToolByName(home, args.name),
+      execute: (args) => deleteDeclarationByName(home, args.name),
     }),
   ]
 }

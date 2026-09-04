@@ -1,7 +1,11 @@
 /**
- * Tool registration: every tool definition, registered through the tools
- * service. Each register() returns a disposer; the caller (src/index.ts)
- * wraps them in ctx.effect so unload cleans everything up.
+ * Code-authored tool declarations: every module here builds tool definitions
+ * through defineJsonTool (see ../define.ts). Archive-authored tools — the
+ * declarations in external-tools.jsonl, compiled by ../declarations.ts —
+ * produce exactly the same shape; only the author differs. This file only
+ * aggregates the code-authored set; registration itself happens in the host
+ * (../index.ts), which mounts this set plus the declarations and the
+ * declaration manager tools in one pipeline.
  */
 import type { Context } from 'cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
@@ -15,7 +19,6 @@ import { noiseTools } from './noise-tools.ts'
 import { transmissionTools } from './transmission-tools.ts'
 import { electronicsTools } from './electronics-tools.ts'
 import { filterTool } from './filter-tool.ts'
-import { createSolveStepsTool } from './solve-steps.ts'
 import { unitTools } from './unit-tools.ts'
 import { signalQualityTools } from './signal-quality-tools.ts'
 import { seriesTools } from './series-tools.ts'
@@ -29,13 +32,5 @@ declare module 'cordis' {
 
 export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools, ...noiseTools, ...transmissionTools, ...electronicsTools, ...unitTools, ...signalQualityTools, ...seriesTools, ...recordTools]
 
-/** Register all tools (the orchestrator is bound to the live context); returns one disposer that unregisters every tool. */
-export function registerTools(ctx: Context): () => void {
-  const disposers: Array<() => void> = []
-  for (const tool of [...ALL_TOOLS, filterTool, createSolveStepsTool(ctx)]) {
-    disposers.push(ctx.tools.register(tool))
-  }
-  return () => {
-    for (const off of disposers) off()
-  }
-}
+/** Static tools registered alongside ALL_TOOLS (solve_steps is context-bound, so it stays apart). */
+export const STATIC_TOOLS = [filterTool]

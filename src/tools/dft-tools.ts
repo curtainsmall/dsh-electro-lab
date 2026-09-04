@@ -15,7 +15,7 @@ import {
 } from '../math/dft.ts'
 import { toComplex, toScalar, serializeComplex, serializeReal } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from '../tool-defines.ts'
 
 const createSequenceParam = (description: string) => ({
   type: 'array' as const,

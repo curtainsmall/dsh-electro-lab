@@ -7,7 +7,7 @@
 import { expandPowerSeries, findPolesZeros } from '../math/polynomial.ts'
 import { toComplex, serializeComplex } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from '../tool-defines.ts'
 
 const createCoeffArrayParam = (description: string) => ({
   type: 'array' as const,

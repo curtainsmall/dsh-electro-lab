@@ -2,7 +2,7 @@
  * Electronics tools: op-amp configurations, time constants, voltage
  * dividers and LED series resistors. IO is JSON-and-complex-only.
  */
-import { ToolError } from './helpers.ts'
+import { ToolError } from '../tool-defines.ts'
 import {
   calcDifferentiatorOpamp,
   calcDifferenceOpamp,
@@ -17,7 +17,7 @@ import {
 } from '../math/electronics.ts'
 import { toScalar, serializeReal, serializeComplex } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from '../tool-defines.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 export const electronicsTools = [

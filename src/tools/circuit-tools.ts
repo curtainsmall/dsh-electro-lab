@@ -2,7 +2,7 @@
  * Concept-level circuit tools: primitives (element/series/parallel/circuit
  * impedance) plus scalar concepts. IO is JSON-and-complex-only.
  */
-import { ToolError } from './helpers.ts'
+import { ToolError } from '../tool-defines.ts'
 import { Complex } from 'complex.js'
 import {
   CircuitMode,
@@ -20,7 +20,7 @@ import {
 } from '../math/circuits.ts'
 import { toComplex, toScalar, serializeComplex, serializeReal, type ComplexValue } from '../math/convert.ts'
 import { QuantityKind } from '../math/quantity-kind.ts'
-import { defineJsonTool, createValueParam } from './helpers.ts'
+import { defineJsonTool, createValueParam } from '../tool-defines.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 /** Element kind → quantity kind: the leaf value object's kind must match. */

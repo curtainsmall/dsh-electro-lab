@@ -10,7 +10,7 @@
  * record as a duplicate-start error record and opens a new one.
  * `record_answer` with no open record keeps a duplicate-end error record.
  */
-import { defineJsonTool } from './helpers.ts'
+import { defineJsonTool } from '../tool-defines.ts'
 
 export const RECORD_QUESTION_TOOL = 'record_question'
 export const RECORD_ANALYSE_TOOL = 'record_analyse'

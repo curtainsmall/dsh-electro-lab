@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { ToolError, ToolErrorCode, defineJsonTool } from '../../src/tools/helpers.ts'
+import { ToolError, ToolErrorCode, defineJsonTool } from '../../src/tool-defines.ts'
 
 function fakeExec(): ToolRunContext {
   return {

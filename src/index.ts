@@ -7,14 +7,14 @@ import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import type { Context } from 'cordis'
-import { registerTools } from './tools/index.ts'
+import { ALL_TOOLS, STATIC_TOOLS } from './tools/index.ts'
+import { createSolveStepsTool } from './tools/solve-steps.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
 import { RecordManager, readRecordArchive, deleteRecordFromArchive, type Record, type RecordEvent } from './records.ts'
 import { ArticleFormat, ArticleLanguage, GenerationPhase, TemplateLanguage, buildArticlePrompt, buildLatexDocument, normalizeFileName, resolveTemplateLanguage, templateLanguageToArticleLanguage } from './generate.ts'
-import { clearRestartRequired, deleteExternalTool, readExternalTools, restartRequired, upsertExternalTool, validateExternalTool } from './external-tool/registry.ts'
-import { compileExternalTool } from './external-tool/compile.ts'
-import { createExternalManagerTools } from './external-tool/manager-tools.ts'
+import { clearRestartRequired, compileDeclaration, deleteDeclaration, readDeclarations, restartRequired, upsertDeclaration, validateDeclaration } from './tool-declarations.ts'
+import { createDeclarationTools } from './tools/declaration-tools.ts'
 
 /** Plugin identity for cordis.yml rows. */
 export const name = 'dsh-electro-lab'
@@ -590,7 +590,91 @@ function beginGenerate(ctx: Context, url: string): { jobId: string } {
 }
 
 export function apply(ctx: Context): void {
-  ctx.effect(() => registerTools(ctx), 'dsh-electro-lab: tools')
+  // One registration pipeline for every tool the plugin mounts: the
+  // code-authored modules (tools/), the archive-authored declarations
+  // (external-tools.jsonl) and the declaration manager tools. The restart
+  // dirty bit clears once registration ran with the current archive.
+  ctx.effect(() => {
+    const disposers: Array<() => void> = []
+    for (const tool of [...ALL_TOOLS, ...STATIC_TOOLS]) {
+      disposers.push(ctx.tools.register(tool))
+    }
+    disposers.push(ctx.tools.register(createSolveStepsTool(ctx)))
+    for (const declaration of readDeclarations(recordsHome)) {
+      // A declaration without the flag registers (enabled is the default);
+      // only an explicit false disables the tool.
+      if (declaration.enabled === false) continue
+      try {
+        disposers.push(ctx.tools.register(compileDeclaration(declaration)))
+      } catch (error) {
+        ctx.logger?.warn(`[dsh-electro-lab] failed to register declaration tool "${declaration.name}": ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    // The LLM-facing manager tools (external_tool_add/update/delete) edit
+    // the archive; register them alongside the tools they manage.
+    for (const tool of createDeclarationTools(recordsHome)) {
+      disposers.push(ctx.tools.register(tool))
+    }
+    // Registration just ran with the current file: the restart dirty bit is
+    // stale now and clears until the next change.
+    clearRestartRequired(recordsHome)
+
+    // Management endpoints: GET lists declarations + dirty bit; PUT
+    // upserts one declaration (base64 JSON in the query, no body parsing);
+    // DELETE ?name= removes one. Every write sets the restart dirty bit.
+    const EXTERNAL_PATH = '/api/dsh-electro-lab/external-tools'
+    disposers.push(ctx.webServer.register({
+      kind: 'exact',
+      path: EXTERNAL_PATH,
+      handler: (req, res) => {
+        const request = req as RequestLike
+        const method = request.method ?? 'GET'
+        res.setHeader('content-type', 'application/json')
+        if (method === 'PUT') {
+          const encoded = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('config')
+          if (encoded === null) {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: 'config parameter is required (base64 JSON)' }))
+            return
+          }
+          let config: unknown
+          try {
+            config = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
+          } catch {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: 'config is not valid base64 JSON' }))
+            return
+          }
+          const errors = validateDeclaration(config)
+          if (errors.length > 0) {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: errors.join('; ') }))
+            return
+          }
+          upsertDeclaration(recordsHome, config as never)
+          res.end(JSON.stringify({ saved: true, restartRequired: true }))
+          return
+        }
+        if (method === 'DELETE') {
+          const name = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('name')
+          const deleted = name !== null && deleteDeclaration(recordsHome, name)
+          res.end(JSON.stringify({ deleted, restartRequired: restartRequired(recordsHome) }))
+          return
+        }
+        if (method !== 'GET') {
+          res.statusCode = 405
+          res.end('method not allowed')
+          return
+        }
+        res.end(JSON.stringify({ tools: readDeclarations(recordsHome), restartRequired: restartRequired(recordsHome) }))
+      },
+    }))
+
+    return () => {
+      for (const off of disposers) off()
+    }
+  }, 'dsh-electro-lab: tools')
+
   ctx.effect(() => registerSkills(ctx), 'dsh-electro-lab: skills')
 
   ctx.effect(() => {
@@ -854,86 +938,6 @@ export function apply(ctx: Context): void {
       for (const off of disposers) off()
     }
   }, 'dsh-electro-lab: records')
-
-  // External tools: declared over http/file transports, compiled and
-  // registered at plugin start (changes need a restart — see the dirty bit).
-  ctx.effect(() => {
-    const disposers: Array<() => void> = []
-    for (const config of readExternalTools(recordsHome)) {
-      // A declaration without the flag registers (enabled is the default);
-      // only an explicit false disables the tool.
-      if (config.enabled === false) continue
-      try {
-        disposers.push(ctx.tools.register(compileExternalTool(config)))
-      } catch (error) {
-        ctx.logger?.warn(`[dsh-electro-lab] failed to register external tool "${config.name}": ${error instanceof Error ? error.message : String(error)}`)
-      }
-    }
-    // The LLM-facing manager tools (external_tool_add/update/delete) edit
-    // the archive through the registry; register them alongside the tools
-    // they manage.
-    for (const tool of createExternalManagerTools(recordsHome)) {
-      disposers.push(ctx.tools.register(tool))
-    }
-    // Registration just ran with the current file: the restart dirty bit is
-    // stale now and clears until the next change.
-    clearRestartRequired(recordsHome)
-
-    // Management endpoints: GET lists declarations + dirty bit; PUT
-    // upserts one declaration (base64 JSON in the query, no body parsing);
-    // DELETE ?name= removes one. Every write sets the restart dirty bit.
-    const EXTERNAL_PATH = '/api/dsh-electro-lab/external-tools'
-    disposers.push(ctx.webServer.register({
-      kind: 'exact',
-      path: EXTERNAL_PATH,
-      handler: (req, res) => {
-        const request = req as RequestLike
-        const method = request.method ?? 'GET'
-        res.setHeader('content-type', 'application/json')
-        if (method === 'PUT') {
-          const encoded = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('config')
-          if (encoded === null) {
-            res.statusCode = 400
-            res.end(JSON.stringify({ error: 'config parameter is required (base64 JSON)' }))
-            return
-          }
-          let config: unknown
-          try {
-            config = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
-          } catch {
-            res.statusCode = 400
-            res.end(JSON.stringify({ error: 'config is not valid base64 JSON' }))
-            return
-          }
-          const errors = validateExternalTool(config)
-          if (errors.length > 0) {
-            res.statusCode = 400
-            res.end(JSON.stringify({ error: errors.join('; ') }))
-            return
-          }
-          upsertExternalTool(recordsHome, config as never)
-          res.end(JSON.stringify({ saved: true, restartRequired: true }))
-          return
-        }
-        if (method === 'DELETE') {
-          const name = request.url === undefined ? null : new URL(request.url, 'http://dsh.local').searchParams.get('name')
-          const deleted = name !== null && deleteExternalTool(recordsHome, name)
-          res.end(JSON.stringify({ deleted, restartRequired: restartRequired(recordsHome) }))
-          return
-        }
-        if (method !== 'GET') {
-          res.statusCode = 405
-          res.end('method not allowed')
-          return
-        }
-        res.end(JSON.stringify({ tools: readExternalTools(recordsHome), restartRequired: restartRequired(recordsHome) }))
-      },
-    }))
-
-    return () => {
-      for (const off of disposers) off()
-    }
-  }, 'dsh-electro-lab: external tools')
 
   try {
     const synced = installPresets()

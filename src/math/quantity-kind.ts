@@ -39,6 +39,9 @@ export enum QuantityKind {
   None = 'none',
 }
 
+/** The lowercase kind names (derived from the enum, no drift). Pure — usable from the browser. */
+export const QUANTITY_KIND_NAMES: readonly string[] = Object.values(QuantityKind)
+
 /** Pure relative tolerance comparison (no absolute floor). Zero matches zero exactly. */
 export function isNearlyEqual(a: number, b: number, tol = 1e-9): boolean {
   if (a === 0 && b === 0) return true

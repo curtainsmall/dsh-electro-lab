@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-tools'
-import { makeExecutor } from '../../src/external-tool/transports.ts'
-import { ExternalHttpMethod, ExternalParamType, ExternalTransport, type ExternalToolConfig } from '../../src/external-tool/types.ts'
+import { makeExecutor } from '../../src/tool-declarations.ts'
+import { DeclarationHttpMethod, DeclarationParamType, DeclarationTransport, type ToolDeclaration } from '../../src/tool-declarations.ts'
 
 function fakeExec(): ToolRunContext {
   return {
@@ -52,13 +52,13 @@ afterEach(() => {
   rmSync(home, { recursive: true, force: true })
 })
 
-function fileTool(directory: string, pollMs: number, timeoutMs: number): ExternalToolConfig {
+function fileTool(directory: string, pollMs: number, timeoutMs: number): ToolDeclaration {
   return {
     name: 'file_demo',
     description: 'demo',
     enabled: true,
-    parameters: { x: { type: ExternalParamType.Quantity, kind: 'resistance' }, label: { type: ExternalParamType.String } },
-    transport: ExternalTransport.File,
+    parameters: { x: { type: DeclarationParamType.Quantity, kind: 'resistance' }, label: { type: DeclarationParamType.String } },
+    transport: DeclarationTransport.File,
     transportOptions: { directory, pollMs },
     timeoutMs,
   }
@@ -192,38 +192,38 @@ describe('http transport', () => {
     server.close()
   })
 
-  function httpTool(path: string, method: ExternalHttpMethod, timeoutMs = 2000): ExternalToolConfig {
+  function httpTool(path: string, method: DeclarationHttpMethod, timeoutMs = 2000): ToolDeclaration {
     return {
       name: 'http_demo',
       description: 'demo',
       enabled: true,
-      parameters: { x: { type: ExternalParamType.Quantity, kind: 'resistance' } },
-      transport: ExternalTransport.Http,
+      parameters: { x: { type: DeclarationParamType.Quantity, kind: 'resistance' } },
+      transport: DeclarationTransport.Http,
       transportOptions: { url: `${base}${path}`, method },
       timeoutMs,
     }
   }
 
   it('POSTs the envelope and returns the echoed result', async () => {
-    const execute = makeExecutor(httpTool('/calc', ExternalHttpMethod.Post))
+    const execute = makeExecutor(httpTool('/calc', DeclarationHttpMethod.Post))
     const result = await execute({ x: 21 } as never, fakeExec())
     expect(result).toEqual({ x: 42 })
   })
 
   it('GETs the envelope as query parameters', async () => {
-    const execute = makeExecutor(httpTool('/calc', ExternalHttpMethod.Get))
+    const execute = makeExecutor(httpTool('/calc', DeclarationHttpMethod.Get))
     const result = await execute({ x: 7 } as never, fakeExec())
     expect(result).toEqual({ x: 14 })
   })
 
   it('reports non-JSON responses, http errors and timeouts', async () => {
-    await expect(makeExecutor(httpTool('/text', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/non-JSON/)
-    await expect(makeExecutor(httpTool('/boom', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/http 500 from/)
-    await expect(makeExecutor(httpTool('/hang', ExternalHttpMethod.Post, 60))({ x: 1 } as never, fakeExec())).rejects.toThrow(/timed out after 60 ms/)
+    await expect(makeExecutor(httpTool('/text', DeclarationHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/non-JSON/)
+    await expect(makeExecutor(httpTool('/boom', DeclarationHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/http 500 from/)
+    await expect(makeExecutor(httpTool('/hang', DeclarationHttpMethod.Post, 60))({ x: 1 } as never, fakeExec())).rejects.toThrow(/timed out after 60 ms/)
   })
 
   it('raises an envelope error field as the tool failure, ignoring result', async () => {
-    await expect(makeExecutor(httpTool('/fail', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toMatchObject({
+    await expect(makeExecutor(httpTool('/fail', DeclarationHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toMatchObject({
       name: 'ToolError',
       code: 'EXTERNAL_ERROR',
       message: 'denied by peer',
@@ -231,9 +231,9 @@ describe('http transport', () => {
   })
 
   it('rejects a non-string envelope error field as a protocol violation', async () => {
-    await expect(makeExecutor(httpTool('/baderror', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toMatchObject({
+    await expect(makeExecutor(httpTool('/baderror', DeclarationHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toMatchObject({
       code: 'EXTERNAL_RESPONSE',
     })
-    await expect(makeExecutor(httpTool('/baderror', ExternalHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/error" field must be a non-empty string/)
+    await expect(makeExecutor(httpTool('/baderror', DeclarationHttpMethod.Post))({ x: 1 } as never, fakeExec())).rejects.toThrow(/error" field must be a non-empty string/)
   })
 })
