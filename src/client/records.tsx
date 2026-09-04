@@ -796,7 +796,8 @@ function RecordDetailPage({ record, onBack }: { record: DetailRecord; onBack: ()
       language: genLanguage,
       directory: dir,
       fileName: genFile.trim(),
-      compile: genCompile,
+      // PDF compilation is a LaTeX-only feature (xelatex); Markdown stays a single .md file.
+      compile: format === ArticleFormat.Latex && genCompile,
     })
   }
 
