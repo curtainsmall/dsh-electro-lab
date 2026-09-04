@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import type { Context } from 'cordis'
-import { ALL_TOOLS, STATIC_TOOLS } from './tools/index.ts'
+import { ALL_TOOLS } from './tools/index.ts'
 import { createSolveStepsTool } from './tools/solve-steps.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
@@ -596,7 +596,10 @@ export function apply(ctx: Context): void {
   // dirty bit clears once registration ran with the current archive.
   ctx.effect(() => {
     const disposers: Array<() => void> = []
-    for (const tool of [...ALL_TOOLS, ...STATIC_TOOLS]) {
+    // Unbound code-authored tools register as-is; tools that bind runtime
+    // values (solve_steps needs ctx, the manager tools need the records
+    // home) are built per mount by their factories.
+    for (const tool of ALL_TOOLS) {
       disposers.push(ctx.tools.register(tool))
     }
     disposers.push(ctx.tools.register(createSolveStepsTool(ctx)))

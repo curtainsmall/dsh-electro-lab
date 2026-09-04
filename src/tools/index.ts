@@ -2,10 +2,11 @@
  * Code-authored tool declarations: every module here builds tool definitions
  * through defineJsonTool (see ../tool.ts). Archive-authored tools — the
  * declarations in external-tools.jsonl, compiled by ../tool.ts — produce
- * exactly the same shape; only the author differs. This file only
- * aggregates the code-authored set; registration itself happens in the host
- * (../index.ts), which mounts this set plus the declarations and the
- * declaration manager tools in one pipeline.
+ * exactly the same shape; only the author differs. This file aggregates the
+ * code-authored set that needs no runtime binding; tools that bind runtime
+ * values (ctx for solve_steps, the records home for the declaration manager
+ * tools) are factories and stay out of the list. Registration itself happens
+ * in the host (../index.ts).
  */
 import type { Context } from 'cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
@@ -30,7 +31,5 @@ declare module 'cordis' {
   }
 }
 
-export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools, ...noiseTools, ...transmissionTools, ...electronicsTools, ...unitTools, ...signalQualityTools, ...seriesTools, ...recordTools]
-
-/** Static tools registered alongside ALL_TOOLS (solve_steps is context-bound, so it stays apart). */
-export const STATIC_TOOLS = [filterTool]
+/** Every tool definition that needs no runtime binding, in registration order. */
+export const ALL_TOOLS = [...expressionTools, ...circuitTools, ...smithTools, ...dftTools, ...polynomialTools, ...transferTools, ...noiseTools, ...transmissionTools, ...electronicsTools, filterTool, ...unitTools, ...signalQualityTools, ...seriesTools, ...recordTools]

@@ -57,7 +57,6 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { ALL_TOOLS } from './tools/index.ts'
-import { filterTool } from './tools/filter-tool.ts'
 import { RECORD_QUESTION_TOOL, RECORD_ANALYSE_TOOL, RECORD_ANSWER_TOOL } from './tools/record-tools.ts'
 
 /** A record settles when no electro-lab activity arrives within this window. */
@@ -70,10 +69,9 @@ export const MAX_TEXTS = 8
 export const MAX_CALLS = 32
 export const MAX_RESULTS = 32
 
-/** Every tool the electro-lab plugin registers (ALL_TOOLS + the separately-registered pair). */
+/** Every tool the electro-lab plugin registers (ALL_TOOLS + the ctx-bound solve_steps + the record markers). */
 export const RECORD_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...ALL_TOOLS.map((tool) => tool.name),
-  filterTool.name,
   'solve_steps',
   RECORD_QUESTION_TOOL,
   RECORD_ANALYSE_TOOL,
