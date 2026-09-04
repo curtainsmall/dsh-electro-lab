@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { QuantityKind } from '../../src/math/quantity-kind.ts'
-import { formatValueText, parseValueText } from '../../src/math/text-value.ts'
+import { formatValueText, parseValueText, parseValueTexts } from '../../src/math/text-value.ts'
 
 describe('parseValueText — real values with prefix + unit', () => {
   it('parses prefixed electrical units into SI base values', () => {
@@ -111,5 +111,34 @@ describe('formatValueText', () => {
     expect(formatValueText({ re: 0, im: -3 })).toBe('-3j')
     expect(formatValueText({ mag: 3, ang: 0.5 })).toBe('3 ∠ 0.5 rad')
     expect(formatValueText({ mag: 220, ang: 0 }, QuantityKind.Voltage)).toBe('220 ∠ 0 rad V')
+  })
+})
+
+describe('parseValueTexts — batch parsing with per-item tolerance', () => {
+  it('parses every item in order with its own outcome', () => {
+    const items = parseValueTexts(['100 mF', '50 kHz', '25 °C'])
+    expect(items).toHaveLength(3)
+    const first = items[0] as { ok: true; value: number; kind: QuantityKind; unit: string; prefix: string | null }
+    expect(first.ok).toBe(true)
+    expect(first.value).toBe(0.1)
+    expect(first.kind).toBe(QuantityKind.Capacitance)
+    expect(first.unit).toBe('F')
+    expect(first.prefix).toBe('m')
+    expect((items[1] as { ok: true; value: number }).value).toBe(50000)
+    expect((items[2] as { ok: true; value: number }).value).toBeCloseTo(298.15, 12)
+  })
+
+  it('keeps the good items and reports the bad ones individually', () => {
+    const items = parseValueTexts(['100ohm', '1 second', '1+2j', 'nonsense'])
+    expect(items[0]).toMatchObject({ ok: true, value: 100, kind: QuantityKind.Resistance })
+    const bad = items[1] as { ok: false; error: string }
+    expect(bad.ok).toBe(false)
+    expect(bad.error).toMatch(/unrecognized value text "1 second"/)
+    expect((items[2] as { ok: true }).ok).toBe(true)
+    expect((items[3] as { ok: false; error: string }).error).toMatch(/unrecognized/)
+  })
+
+  it('returns an empty list for no input', () => {
+    expect(parseValueTexts([])).toEqual([])
   })
 })

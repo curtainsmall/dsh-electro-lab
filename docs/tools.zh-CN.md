@@ -107,8 +107,8 @@ DeepSeek Harness ElectroLab 插件的全部工具，按领域分组。所有工�
 
 | 工具 | 用途 |
 |---|---|
-| `parse_value` | 把文本量解析为 SI 基单位的规范值载荷：SI 前缀 p…T、单位（Hz、Ω/ohm、F、H、V、A、W、s、rad、°/deg、K、°C、°F、dB）、复数 `1+2j` 与极坐标 `3 ∠ 0.5` |
-| `format_value` | 把值载荷渲染为文本：工程前缀（auto/none/显式）与按 kind 的单位，如 `0.1 F` → `100 mF`、`1 + 2j Ω`、`3 ∠ 0.5 rad V` |
+| `parse_value` | 批量解析文本量列表为 SI 基单位的规范值载荷（逐项独立，失败单独报告）：SI 前缀 p…T、单位（Hz、Ω/ohm、F、H、V、A、W、s、rad、°/deg、K、°C、°F、dB）、复数 `1+2j` 与极坐标 `3 ∠ 0.5` |
+| `format_value` | 批量渲染值载荷列表为文本：工程前缀（auto/none/显式）与按 kind 的单位，如 `0.1 F` → `100 mF`、`1 + 2j Ω`、`3 ∠ 0.5 rad V` |
 
 ## 编排
 

@@ -16,9 +16,9 @@ Values are complex quantities in SI base units. A value parameter takes a bare n
 
 The user's question arrives as text; the tools speak SI numbers. The bridge is tool work, never head work:
 
-- `parse_value` turns one textual quantity into the canonical value payload: SI prefixes (p/n/µ/m/k/M/G/T), units (Hz, Ω/ohm, F, H, V, A, W, s, rad, °, K, °C, °F, dB), complex `1+2j`, polar `3 ∠ 0.5` — "100 mF" → 0.1, "50 kHz" → 50000, "25 °C" → 298.15. Call it right after `record_question` with the exact text and quote its returned value verbatim in the analysis and in every later argument.
+- `parse_value` turns a LIST of textual quantities into canonical value payloads in one call: SI prefixes (p/n/µ/m/k/M/G/T), units (Hz, Ω/ohm, F, H, V, A, W, s, rad, °, K, °C, °F, dB), complex `1+2j`, polar `3 ∠ 0.5` — "100 mF" → 0.1, "50 kHz" → 50000, "25 °C" → 298.15. Call it right after `record_question` with every textual quantity as the list, quote each returned value verbatim in the analysis and reuse it unchanged in every later argument; items it reports as `ok: false` are re-cast and re-called individually.
 - `convert_unit` handles unit-family conversions of values already in payload form (°C ↔ °F ↔ K, bar/psi/atm/Pa, cal/kWh/J, hp/W, inch/mile/m, lb/oz/kg, degree ↔ radian, ratio ↔ dB).
-- `format_value` renders a payload back to readable text with an engineering prefix and unit (0.1 F → "100 mF") when the answer benefits from it.
+- `format_value` renders a LIST of value payloads back to readable text with an engineering prefix and unit (0.1 F → "100 mF") when the answer benefits from it.
 
 Never rewrite a textual quantity yourself — no hand prefix math, no hand unit conversion, no "10e-6"-style rewrites outside a tool call.
 

@@ -13,7 +13,7 @@ The structured content (question, analysis, tool calls, results, answer) is capt
 A record is bracketed by the marker tools — only what happens between them is recorded:
 
 - Call `record_question` FIRST, before any calculation tool, passing the consolidated question (verbatim) as `text` — merge every user input, including follow-ups, into one full question that needs no further context.
-- Reading is tool work: if a quantity in the user's text carries a unit, SI prefix or complex notation (e.g. "100 mF", "1+2j Ω", "220∠30° V", "25 °C"), call `parse_value` on the exact text (or `convert_unit` for unit-family conversions such as °C ↔ °F) right after `record_question` — readings only, not calculations.
+- Reading is tool work: if quantities in the user's text carry units, SI prefixes or complex notation (e.g. "100 mF", "1+2j Ω", "220∠30° V", "25 °C"), call `parse_value` once with all of them as a list (or `convert_unit` for unit-family conversions such as °C ↔ °F) right after `record_question` — readings only, not calculations; re-call only the items it reports as failed.
 - Call `record_analyse` BEFORE the first calculation tool, passing the analysis as `text`. It holds the BASIC IDEA of solving only: the knowns with their units (quoted from the reading-tool outputs), the target quantity, and the approach with formulas. No computed numbers, no calculation outputs, no verification talk — every calculated value belongs in the answer.
 - Call `record_answer` LAST, after the tool calls, passing the final answer as `text` — it settles the record immediately. Reason only from the tool results; this is where all numbers go.
 

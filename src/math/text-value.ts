@@ -169,6 +169,27 @@ export function parseValueText(text: string): ParsedValueText {
   throw new Error(`unrecognized value text "${trimmed}" — expected forms like 100 mF, 1+2j, 3 ∠ 0.5, 25 °C`)
 }
 
+/** One batch item of {@link parseValueTexts}: parsed, or rejected with the reason. */
+export type ParsedTextItem =
+  | ({ ok: true; text: string } & ParsedValueText)
+  | { ok: false; text: string; error: string }
+
+/**
+ * Parse a list of text quantities, item by item, tolerating failures: each
+ * item is either the parsed outcome (ok) or a per-item error (ok: false with
+ * the reason), so one bad string never discards the good conversions.
+ */
+export function parseValueTexts(texts: readonly string[]): ParsedTextItem[] {
+  return texts.map((text) => {
+    try {
+      const parsed = parseValueText(text)
+      return { ok: true, text, ...parsed }
+    } catch (error) {
+      return { ok: false, text, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+}
+
 /* ── Formatting ───────────────────────────────────────────────────────────── */
 
 /** SI symbol per kind ('' for kinds without one). */
