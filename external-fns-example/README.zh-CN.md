@@ -11,7 +11,7 @@
 
 ## 1. 启动对端
 
-在本目录（`external-tool-example/`）下执行：
+在本目录（`external-fns-example/`）下执行：
 
 ```bash
 node src/echo.ts http --port 8787

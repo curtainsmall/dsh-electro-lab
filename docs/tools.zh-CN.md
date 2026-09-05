@@ -318,4 +318,4 @@ failure:  { "requestId": "<uuid>", "error": "<string message>" }
 | `external_fns_update` | 替换一条已有声明（不存在时报错） |
 | `external_fns_delete` | 按名称删除一条声明 |
 
-写入会立即持久化并置脏位；结果报告 `restartRequired: true`。记录面板的**「外部函数」页**以表单编辑方式提供同样的操作。[`external-tool-example/`](../external-tool-example/README.zh-CN.md) 是独立的 npm 工程，内含该信封协议的手动测试对端——`node src/echo.ts http` / `file` 可将其端到端回显。
+写入会立即持久化并置脏位；结果报告 `restartRequired: true`。记录面板的**「外部函数」页**以表单编辑方式提供同样的操作。[`external-fns-example/`](../external-fns-example/README.zh-CN.md) 是独立的 npm 工程，内含该信封协议的手动测试对端——`node src/echo.ts http` / `file` 可将其端到端回显。

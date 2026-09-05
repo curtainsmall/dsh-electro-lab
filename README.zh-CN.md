@@ -24,7 +24,7 @@ dsh plugin --profile web add dsh-electro-lab
 
 除内置函数外，你还可以注册自己的计算函数，经 **http** 或 **file** 传输访问。声明（名称、描述、参数、显式的 **returns** 形状、传输选项）存放于 `~/.dsh-electro-lab/external-fns.jsonl`；状态机启动时，每条启用的声明都会作为外部函数注册，因此更改在宿主重启后生效。可通过管理工具（`external_fns_add` / `external_fns_update` / `external_fns_delete`）或记录面板的**「外部函数」页**注册——该页还能编辑、启用/停用与删除声明。线协议是类型化信封：`{requestId, args}` → `{requestId, result}`（类型化值，void 时为 `null`）或 `{requestId, error}`——只发 POST、只传类型化值、线上不出现符号。
 
-[`external-tool-example/`](external-tool-example/README.zh-CN.md) 是独立的 npm 工程，内含该功能的手动测试对端——`node src/echo.ts http` / `file` 可将信封协议端到端回显。
+[`external-fns-example/`](external-fns-example/README.zh-CN.md) 是独立的 npm 工程，内含该功能的手动测试对端——`node src/echo.ts http` / `file` 可将信封协议端到端回显。
 
 ## 开发
 
@@ -33,7 +33,7 @@ dsh plugin --profile web add dsh-electro-lab
 ## 文档
 
 - [状态机手册](docs/tools.zh-CN.md)（另见 [English](docs/tools.md)）
-- [external-tool-example](external-tool-example/README.zh-CN.md)
+- [external-fns-example](external-fns-example/README.zh-CN.md)
 - [参与贡献](docs/CONTRIBUTING.zh-CN.md)
 
 ## 许可

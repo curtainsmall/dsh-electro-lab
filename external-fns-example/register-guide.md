@@ -6,7 +6,7 @@ open the **External fns** tab and click **Add external fn**, then fill
 the dialog with the values below. Changes apply after a host restart.
 
 Alternatively, ask the agent in a session to register the function and paste
-the tool's `agentDeclaration` JSON; the agent calls `external_fns_add`.
+the fn's `agentDeclaration` JSON; the agent calls `external_fns_add`.
 
 ## echo_http
 

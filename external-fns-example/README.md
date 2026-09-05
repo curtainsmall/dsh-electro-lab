@@ -23,7 +23,7 @@ never ships it. It only lives inside the repository for convenience.
 
 ## 1. Run a peer
 
-From this directory (`external-tool-example/`):
+From this directory (`external-fns-example/`):
 
 ```bash
 node src/echo.ts http --port 8787
@@ -53,7 +53,7 @@ exact value for every dialog field, including the **returns** editor (a
 declaration without an explicit returns is archived but never registers). In
 the Records panel open the **External fns** tab → **Add external fn** and
 fill the form accordingly, or ask the agent in a session to register the
-function, pasting the tool's `agentDeclaration` JSON from the guide; the
+function, pasting the fn's `agentDeclaration` JSON from the guide; the
 agent calls `external_fns_add`. The `echo_file` directory assumes the peer
 runs with `--dir C:/elab-inbox` — adapt it to the directory you actually
 use. Changes apply at the next host restart.

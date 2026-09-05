@@ -318,4 +318,4 @@ failure:  { "requestId": "<uuid>", "error": "<string message>" }
 | `external_fns_update` | Replace an existing declaration (fails when it does not exist) |
 | `external_fns_delete` | Remove a declaration by name |
 
-Writes persist immediately and set the dirty bit; results report `restartRequired: true`. The Records panel's **External fns** tab offers the same actions with form editing. [`external-tool-example/`](../external-tool-example/README.md) is an independent npm project with manual test counterparts for the envelope protocol — `node src/echo.ts http` / `file` echoes it end to end.
+Writes persist immediately and set the dirty bit; results report `restartRequired: true`. The Records panel's **External fns** tab offers the same actions with form editing. [`external-fns-example/`](../external-fns-example/README.md) is an independent npm project with manual test counterparts for the envelope protocol — `node src/echo.ts http` / `file` echoes it end to end.

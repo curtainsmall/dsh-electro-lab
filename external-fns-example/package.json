@@ -1,7 +1,7 @@
 {
   "name": "dsh-electro-lab-peer",
   "version": "0.1.0",
-  "description": "Independent echo peers for DeepSeek Harness ElectroLab external tools (http and file transports)",
+  "description": "Independent echo peers for DeepSeek Harness ElectroLab external fns (http and file transports)",
   "private": true,
   "type": "module",
   "license": "MIT",
