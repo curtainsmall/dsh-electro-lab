@@ -49,74 +49,84 @@ const zh = {
   paramDescriptionLabel: '说明',
   paramRequiredLabel: '必填',
   unmodeledParams: '{count} 个参数无法用表单表示（如嵌套数组），保存时原样保留：',
+  returnsLabel: '返回值（returns，必填）',
+  returnsTypeLabel: '返回类型',
+  returnsPreserved: '该声明的 returns 无法用表单表示（嵌套结构），保存时原样保留。',
+  returnsVoidHint: 'void：返回 null——端点必须应答 result: null。',
+  returnsEmptyObjectHint: '空字段对象：端点应答的 result 必须是不带任何字段的对象。',
+  addReturnField: '添加字段',
+  fieldNameLabel: '字段名',
+  emptyFieldName: '字段名不能为空。',
+  duplicateFieldName: '字段名重复：“{name}”。',
   invalidName: '名称须以小写字母开头，仅含小写字母、数字与下划线。',
   invalidParamName: '参数名 “{name}” 不合法——须以小写字母开头，仅含小写字母、数字与下划线。',
   duplicateParamName: '参数名重复：“{name}”。',
   urlRequired: '请输入 http(s) URL。',
   fileDirectoryRequired: '请输入目录路径。',
   positiveNumberRequired: '“{label}”须为正数。',
-  select: '选择',
+
   emptyHint: '暂无 ElectroLab 记录——让智能体做一次计算。',
   unreachable: '暂未检测到记录——记录端点未响应,面板会自动重试;若刚更新插件,宿主可能需要重启。',
-  inProgress: '● 进行中',
-  toolCallsCount: '{count} 次工具调用',
-  errorsCount: ', {count} 个错误',
-  startedAt: '开始',
-  settledAt: '结束',
-  sectionQuestion: '1 · 问题',
-  sectionAnalyse: '2 · 分析',
-  sectionCalls: '3 · 工具调用',
-  sectionAnswer: '5 · 答案',
-  backToRecords: '返回记录',
-  exportRecord: '导出',
-  exported: '导出',
-  generate: '生成',
-  generateSetup: '生成设置',
-  generateMarkdown: '生成 Markdown 文章',
-  generateLatex: '生成 LaTeX 文章',
-  generateSetupMarkdown: 'Markdown 生成设置',
-  generateSetupLatex: 'LaTeX 生成设置',
-  generating: '生成中…',
-  generateDone: '生成完成',
-  generateFailed: '生成失败',
-  generatedAt: '已生成至',
-  openFile: '打开文件',
-  openDirectory: '打开目录',
-  phasePrepare: '读取记录…',
-  phaseGenerate: '生成文章中…',
-  phaseWrite: '写入文件…',
-  phaseCompile: '编译 PDF 中…',
-  minimize: '最小化',
-  directoryRequired: '输出目录不能为空。',
-  compilePdf: '编译为 PDF',
-  generatedPdfAt: 'PDF 已生成至',
-  compileFailed: 'PDF 编译失败:',
-  format: '格式',
-  language: '语言',
-  languageAuto: '跟随问题',
-  languageZh: '简体中文',
-  languageEn: 'English',
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   directory: '目录',
-  fileName: '文件名',
-  browse: '浏览',
-  browseDirectory: '选择输出目录',
-  upLevel: '上一级',
+
+
+
+
   confirm: '确定',
-  stepQuestion: '问题',
-  stepAnalyse: '分析',
-  stepCalls: '工具调用',
-  stepAnswer: '答案',
-  deleteSelectedTitle: '删除选中的 {count} 条记录?',
+
+
+
+
+
   irreversible: '此操作不可恢复。',
   cancel: '取消',
-  cancelSelect: '取消选择',
+
   delete: '删除',
-  resultItem: '结果',
-  params: '参数',
-  externalToolMark: '外部',
-  errorDuplicateStartMsg: '重复开启记录——原记录已作为错误记录结算。',
-  errorDuplicateEndMsg: '在无记录时调用了 record_answer。',
-  errorIncompleteMsg: '记录内没有工具调用:事件不足以构成一次计算。',
+
+
+
+
+
+
+  incomplete: '未完成',
 } as const
 
 const en: Record<keyof typeof zh, string> = {
@@ -159,74 +169,84 @@ const en: Record<keyof typeof zh, string> = {
   paramDescriptionLabel: 'Description',
   paramRequiredLabel: 'Required',
   unmodeledParams: '{count} parameter(s) cannot be represented in the form (e.g. nested arrays) and are preserved verbatim on save:',
+  returnsLabel: 'Returns (required)',
+  returnsTypeLabel: 'Return type',
+  returnsPreserved: 'The declaration’s returns cannot be represented in the form (nested structures) and is preserved verbatim on save.',
+  returnsVoidHint: 'void: returns null — the endpoint must answer result: null.',
+  returnsEmptyObjectHint: 'An object with no fields: the endpoint’s result must be an object without any field.',
+  addReturnField: 'Add field',
+  fieldNameLabel: 'Field name',
+  emptyFieldName: 'Field name must not be empty.',
+  duplicateFieldName: 'Duplicate field name: “{name}”.',
   invalidName: 'Name must start with a lowercase letter; only lowercase letters, digits and underscores are allowed.',
   invalidParamName: 'Parameter name “{name}” is invalid — it must start with a lowercase letter; only lowercase letters, digits and underscores are allowed.',
   duplicateParamName: 'Duplicate parameter name: “{name}”.',
   urlRequired: 'Enter an http(s) URL.',
   fileDirectoryRequired: 'Enter a directory path.',
   positiveNumberRequired: '“{label}” must be a positive number.',
-  select: 'Select',
+
   emptyHint: 'No ElectroLab records yet — ask the agent for a calculation.',
   unreachable: 'No records detected yet — the records endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.',
-  inProgress: '● in progress',
-  toolCallsCount: '{count} tool call(s)',
-  errorsCount: ', {count} error(s)',
-  startedAt: 'started',
-  settledAt: 'settled',
-  sectionQuestion: '1 · Question',
-  sectionAnalyse: '2 · Analysis',
-  sectionCalls: '3 · Tool calls',
-  sectionAnswer: '5 · Answer',
-  backToRecords: 'Back to records',
-  exportRecord: 'Export',
-  exported: 'Exported',
-  generate: 'Generate',
-  generateSetup: 'Generation setup',
-  generateMarkdown: 'Generate Markdown article',
-  generateLatex: 'Generate LaTeX article',
-  generateSetupMarkdown: 'Markdown generation setup',
-  generateSetupLatex: 'LaTeX generation setup',
-  generating: 'Generating…',
-  generateDone: 'Generation complete',
-  generateFailed: 'Generation failed',
-  generatedAt: 'Generated at',
-  openFile: 'Open file',
-  openDirectory: 'Open directory',
-  phasePrepare: 'Reading record…',
-  phaseGenerate: 'Generating article…',
-  phaseWrite: 'Writing file…',
-  phaseCompile: 'Compiling PDF…',
-  minimize: 'Minimize',
-  directoryRequired: 'The output directory is required.',
-  compilePdf: 'Compile to PDF',
-  generatedPdfAt: 'PDF generated at',
-  compileFailed: 'PDF compilation failed:',
-  format: 'Format',
-  language: 'Language',
-  languageAuto: 'Auto (follow the question)',
-  languageZh: '简体中文',
-  languageEn: 'English',
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   directory: 'Directory',
-  fileName: 'File name',
-  browse: 'Browse',
-  browseDirectory: 'Select output directory',
-  upLevel: 'Up one level',
+
+
+
+
   confirm: 'OK',
-  stepQuestion: 'Question',
-  stepAnalyse: 'Analysis',
-  stepCalls: 'Tool calls',
-  stepAnswer: 'Answer',
-  deleteSelectedTitle: 'Delete {count} selected record(s)?',
+
+
+
+
+
   irreversible: 'This cannot be undone.',
   cancel: 'Cancel',
-  cancelSelect: 'Cancel select',
+
   delete: 'Delete',
-  resultItem: 'Result',
-  params: 'Parameters',
-  externalToolMark: 'external',
-  errorDuplicateStartMsg: 'record_question fired while a record was already open; it was settled as an error record',
-  errorDuplicateEndMsg: 'record_answer fired with no open record',
-  errorIncompleteMsg: 'the record has no tool call: not enough events for a calculation',
+
+
+
+
+
+
+  incomplete: 'incomplete',
 }
 
 export type LocaleKey = keyof typeof zh

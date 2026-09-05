@@ -9,10 +9,11 @@
  * declaration IS the authorization for its transport — the form shows the
  * reach of http/file transports in warning text before the save button.
  *
- * The form covers the whole declaration language except fields that are
- * preserved verbatim on edit (returns, headers) or unrepresentable in the
- * row editor (e.g. nested array items) — those are kept untouched and never
- * shown as raw JSON.
+ * The form covers the whole declaration language except transport headers
+ * and shapes unrepresentable in the row editors (deeply nested arrays or
+ * returns structures) — those are preserved verbatim on edit and never shown
+ * as raw JSON. Returns has its own guided editor (void / simple leaves /
+ * object fields / array items).
  */
 import { useEffect, useState } from 'react'
 import { t, useAppLocale } from './locales.ts'
@@ -279,6 +280,32 @@ const NAME_PATTERN = /^[a-z][a-z0-9_]{0,63}$/
 type ParamRowType = 'quantity' | 'string' | 'boolean' | 'array'
 type SimpleRowType = 'quantity' | 'string' | 'boolean'
 
+/** Returns 叶子/数组元素形状（字段行与数组行共用）。 */
+type ReturnsLeafType = 'quantity' | 'string' | 'boolean' | 'array'
+
+/** 返回形状的可编辑形态：null = void，或 spec 叶子、对象字段、数组元素。 */
+interface ReturnsForm {
+  mode: 'void' | 'string' | 'boolean' | 'number' | 'complex' | 'array' | 'object'
+  /** number/complex 叶子与 quantity 数组元素的 kind。 */
+  kind: string
+  itemType: SimpleRowType
+  itemKind: string
+  /** object 模式的字段行。 */
+  fields: ReturnsFieldRow[]
+  /** 既有 returns 无法用表单表示（嵌套结构等）——保存时原样保留。 */
+  unmodeled: boolean
+}
+
+/** object 返回的一个字段：叶子或一层数组（与参数行同一限制）。 */
+interface ReturnsFieldRow {
+  id: number
+  name: string
+  type: ReturnsLeafType
+  kind: string
+  itemType: SimpleRowType
+  itemKind: string
+}
+
 /** One editable parameter row; array rows edit one level of homogeneous items. */
 interface ParamRow {
   id: number
@@ -309,6 +336,115 @@ interface FormState {
   rows: ParamRow[]
   /** Parameter names preserved verbatim (the row editor cannot model them). */
   unmodeled: string[]
+  /** 返回形状（M3：returns 必填编辑，spec 或显式 null = void）。 */
+  returns: ReturnsForm
+}
+
+/** 默认表单（新工具）：object 空字段——保存即产出显式 spec。 */
+function defaultReturnsForm(): ReturnsForm {
+  return { mode: 'object', kind: 'none', itemType: 'quantity', itemKind: 'none', fields: [], unmodeled: false }
+}
+
+/** 可编辑的简单叶子或数组元素 spec（无 description/enum/required）。 */
+function parseReturnsLeaf(spec: unknown): { type: SimpleRowType; kind: string } | undefined {
+  if (typeof spec !== 'object' || spec === null) return undefined
+  const s = spec as Record<string, unknown>
+  if (s.type === 'quantity') {
+    if (typeof s.kind !== 'string' || !QUANTITY_KIND_NAMES.includes(s.kind)) return undefined
+    return { type: 'quantity', kind: s.kind }
+  }
+  if (s.type === 'string' && s.enum === undefined) return { type: 'string', kind: 'none' }
+  if (s.type === 'boolean') return { type: 'boolean', kind: 'none' }
+  return undefined
+}
+
+/** 解析既有 returns 为表单；undefined = 无法表示（原样保留）。 */
+function parseReturnsForm(returns: unknown): ReturnsForm {
+  const fallback = (): ReturnsForm => ({ ...defaultReturnsForm(), unmodeled: true })
+  if (returns === null) return { ...defaultReturnsForm(), mode: 'void' }
+  if (typeof returns !== 'object' || returns === null) return fallback()
+  const r = returns as Record<string, unknown>
+  const empty = { kind: 'none', itemType: 'quantity' as SimpleRowType, itemKind: 'none' }
+  switch (r.type) {
+    case 'string':
+      return { ...empty, mode: 'string', fields: [], unmodeled: false }
+    case 'boolean':
+      return { ...empty, mode: 'boolean', fields: [], unmodeled: false }
+    case 'number':
+    case 'complex': {
+      if (typeof r.kind !== 'string' || !QUANTITY_KIND_NAMES.includes(r.kind)) return fallback()
+      return { ...empty, mode: r.type, kind: r.kind, fields: [], unmodeled: false }
+    }
+    case 'array': {
+      const item = parseReturnsLeaf(r.items)
+      if (item === undefined) return fallback()
+      return {
+        ...empty,
+        mode: 'array',
+        itemType: item.type,
+        itemKind: item.kind,
+        fields: [],
+        unmodeled: false,
+      }
+    }
+    case 'object': {
+      if (typeof r.fields !== 'object' || r.fields === null || Array.isArray(r.fields)) return fallback()
+      const fields: ReturnsFieldRow[] = []
+      for (const [name, spec] of Object.entries(r.fields as Record<string, unknown>)) {
+        const leaf = parseReturnsLeaf(spec)
+        if (leaf !== undefined) {
+          fields.push({ id: fields.length, name, type: leaf.type, kind: leaf.kind, itemType: 'quantity', itemKind: 'none' })
+          continue
+        }
+        // 一层数组字段（与参数行同限制）。
+        if (typeof spec === 'object' && spec !== null && (spec as Record<string, unknown>).type === 'array') {
+          const item = parseReturnsLeaf((spec as Record<string, unknown>).items)
+          if (item === undefined) return fallback()
+          fields.push({ id: fields.length, name, type: 'array', kind: 'none', itemType: item.type, itemKind: item.kind })
+          continue
+        }
+        return fallback()
+      }
+      return { ...empty, mode: 'object', fields, unmodeled: false }
+    }
+    default:
+      return fallback()
+  }
+}
+
+/** 由叶子/数组行构建 spec（字段与数组元素共用）。 */
+function buildReturnsLeaf(row: { type: SimpleRowType | 'array'; kind: string; itemType: SimpleRowType; itemKind: string }): Record<string, unknown> {
+  if (row.type === 'array') {
+    const items: Record<string, unknown> = { type: row.itemType }
+    if (row.itemType === 'quantity') items.kind = row.itemKind
+    return { type: 'array', items }
+  }
+  if (row.type === 'quantity') return { type: 'quantity', kind: row.kind }
+  return { type: row.type }
+}
+
+/** 表单 → returns spec；null = void。 */
+function buildReturnsSpec(form: ReturnsForm): unknown {
+  switch (form.mode) {
+    case 'void':
+      return null
+    case 'string':
+    case 'boolean':
+      return { type: form.mode }
+    case 'number':
+    case 'complex':
+      return { type: form.mode, kind: form.kind }
+    case 'array': {
+      const items: Record<string, unknown> = { type: form.itemType }
+      if (form.itemType === 'quantity') items.kind = form.itemKind
+      return { type: 'array', items }
+    }
+    case 'object': {
+      const fields: Record<string, unknown> = {}
+      for (const row of form.fields) fields[row.name.trim()] = buildReturnsLeaf(row)
+      return { type: 'object', fields }
+    }
+  }
 }
 
 /** Parse one parameter spec into an editable row; undefined = keep verbatim. */
@@ -407,6 +543,7 @@ function seedForm(tool: ExternalToolView | null): FormState {
     timeoutMs: typeof tool?.timeoutMs === 'number' ? String(tool.timeoutMs) : '',
     rows,
     unmodeled,
+    returns: tool === null ? defaultReturnsForm() : parseReturnsForm(tool.returns),
   }
 }
 
@@ -425,7 +562,12 @@ function buildConfig(state: FormState, original: ExternalToolView | null): unkno
   delete base.transport
   delete base.transportOptions
   delete base.timeoutMs
+  delete base.returns
   const config: Record<string, unknown> = { ...base, name: state.name.trim(), description: state.description.trim(), enabled: state.enabled }
+
+  // returns：unmodeled 时从 base 原样保留；可编辑形态覆盖为表单产物（null = void）。
+  if (!state.returns.unmodeled) config.returns = buildReturnsSpec(state.returns)
+  else if (original?.returns !== undefined) config.returns = original.returns
 
   const timeout = parsePositive(state.timeoutMs)
   if (timeout !== undefined && Number.isNaN(timeout)) config.timeoutMs = state.timeoutMs // keeps raw text; validation blocks the save
@@ -492,6 +634,16 @@ function validateForm(state: FormState): string[] {
     if (!NAME_PATTERN.test(name)) errors.push(t('invalidParamName', { name }))
     else if (seen.has(name)) errors.push(t('duplicateParamName', { name }))
     else seen.add(name)
+  }
+  // returns 对象字段：名称非空、不重复（字段名不强制参数命名规则——如 'low-pass'）。
+  if (state.returns.mode === 'object' && !state.returns.unmodeled) {
+    const fieldNames = new Set<string>()
+    for (const row of state.returns.fields) {
+      const name = row.name.trim()
+      if (name.length === 0) errors.push(t('emptyFieldName'))
+      else if (fieldNames.has(name)) errors.push(t('duplicateFieldName', { name }))
+      else fieldNames.add(name)
+    }
   }
   return errors
 }
@@ -561,6 +713,18 @@ function EditorDialog({ editor, onClose, onSaved }: {
   }
   const removeRow = (id: number): void => {
     set('rows', state.rows.filter((row) => row.id !== id))
+  }
+  const setReturns = (patch: Partial<ReturnsForm>): void => set('returns', { ...state.returns, ...patch })
+  const setReturnField = (id: number, patch: Partial<ReturnsFieldRow>): void => set('returns', {
+    ...state.returns,
+    fields: state.returns.fields.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+  })
+  const addReturnField = (): void => {
+    const id = state.returns.fields.reduce((max, row) => Math.max(max, row.id), -1) + 1
+    set('returns', { ...state.returns, fields: [...state.returns.fields, { id, name: '', type: 'quantity', kind: 'none', itemType: 'quantity', itemKind: 'none' }] })
+  }
+  const removeReturnField = (id: number): void => {
+    set('returns', { ...state.returns, fields: state.returns.fields.filter((row) => row.id !== id) })
   }
   const isHttp = state.transport === 'http'
 
@@ -732,6 +896,111 @@ function EditorDialog({ editor, onClose, onSaved }: {
         ))}
         {state.rows.length === 0 && (
           <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>{t('parametersLabel')} —</div>
+        )}
+
+        {/* Returns：必填编辑——spec（叶子/对象/数组）或显式 void（returns: null）。 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)' }}>{t('returnsLabel')}</span>
+        </div>
+        {state.returns.unmodeled ? (
+          <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-secondary)', lineHeight: 1.5 }}>{t('returnsPreserved')}</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Field label={t('returnsTypeLabel')} style={{ flex: 0.9 }}>
+                <select value={state.returns.mode} onChange={(event) => setReturns({ mode: event.target.value as ReturnsForm['mode'] })} style={controlStyle}>
+                  <option value="void">void</option>
+                  <option value="string">string</option>
+                  <option value="boolean">boolean</option>
+                  <option value="number">number</option>
+                  <option value="complex">complex</option>
+                  <option value="object">object</option>
+                  <option value="array">array</option>
+                </select>
+              </Field>
+              {(state.returns.mode === 'number' || state.returns.mode === 'complex') && (
+                <Field label={t('paramKindLabel')} style={{ flex: 1.4 }}>
+                  <select value={state.returns.kind} onChange={(event) => setReturns({ kind: event.target.value })} style={controlStyle}>
+                    {QUANTITY_KIND_NAMES.map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+                  </select>
+                </Field>
+              )}
+              {state.returns.mode === 'array' && (
+                <Field label={t('paramItemsLabel')} style={{ flex: 1.4 }}>
+                  <select value={state.returns.itemType} onChange={(event) => setReturns({ itemType: event.target.value as SimpleRowType })} style={controlStyle}>
+                    <option value="quantity">quantity</option>
+                    <option value="string">string</option>
+                    <option value="boolean">boolean</option>
+                  </select>
+                </Field>
+              )}
+              {state.returns.mode === 'array' && state.returns.itemType === 'quantity' && (
+                <Field label={t('paramKindLabel')} style={{ flex: 1.4 }}>
+                  <select value={state.returns.itemKind} onChange={(event) => setReturns({ itemKind: event.target.value })} style={controlStyle}>
+                    {QUANTITY_KIND_NAMES.map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+                  </select>
+                </Field>
+              )}
+            </div>
+            {state.returns.mode === 'void' && (
+              <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', lineHeight: 1.5 }}>{t('returnsVoidHint')}</div>
+            )}
+            {state.returns.mode === 'object' && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <GhostButton onClick={addReturnField}>{t('addReturnField')}</GhostButton>
+                </div>
+                {state.returns.fields.map((row) => (
+                  <div key={row.id} style={{ border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 6, padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <Field label={t('paramTypeLabel')} style={{ flex: 0.8 }}>
+                        <select value={row.type} onChange={(event) => setReturnField(row.id, { type: event.target.value as ReturnsLeafType })} style={controlStyle}>
+                          <option value="quantity">quantity</option>
+                          <option value="string">string</option>
+                          <option value="boolean">boolean</option>
+                          <option value="array">array</option>
+                        </select>
+                      </Field>
+                      <Field label={t('paramKindLabel')} style={{ flex: 1.2 }}>
+                        <select
+                          value={row.type === 'array' ? row.itemKind : row.kind}
+                          disabled={row.type !== 'quantity' && row.type !== 'array'}
+                          onChange={(event) => setReturnField(row.id, row.type === 'array' ? { itemKind: event.target.value } : { kind: event.target.value })}
+                          style={{ ...controlStyle, opacity: row.type !== 'quantity' && row.type !== 'array' ? 0.5 : 1 }}
+                        >
+                          {QUANTITY_KIND_NAMES.map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+                        </select>
+                      </Field>
+                      <Field label={t('fieldNameLabel')} style={{ flex: 1.4 }}>
+                        <input type="text" value={row.name} spellCheck={false} onChange={(event) => setReturnField(row.id, { name: event.target.value })} style={{ ...controlStyle, fontFamily: 'ui-monospace, monospace' }} />
+                      </Field>
+                      <button
+                        type="button"
+                        aria-label={t('removeParameter')}
+                        title={t('removeParameter')}
+                        onClick={() => removeReturnField(row.id)}
+                        style={{ flex: 'none', border: 'none', background: 'none', color: 'var(--dsw-alias-state-error-primary)', cursor: 'pointer', fontSize: 14, padding: '2px 4px', marginBottom: 4 }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {row.type === 'array' && (
+                      <Field label={t('paramItemsLabel')} style={{ flex: 1 }}>
+                        <select value={row.itemType} onChange={(event) => setReturnField(row.id, { itemType: event.target.value as SimpleRowType })} style={controlStyle}>
+                          <option value="quantity">quantity</option>
+                          <option value="string">string</option>
+                          <option value="boolean">boolean</option>
+                        </select>
+                      </Field>
+                    )}
+                  </div>
+                ))}
+                {state.returns.fields.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>{t('returnsEmptyObjectHint')}</div>
+                )}
+              </>
+            )}
+          </div>
         )}
         {state.unmodeled.length > 0 && (
           <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-secondary)', lineHeight: 1.5 }}>

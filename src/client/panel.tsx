@@ -12,7 +12,7 @@
  */
 import { useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
-import { RecordsTab, GenerationOverlay } from './records.tsx'
+import { RecordsTab } from './records.tsx'
 import { ExternalToolsTab } from './external-tools.tsx'
 import { t, useAppLocale } from './locales.ts'
 import { IconChevronLeft } from './icons.tsx'
@@ -57,17 +57,6 @@ export function mountElectroLabPanel(): () => void {
   container.dataset.dshElectrolabView = ''
   container.style.display = 'none'
 
-  // Generation overlay root: a body-level mount (independent of the panel
-  // container and its display toggle) so the progress dialog and minimized
-  // pill stay visible across the records list, the session chat, and every
-  // other page. The shell defines the theme tokens on <body>, so the overlay
-  // inherits them; pointer-events are re-enabled on the dialog/pill themselves.
-  const overlayContainer = document.createElement('div')
-  overlayContainer.style.cssText = 'position: fixed; inset: 0; z-index: 95; pointer-events: none;'
-  document.body.appendChild(overlayContainer)
-  let overlayRoot: ReturnType<typeof createRoot> | undefined
-  overlayRoot ??= createRoot(overlayContainer)
-  overlayRoot.render(<GenerationOverlay />)
   const style = document.createElement('style')
   style.textContent = `
     [data-pane="conversation"], [class*="centerCol"] { position: relative; }
@@ -93,14 +82,6 @@ export function mountElectroLabPanel(): () => void {
       background: var(--dsw-alias-label-primary); }
   `
   document.head.appendChild(style)
-  // The vendored directory-tree stylesheet, served by the host (injected on
-  // arrival so the bundle never has to inline the CSS).
-  void fetch('/api/dsh-electro-lab/directory-tree.css')
-    .then((res) => (res.ok ? res.text() : ''))
-    .then((css) => {
-      if (css.length > 0) style.textContent += `\n${css}`
-    })
-    .catch(() => {})
 
   let root: ReturnType<typeof createRoot> | undefined
   const tryPlace = (): void => {
@@ -176,8 +157,6 @@ export function mountElectroLabPanel(): () => void {
     style.remove()
     root?.unmount()
     container.remove()
-    overlayRoot?.unmount()
-    overlayContainer.remove()
   }
 }
 
