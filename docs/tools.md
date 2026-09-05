@@ -59,7 +59,7 @@ call { fn, args, target }  call one registered fn; args values are typed values 
 Semantics:
 
 - `"100 kΩ"` is always a string; a resistance of 100 kΩ must be given as `{ "type": "number", "value": 100, "kind": "resistance", "prefix": "kilo" }`.
-- `@name` / `@name.path` is a slot reference (`@` prefix = reference, no `@` = literal). The state machine expands it and kind/shape-checks it against the fn signature. A reference to a missing slot fails with `CONTEXT_UNDECLARED`.
+- `@name` / `@name.path` is a slot reference (`@` prefix = reference, no `@` = literal). The state machine expands it and kind/shape-checks it against the fn signature. A reference to a missing slot fails with `ENGINE_UNDECLARED`.
 - **Every call returns one receipt** — there is no "exception vs normal return" duality:
 
 ```
@@ -70,10 +70,10 @@ failure:      → { ok: false, code, error }
 ```
 
   Check `ok` first. Receipts carry no business data (except `get`); read values only through `get`.
-- **target matches the fn signature** (the state machine decides from the registry; the model does not need to remember rules): a void fn (declared `returns: null`) takes `target: null` (a named target → `CONTEXT_VOID_TARGET`); a value fn requires a named target (missing/null → `CONTEXT_TARGET_REQUIRED`).
+- **target matches the fn signature** (the state machine decides from the registry; the model does not need to remember rules): a void fn (declared `returns: null`) takes `target: null` (a named target → `ENGINE_VOID_TARGET`); a value fn requires a named target (missing/null → `ENGINE_TARGET_REQUIRED`).
 - **target always overwrites**: writing an existing slot replaces the whole value (kind check passes) and bumps `rev`; nothing is inherited from the old representation.
 - **Delete = `set` with `value: null`**: the slot disappears from the table, deleting a missing slot is an idempotent ok, re-creating later restarts at rev 1; the trace line carries `deleted: true`.
-- Slot kinds are pinned on first write: overwriting with a different kind fails (`CONTEXT_KIND_MISMATCH`) and does not advance the revision.
+- Slot kinds are pinned on first write: overwriting with a different kind fails (`ENGINE_KIND_MISMATCH`) and does not advance the revision.
 - Failed operations have **no side effects**: no slot is created, the table does not change, revisions do not move. The failure still lands in the trace.
 
 ## 4. Records & markers
@@ -228,7 +228,7 @@ One line per state machine operation or marker; every line carries everything ne
 { "seq": 3, "tool": "call", "ok": true, "fn": "resonance",
   "args": { …original… }, "resolved": { …expanded + SI/rect end values… },
   "result": { …typed output… }, "target": "res", "rev": 1, "at": … }
-{ "seq": 4, "tool": "call", "ok": false, "code": "CONTEXT_UNDECLARED", "error": "…", "at": … }
+{ "seq": 4, "tool": "call", "ok": false, "code": "ENGINE_UNDECLARED", "error": "…", "at": … }
 { "seq": 5, "tool": "set", "ok": true, "name": "tmp", "value": null, "deleted": true, "at": … }
 { "seq": 6, "tool": "marker", "kind": "answer", "ok": true, "text": "…", "at": … }
 ```

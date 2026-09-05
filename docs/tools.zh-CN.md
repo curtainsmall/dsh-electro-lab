@@ -59,7 +59,7 @@ call { fn, args, target }  call one registered fn; args values are typed values 
 语义：
 
 - `"100 kΩ"` 永远是字符串；表示 100 kΩ 的电阻，必须给 `{ "type": "number", "value": 100, "kind": "resistance", "prefix": "kilo" }`。
-- `@name` / `@name.path` 是槽引用（`@` 前缀即引用记号，无 `@` 即字面量）。状态机展开引用后，按 fn 签名对它做 kind/形状校验。引用不存在的槽会以 `CONTEXT_UNDECLARED` 失败。
+- `@name` / `@name.path` 是槽引用（`@` 前缀即引用记号，无 `@` 即字面量）。状态机展开引用后，按 fn 签名对它做 kind/形状校验。引用不存在的槽会以 `ENGINE_UNDECLARED` 失败。
 - **每次调用都返回一张收据**——不存在「异常 vs 正常返回」的分野：
 
 ```
@@ -70,10 +70,10 @@ failure:      → { ok: false, code, error }
 ```
 
   先看 `ok`。收据不携带业务数据（`get` 除外）；读值只能经由 `get`。
-- **target 与 fn 签名匹配**（由状态机按注册表判别，模型无需记忆规则）：void fn（声明为 `returns: null`）接受 `target: null`（具名 target → `CONTEXT_VOID_TARGET`）；有返回值的 fn 必须给具名 target（缺失/null → `CONTEXT_TARGET_REQUIRED`）。
+- **target 与 fn 签名匹配**（由状态机按注册表判别，模型无需记忆规则）：void fn（声明为 `returns: null`）接受 `target: null`（具名 target → `ENGINE_VOID_TARGET`）；有返回值的 fn 必须给具名 target（缺失/null → `ENGINE_TARGET_REQUIRED`）。
 - **target 恒覆盖**：写入已存在的槽会用新值整体替换（kind 校验通过后）并推进 `rev`；不继承旧表示的任何部分。
 - **删除 = 以 `value: null` 执行 `set`**：槽从变量表消失；删除不存在的槽是幂等的 ok；之后重建会从 rev 1 重新开始；轨迹行带 `deleted: true`。
-- 槽的 kind 在首次写入时钉死：以不同 kind 覆盖会失败（`CONTEXT_KIND_MISMATCH`），且不推进版本号。
+- 槽的 kind 在首次写入时钉死：以不同 kind 覆盖会失败（`ENGINE_KIND_MISMATCH`），且不推进版本号。
 - 失败的操作**没有副作用**：不建槽、变量表不变、版本号不动。失败仍会落入轨迹。
 
 ## 4. 记录与标记
@@ -228,7 +228,7 @@ fn 表面正是在「每 fn 单一返回形状」纪律下迁移后的内核。�
 { "seq": 3, "tool": "call", "ok": true, "fn": "resonance",
   "args": { …original… }, "resolved": { …expanded + SI/rect end values… },
   "result": { …typed output… }, "target": "res", "rev": 1, "at": … }
-{ "seq": 4, "tool": "call", "ok": false, "code": "CONTEXT_UNDECLARED", "error": "…", "at": … }
+{ "seq": 4, "tool": "call", "ok": false, "code": "ENGINE_UNDECLARED", "error": "…", "at": … }
 { "seq": 5, "tool": "set", "ok": true, "name": "tmp", "value": null, "deleted": true, "at": … }
 { "seq": 6, "tool": "marker", "kind": "answer", "ok": true, "text": "…", "at": … }
 ```
