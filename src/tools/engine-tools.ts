@@ -1,5 +1,6 @@
 /**
- * Engine tool surface: the set / get / call primitives + markers.
+ * Engine tool surface: the set / get / call primitives, solver_info
+ * introspection and the record markers.
  * Thin wrapper: arguments pass schema validation then go to the engine shell; a uniform receipt (ok) is returned.
  */
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
@@ -58,6 +59,14 @@ export function createEngineTools(engine: Engine): Array<ReturnType<typeof defin
         target: { type: 'json', description: 'result slot name (string), or null for void solvers', required: true },
       },
       execute: async (args) => engine.opCall(args.solver as string, args.args as Record<string, unknown> | undefined, args.target as string | null) as never,
+    }),
+    defineJsonTool({
+      name: 'solver_info',
+      description: `Inspect one registered solver before calling it: its parameter signature (parameter names, types, quantity kinds, allowed enum values, optional flags, nested items) and its returns (spec, or null for void). Read this whenever you are about to call a solver you have not used yet.${solverList}`,
+      parameters: {
+        solver: { type: 'string', enum: solverEnum, description: 'the registered solver to inspect', required: true },
+      },
+      execute: (args) => engine.opInfo(args.solver as string) as never,
     }),
     defineJsonTool({
       name: 'record_question',

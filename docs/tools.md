@@ -9,7 +9,7 @@ This manual is the full reference for the engine surface — typed values, primi
 ## 1. How it works
 
 - **One global engine per host process.** Any session's markers act on the same engine; at most one record is open at a time (single-open invariant).
-- **The LLM surface is six tools**: `set`, `get`, `call`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_solver_add` / `external_solver_update` / `external_solver_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the engine's solver registry and are invoked by `call`.
+- **The LLM surface is seven tools**: `set`, `get`, `call`, `solver_info`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_solver_add` / `external_solver_update` / `external_solver_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the engine's solver registry and are invoked by `call`. `solver_info` exposes a solver's exact signature (parameter names, quantity kinds, allowed enums, optional flags, returns) straight from the registry — read it before calling an unfamiliar solver.
 - **A record is a process (timeline).** Each engine operation appends one fully self-describing trace line (input and output both stored); a record can be replayed to rebuild the recorded state at any point without re-computing anything.
 - **Input is value.** What the model gives is what the engine stores; a string stays a string.
 
@@ -54,6 +54,7 @@ The table stores values **exactly as given** — `get` returns what `set` wrote,
 set  { name, value }     write one slot: value = a typed value; value: null deletes the slot
 get  { name }            read one slot (the stored typed value, exactly as written)
 call { solver, args, target }  call one registered solver; args values are typed values or slot references like { "type": "slot", "value": "R" }
+solver_info { solver }        inspect a solver's signature (parameters, enums, returns) before calling it
 ```
 
 Semantics:

@@ -165,6 +165,22 @@ export class Engine {
     }
   }
 
+  /** Inspect one solver: its exact signature from the registry, traced as its own row. */
+  opInfo(solverId: string): Receipt {
+    try {
+      const solver = this.registry.require(solverId)
+      this.trace({ tool: 'solver_info', ok: true, solver: solverId })
+      // Specs are plain JSON by design; round-trip them so the receipt carries plain data.
+      const signature = JSON.parse(JSON.stringify({ parameters: solver.parameters, returns: solver.returns })) as {
+        parameters: unknown
+        returns: unknown
+      }
+      return { ok: true, solver: solver.id, summary: solver.summary, parameters: signature.parameters, returns: signature.returns }
+    } catch (error) {
+      return this.failure('solver_info', error)
+    }
+  }
+
   async opCall(solverId: string, rawArgs: Record<string, unknown> | undefined, target: string | null): Promise<Receipt> {
     const args: Record<string, unknown> = rawArgs ?? {}
     try {
@@ -204,35 +220,45 @@ export class Engine {
   private resolveArgs(solver: SolverDef, args: Record<string, unknown>): { resolved: Record<string, TypedValue>; native: Record<string, unknown> } {
     const resolved: Record<string, TypedValue> = {}
     const native: Record<string, unknown> = {}
+    const missing: string[] = []
     for (const [name, spec] of Object.entries(solver.parameters)) {
       const raw = args[name]
       if (raw === undefined) {
         if (spec.optional === true) continue
-        throw new ToolError(`solver "${solver.id}" is missing argument "${name}"`, ToolErrorCode.InvalidArgs)
+        missing.push(`${name}: ${describeSpec(spec)}`)
+        continue
       }
-      const typed = this.resolveValue(raw)
+      const typed = this.resolveValue(raw, name, spec)
       const error = validateAgainstSpec(spec, typed, `argument "${name}"`)
       if (error !== undefined) throw new ToolError(`solver "${solver.id}": ${error}`, ToolErrorCode.KindMismatch)
       const canonical = toCanonical(typed)
       resolved[name] = canonical
       native[name] = nativeValue(spec, canonical)
     }
+    if (missing.length > 0) {
+      throw new ToolError(`solver "${solver.id}" is missing required arguments: ${missing.join(', ')}`, ToolErrorCode.InvalidArgs)
+    }
     return { resolved, native }
   }
 
   /** One argument value: a slot reference ({type: 'slot', value: full path}) or a typed-value literal. */
-  private resolveValue(raw: unknown): TypedValue {
+  private resolveValue(raw: unknown, name: string, spec: Spec): TypedValue {
     if (isSlotValue(raw)) {
       const reference = raw.value
       const dot = reference.indexOf('.')
-      const name = dot === -1 ? reference : reference.slice(0, dot)
+      const slotName = dot === -1 ? reference : reference.slice(0, dot)
       const path = dot === -1 ? undefined : reference.slice(dot + 1)
-      const slot = this.table.get(name)
-      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.SlotUndeclared)
+      const slot = this.table.get(slotName)
+      if (slot === undefined) throw new ToolError(`argument "${name}": slot "${slotName}" is not declared`, ToolErrorCode.SlotUndeclared)
       return refPath(slot.value, path)
     }
     const error = validateValue(raw)
-    if (error !== undefined) throw new ToolError(`argument value: ${error}`, ToolErrorCode.InvalidArgs)
+    if (error !== undefined) {
+      const hint = typeof raw === 'string' && raw.startsWith('@')
+        ? ' — "@name" strings are no longer references: pass { "type": "slot", "value": "name" }'
+        : ''
+      throw new ToolError(`argument "${name}": ${error}; expected ${describeSpec(spec)}${hint}`, ToolErrorCode.InvalidArgs)
+    }
     return raw as TypedValue
   }
 
@@ -272,6 +298,22 @@ export class Engine {
       this.trace({ tool, ok: false, code, error: message })
     }
     return { ok: false, code, error: message }
+  }
+}
+
+/** Compact human description of a spec, used in failure receipts so the model can self-correct. */
+function describeSpec(spec: Spec): string {
+  switch (spec.type) {
+    case 'quantity':
+      return `quantity(${spec.kind})${spec.form === undefined ? '' : ` ${spec.form}`}`
+    case 'string':
+      return spec.enum === undefined ? 'string' : `string(${spec.enum.join('|')})`
+    case 'boolean':
+      return 'boolean'
+    case 'array':
+      return `array of ${describeSpec(spec.items)}`
+    case 'object':
+      return `object with fields {${Object.keys(spec.fields).join(', ')}}`
   }
 }
 

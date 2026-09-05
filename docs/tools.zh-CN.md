@@ -9,7 +9,7 @@ DeepSeek Harness ElectroLab 插件把全部电气电子计算放在一台确定�
 ## 1. 工作原理
 
 - **每个宿主进程一台全局引擎。** 任何会话的标记都作用于同一台引擎；任何时刻至多有一条未封口记录（单一 open 不变量）。
-- **LLM 使用面只有六个工具**：`set`、`get`、`call`、`record_question`、`record_analyse`、`record_answer`——外加声明管理器 `external_solver_add` / `external_solver_update` / `external_solver_delete`。约 40 个领域工具、`solve_steps` 与文本↔值编解码工具已退役；数学内核住在引擎的 solver 注册表中，由 `call` 调用。
+- **LLM 使用面只有七个工具**：`set`、`get`、`call`、`solver_info`、`record_question`、`record_analyse`、`record_answer`——外加声明管理器 `external_solver_add` / `external_solver_update` / `external_solver_delete`。约 40 个领域工具、`solve_steps` 与文本↔值编解码工具已退役；数学内核住在引擎的 solver 注册表中，由 `call` 调用。`solver_info` 直接从注册表暴露某个 solver 的精确签名（参数名、数量 kind、允许的枚举、可选标记、returns）——调用陌生 solver 前先读它。
 - **记录是一个过程（时间线）。** 每次引擎操作都会追加一行完全自描述的轨迹行（输入与输出都记录在案）；一条记录可以被重放，从而在不重新计算任何东西的前提下重建任意时刻的状态。
 - **输入即值。** 模型给什么，引擎就存什么；字符串永远是字符串。
 
@@ -54,6 +54,7 @@ DeepSeek Harness ElectroLab 插件把全部电气电子计算放在一台确定�
 set  { name, value }     write one slot: value = a typed value; value: null deletes the slot
 get  { name }            read one slot (the stored typed value, exactly as written)
 call { solver, args, target }  call one registered solver; args values are typed values or slot references like { "type": "slot", "value": "R" }
+solver_info { solver }        inspect a solver's signature (parameters, enums, returns) before calling it
 ```
 
 语义：

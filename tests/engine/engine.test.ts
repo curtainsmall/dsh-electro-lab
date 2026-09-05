@@ -142,6 +142,39 @@ describe('engine (set/get/call + markers + trace)', () => {
     await expect(engine.opCall('ghost', {}, null)).resolves.toMatchObject({ ok: false, code: 'ENGINE_UNKNOWN_SOLVER' })
   })
 
+  it('failure receipts name the argument, the expected spec and the slot-reference form', async () => {
+    const engine = makeEngine()
+    engine.registry.register({
+      id: 'two_args',
+      summary: 'two args',
+      parameters: {
+        a: { type: 'quantity', kind: QuantityKind.Resistance },
+        b: { type: 'string', enum: ['x', 'y'] },
+      },
+      returns: { type: 'quantity', kind: QuantityKind.None },
+      run: (args) => (args.a as number),
+    })
+    engine.markerQuestion('q')
+    // Missing arguments are all listed at once, each with its expected spec
+    await expect(engine.opCall('two_args', {}, 'D')).resolves.toMatchObject({
+      ok: false,
+      code: 'ENGINE_ARGS',
+      error: /missing required arguments: a: quantity\(resistance\), b: string\(x\|y\)/,
+    })
+    // A bad literal names the argument and the expected spec
+    await expect(engine.opCall('two_args', { a: 5, b: { type: 'string', value: 'x' } }, 'D')).resolves.toMatchObject({
+      ok: false,
+      code: 'ENGINE_ARGS',
+      error: /argument "a": .*expected quantity\(resistance\)/,
+    })
+    // A bare "@name" string gets the migration hint instead of a silent loop
+    await expect(engine.opCall('two_args', { a: '@R', b: { type: 'string', value: 'x' } }, 'D')).resolves.toMatchObject({
+      ok: false,
+      code: 'ENGINE_ARGS',
+      error: /"@name" strings are no longer references/,
+    })
+  })
+
   it('solver run throws → ok:false ENGINE_SOLVER_FAILED, no slot is created', async () => {
     const engine = makeEngine()
     engine.registry.register({
