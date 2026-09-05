@@ -1,9 +1,9 @@
 /**
- * ElectroLab External tools tab: one page with every external tool
- * declaration (external-tools.jsonl), read through the
- * `/api/dsh-electro-lab/external-tools` endpoint and polled while the tab
+ * ElectroLab External fns tab: one page with every external fn
+ * declaration (external-fns.jsonl), read through the
+ * `/api/dsh-electro-lab/external-fns` endpoint and polled while the tab
  * is open. Declarations are edited through a guided form (add/edit dialog)
- * or through the LLM manager tools (external_tool_add/update/delete); both
+ * or through the LLM manager tools (external_fns_add/update/delete); both
  * paths only register the tools at the next host restart, so the dirty bit
  * returned by the endpoint drives the pending-restart banner. Saving a
  * declaration IS the authorization for its transport — the form shows the
@@ -22,7 +22,7 @@ import { QUANTITY_KIND_NAMES } from '../math/quantity-kind.ts'
 
 /* ── Data shapes (mirror of the host declaration + endpoint) ──────────────── */
 
-interface ExternalToolView {
+interface ExternalFnView {
   name: string
   description: string
   enabled: boolean
@@ -33,16 +33,16 @@ interface ExternalToolView {
   timeoutMs?: number
 }
 
-interface ExternalToolsResponse {
-  tools: ExternalToolView[]
+interface ExternalFnsResponse {
+  fns: ExternalFnView[]
   restartRequired: boolean
 }
 
-const EXTERNAL_ENDPOINT = '/api/dsh-electro-lab/external-tools'
+const EXTERNAL_ENDPOINT = '/api/dsh-electro-lab/external-fns'
 const POLL_MS = 5000
 
 /** The transport target line: "http · GET <url>" or "file · <directory>". */
-function transportLine(tool: ExternalToolView): string {
+function transportLine(tool: ExternalFnView): string {
   const options = tool.transportOptions ?? {}
   if (tool.transport === 'http') {
     const method = typeof options.method === 'string' ? options.method : 'POST'
@@ -81,12 +81,12 @@ const codeFont: React.CSSProperties = {
 
 /* ── The tab ──────────────────────────────────────────────────────────────── */
 
-export function ExternalToolsTab(): React.JSX.Element {
+export function ExternalFnsTab(): React.JSX.Element {
   useAppLocale() // Re-render when the active language changes.
-  const [response, setResponse] = useState<ExternalToolsResponse | null>(null)
+  const [response, setResponse] = useState<ExternalFnsResponse | null>(null)
   const [failed, setFailed] = useState(false)
-  const [editor, setEditor] = useState<{ tool: ExternalToolView | null } | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<ExternalToolView | null>(null)
+  const [editor, setEditor] = useState<{ tool: ExternalFnView | null } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ExternalFnView | null>(null)
   const [actionError, setActionError] = useState('')
   const [refreshTick, setRefreshTick] = useState(0)
   // Pending changes show their banner immediately after a save/delete
@@ -98,8 +98,8 @@ export function ExternalToolsTab(): React.JSX.Element {
     const load = async (): Promise<void> => {
       try {
         const res = await fetch(EXTERNAL_ENDPOINT)
-        if (!res.ok) throw new Error(`external-tools endpoint returned ${res.status}`)
-        const body = (await res.json()) as ExternalToolsResponse
+        if (!res.ok) throw new Error(`external-fns endpoint returned ${res.status}`)
+        const body = (await res.json()) as ExternalFnsResponse
         if (!alive) return
         setResponse(body)
         setPendingRestart(body.restartRequired)
@@ -124,7 +124,7 @@ export function ExternalToolsTab(): React.JSX.Element {
     )
   }
 
-  const tools = response?.tools ?? []
+  const tools = response?.fns ?? []
   const restartRequired = pendingRestart || (response?.restartRequired ?? false)
 
   return (
@@ -133,7 +133,7 @@ export function ExternalToolsTab(): React.JSX.Element {
         <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 12 }}>
           {t('tabExternal')} · {tools.length}
         </span>
-        <PrimaryButton onClick={() => setEditor({ tool: null })}>{t('addExternalTool')}</PrimaryButton>
+        <PrimaryButton onClick={() => setEditor({ tool: null })}>{t('addExternalFn')}</PrimaryButton>
       </div>
       {restartRequired && (
         <div style={{ ...rowStyle, borderColor: 'var(--dsw-alias-state-warn-primary)', color: 'var(--dsw-alias-state-warn-primary)' }}>
@@ -182,14 +182,14 @@ export function ExternalToolsTab(): React.JSX.Element {
                   {tool.enabled ? t('enabled') : t('disabled')}
                 </button>
                 <button type="button" style={headerButtonStyle} onClick={() => setEditor({ tool })}>
-                  {t('editTool')}
+                  {t('editFn')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setDeleteTarget(tool)}
                   style={{ ...headerButtonStyle, color: 'var(--dsw-alias-state-error-primary)', borderColor: 'var(--dsw-alias-state-error-primary)' }}
                 >
-                  {t('deleteTool')}
+                  {t('deleteFn')}
                 </button>
               </span>
             </div>
@@ -201,7 +201,7 @@ export function ExternalToolsTab(): React.JSX.Element {
       <EditorDialog editor={editor} onClose={() => setEditor(null)} onSaved={() => { setPendingRestart(true); setEditor(null); setRefreshTick((tick) => tick + 1) }} />
       <Dialog
         open={deleteTarget !== null}
-        title={deleteTarget === null ? '' : t('deleteToolTitle', { name: deleteTarget.name })}
+        title={deleteTarget === null ? '' : t('deleteFnTitle', { name: deleteTarget.name })}
         width={360}
         onClose={() => setDeleteTarget(null)}
         footer={deleteTarget === null ? undefined : [
@@ -517,7 +517,7 @@ function buildParamSpec(row: ParamRow): Record<string, unknown> {
 }
 
 /** Seed the form from a declaration (or defaults for a new tool). */
-function seedForm(tool: ExternalToolView | null): FormState {
+function seedForm(tool: ExternalFnView | null): FormState {
   const options = (tool?.transportOptions ?? {}) as Record<string, unknown>
   const rows: ParamRow[] = []
   const unmodeled: string[] = []
@@ -556,7 +556,7 @@ function parsePositive(text: string): number | undefined {
 }
 
 /** Rebuild the declaration JSON from the form; unknown fields survive edits. */
-function buildConfig(state: FormState, original: ExternalToolView | null): unknown {
+function buildConfig(state: FormState, original: ExternalFnView | null): unknown {
   const base: Record<string, unknown> = original !== null ? { ...original } : {}
   delete base.parameters
   delete base.transport
@@ -681,7 +681,7 @@ function Field({ label, style, children }: { label: string; style?: React.CSSPro
 
 /** The add/edit dialog: a guided form — no raw JSON. */
 function EditorDialog({ editor, onClose, onSaved }: {
-  editor: { tool: ExternalToolView | null } | null
+  editor: { tool: ExternalFnView | null } | null
   onClose: () => void
   onSaved: () => void
 }): React.JSX.Element | null {
@@ -751,7 +751,7 @@ function EditorDialog({ editor, onClose, onSaved }: {
       open
       width={620}
       height={560}
-      title={editor.tool === null ? t('addExternalTool') : t('editExternalTool')}
+      title={editor.tool === null ? t('addExternalFn') : t('editExternalFn')}
       onClose={() => { if (!saving) onClose() }}
       footer={[
         <GhostButton key="cancel" onClick={onClose}>{t('cancel')}</GhostButton>,

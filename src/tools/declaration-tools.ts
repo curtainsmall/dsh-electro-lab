@@ -1,7 +1,7 @@
 /**
  * Code-authored declaration manager tools — they live with the other tool
- * modules: `external_tool_add`, `external_tool_update` and
- * `external_tool_delete` edit the declaration archive (external-tools.jsonl)
+ * modules: `external_fns_add`, `external_fns_update` and
+ * `external_fns_delete` edit the declaration archive (external-fns.jsonl)
  * through src/tool.ts. Every write persists immediately but
  * only registers after a host restart, so each result carries
  * `restartRequired: true`. Reading/using declared tools needs no manager
@@ -17,10 +17,10 @@ import type { JsonValue } from '@deepseek-ai/dsh-tools'
 
 /** The declaration grammar, taught once and shared by add and update. */
 const DECLARATION_GUIDE =
-  'the full external tool declaration as ONE JSON object: ' +
+  'the full external fn declaration as ONE JSON object: ' +
   '{ "name": starts with a lowercase letter, then lowercase letters/digits/underscores, max 64, ' +
-  'unique among external and built-in tools; ' +
-  '"description": what the tool computes; ' +
+  'unique among external and built-in fns; ' +
+  '"description": what the fn computes; ' +
   '"enabled": true (the default when omitted) or false; ' +
   '"parameters": object mapping each parameter name to its spec; ' +
   '"transport": "http" or "file"; ' +
@@ -48,30 +48,30 @@ const DECLARATION_PARAM = {
 const NAME_PARAM = {
   name: {
     type: 'string',
-    description: 'the name of the external tool to delete',
+    description: 'the name of the external fn to delete',
     required: true,
   },
 } as const
 
 /** Create-only: a name already declared (or pending in the archive) is an error. */
-function addExternalTool(home: string, declaration: unknown): Record<string, JsonValue> {
+function addExternalFn(home: string, declaration: unknown): Record<string, JsonValue> {
   const errors = validateDeclaration(declaration)
   if (errors.length > 0) throw new ToolError(errors.join('; '))
   const config = declaration as ToolDeclaration
   if (readDeclarations(home).some((tool) => tool.name === config.name)) {
-    throw new ToolError(`an external tool named "${config.name}" already exists — use external_tool_update to replace it`)
+    throw new ToolError(`an external fn named "${config.name}" already exists — use external_fns_update to replace it`)
   }
   upsertDeclaration(home, config)
   return { name: config.name, changed: 'added', restartRequired: true }
 }
 
 /** Replace-only: a missing name (or a name not in the archive yet) is an error. */
-function updateExternalTool(home: string, declaration: unknown): Record<string, JsonValue> {
+function updateExternalFn(home: string, declaration: unknown): Record<string, JsonValue> {
   const errors = validateDeclaration(declaration)
   if (errors.length > 0) throw new ToolError(errors.join('; '))
   const config = declaration as ToolDeclaration
   if (!readDeclarations(home).some((tool) => tool.name === config.name)) {
-    throw new ToolError(`no external tool named "${config.name}" exists — use external_tool_add to create it`)
+    throw new ToolError(`no external fn named "${config.name}" exists — use external_fns_add to create it`)
   }
   upsertDeclaration(home, config)
   return { name: config.name, changed: 'updated', restartRequired: true }
@@ -79,7 +79,7 @@ function updateExternalTool(home: string, declaration: unknown): Record<string, 
 
 function deleteDeclarationByName(home: string, name: string): Record<string, JsonValue> {
   if (!readDeclarations(home).some((tool) => tool.name === name)) {
-    throw new ToolError(`no external tool named "${name}" exists`)
+    throw new ToolError(`no external fn named "${name}" exists`)
   }
   deleteDeclaration(home, name)
   return { name, changed: 'deleted', restartRequired: true }
@@ -89,20 +89,20 @@ function deleteDeclarationByName(home: string, name: string): Record<string, Jso
 export function createDeclarationTools(home: string): Array<ReturnType<typeof defineJsonTool>> {
   return [
     defineJsonTool({
-      name: 'external_tool_add',
-      description: `Register a NEW external calculation tool. Pass ${DECLARATION_GUIDE} The change applies after a host restart (the result reports restartRequired).`,
+      name: 'external_fns_add',
+      description: `Register a NEW external calculation fn. Pass ${DECLARATION_GUIDE} The change applies after a host restart (the result reports restartRequired).`,
       parameters: DECLARATION_PARAM,
-      execute: (args) => addExternalTool(home, args.declaration),
+      execute: (args) => addExternalFn(home, args.declaration),
     }),
     defineJsonTool({
-      name: 'external_tool_update',
-      description: `Replace the declaration of an EXISTING external tool. Pass ${DECLARATION_GUIDE} The tool must already be declared (external_tool_add creates it); the change applies after a host restart.`,
+      name: 'external_fns_update',
+      description: `Replace the declaration of an EXISTING external fn. Pass ${DECLARATION_GUIDE} The fn must already be declared (external_fns_add creates it); the change applies after a host restart.`,
       parameters: DECLARATION_PARAM,
-      execute: (args) => updateExternalTool(home, args.declaration),
+      execute: (args) => updateExternalFn(home, args.declaration),
     }),
     defineJsonTool({
-      name: 'external_tool_delete',
-      description: 'Delete an external tool declaration by its name. The change applies after a host restart (the result reports restartRequired).',
+      name: 'external_fns_delete',
+      description: 'Delete an external fn declaration by its name. The change applies after a host restart (the result reports restartRequired).',
       parameters: NAME_PARAM,
       execute: (args) => deleteDeclarationByName(home, args.name),
     }),

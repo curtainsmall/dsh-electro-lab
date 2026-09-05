@@ -3,8 +3,8 @@
  *
  * 一台进程级全局引擎（Engine）：变量表 + fn 注册表 + 记录存储。
  * apply 装配：注册内核 fn 与外部 fn、注册 LLM 工具面（set/get/call +
- * markers）与声明管理工具（external_tool_add/update/delete）、挂两个
- * 端点（记录索引、外部工具档案管理）。
+ * markers）与声明管理工具（external_fns_add/update/delete）、挂两个
+ * 端点（记录索引、外部 fn 档案管理）。
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -55,7 +55,7 @@ const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-el
 export const engine = new Engine(recordsHome)
 
 const RECORDS_INDEX_PATH = '/api/dsh-electro-lab/records-index'
-const EXTERNAL_PATH = '/api/dsh-electro-lab/external-tools'
+const EXTERNAL_PATH = '/api/dsh-electro-lab/external-fns'
 
 export function apply(ctx: Context): void {
   ctx.effect(() => {
@@ -113,7 +113,7 @@ export function apply(ctx: Context): void {
       },
     }))
 
-    // 外部工具档案管理：GET 列表 + dirty 位；PUT 覆盖/新增（base64 JSON 查询参数）；
+    // 外部 fn 档案管理：GET 列表 + dirty 位；PUT 覆盖/新增（base64 JSON 查询参数）；
     // DELETE ?name= 删除。每次写置 dirty 位（重启后经 compileExternalFn 注册）。
     disposers.push(ctx.webServer.register({
       kind: 'exact',
@@ -158,7 +158,7 @@ export function apply(ctx: Context): void {
           res.end('method not allowed')
           return
         }
-        res.end(JSON.stringify({ tools: readDeclarations(recordsHome), restartRequired: restartRequired(recordsHome) }))
+        res.end(JSON.stringify({ fns: readDeclarations(recordsHome), restartRequired: restartRequired(recordsHome) }))
       },
     }))
 

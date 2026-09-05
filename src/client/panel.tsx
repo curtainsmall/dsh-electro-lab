@@ -13,7 +13,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RecordsTab } from './records.tsx'
-import { ExternalToolsTab } from './external-tools.tsx'
+import { ExternalFnsTab } from './external-fns.tsx'
 import { t, useAppLocale } from './locales.ts'
 import { IconChevronLeft } from './icons.tsx'
 
@@ -371,7 +371,7 @@ export function ElectroLabPanel(): React.JSX.Element | null {
         <TabButton active={tab === 'external'} label={t('tabExternal')} onClick={() => setTab('external')} />
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
-        {tab === 'records' ? <RecordsTab /> : <ExternalToolsTab />}
+        {tab === 'records' ? <RecordsTab /> : <ExternalFnsTab />}
       </div>
     </div>
   )

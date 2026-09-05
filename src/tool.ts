@@ -4,9 +4,9 @@
  *
  * 1. Definition: ToolReturns (the declared output shape of a declaration),
  *    renderText and defineJsonTool — the factory used by the manager tools
- *    (external_tool_*) and the engine primitives (set/get/call, markers).
+ *    (external_fns_*) and the engine primitives (set/get/call, markers).
  * 2. Declarations: the archive-authored tool dialect (ToolDeclaration,
- *    Declaration*), the external-tools.jsonl archive with the restart dirty
+ *    Declaration*), the external-fns.jsonl archive with the restart dirty
  *    bit, and validation. Declarations are not compiled into tools anymore —
  *    at plugin start every enabled declaration is recorded verbatim into the
  *    engine's fn registry as an external fn (engine/external-fns.ts), which
@@ -162,8 +162,8 @@ export type ToolDeclaration = DeclarationBase & (
 
 /* ── Archive ──────────────────────────────────────────────────────────────── */
 
-/** The declaration archive file (one JSON declaration per line). */
-export const DECLARATIONS_FILE = 'external-tools.jsonl'
+/** The external-fn declaration archive (one JSON declaration per line). */
+export const DECLARATIONS_FILE = 'external-fns.jsonl'
 /** Non-config serialized state (the restart dirty bit lives here). */
 export const STATE_FILE = 'state.json'
 
