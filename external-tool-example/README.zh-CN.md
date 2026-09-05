@@ -35,7 +35,7 @@ pnpm echo:file          # 使用本目录下的 ./elab-inbox
 
 ## 2. 注册声明
 
-[`register-guide.zh-CN.md`](register-guide.zh-CN.md) 列出两个函数及对话框每个字段应填的确切值，包括 **returns** 编辑器（没有显式 returns 的声明只会被存档、永远不会注册）。在记录面板中打开**「外部工具」页** → **「添加外部工具」**，按指南填写表单；或在会话中让智能体注册该函数，把指南中该函数的 `agentDeclaration` JSON 原文粘贴给它；智能体会调用 `external_tool_add`。`echo_file` 的目录假定对端以 `--dir C:/elab-inbox` 运行——请改成你实际使用的目录。更改在下次宿主重启时生效。
+[`register-guide.zh-CN.md`](register-guide.zh-CN.md) 列出两个函数及对话框每个字段应填的确切值，包括 **returns** 编辑器（没有显式 returns 的声明只会被存档、永远不会注册）。在记录面板中打开**「外部函数」页** → **「添加外部函数」**，按指南填写表单；或在会话中让智能体注册该函数，把指南中该函数的 `agentDeclaration` JSON 原文粘贴给它；智能体会调用 `external_fns_add`。`echo_file` 的目录假定对端以 `--dir C:/elab-inbox` 运行——请改成你实际使用的目录。更改在下次宿主重启时生效。
 
 ## 3. 重启宿主
 

@@ -51,10 +51,10 @@ pnpm echo:file          # uses ./elab-inbox under this directory
 [`register-guide.md`](register-guide.md) lists the two functions with the
 exact value for every dialog field, including the **returns** editor (a
 declaration without an explicit returns is archived but never registers). In
-the Records panel open the **External tools** tab → **Add external tool** and
+the Records panel open the **External fns** tab → **Add external fn** and
 fill the form accordingly, or ask the agent in a session to register the
 function, pasting the tool's `agentDeclaration` JSON from the guide; the
-agent calls `external_tool_add`. The `echo_file` directory assumes the peer
+agent calls `external_fns_add`. The `echo_file` directory assumes the peer
 runs with `--dir C:/elab-inbox` — adapt it to the directory you actually
 use. Changes apply at the next host restart.
 

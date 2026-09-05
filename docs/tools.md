@@ -9,7 +9,7 @@ This manual is the full reference for the state machine surface — typed values
 ## 1. How it works
 
 - **One global state machine per host process.** Any session's markers act on the same state machine; at most one record is open at a time (single-open invariant).
-- **The LLM surface is six tools**: `set`, `get`, `call`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_tool_add` / `external_tool_update` / `external_tool_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the state machine's fn registry and are invoked by `call`.
+- **The LLM surface is six tools**: `set`, `get`, `call`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_fns_add` / `external_fns_update` / `external_fns_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the state machine's fn registry and are invoked by `call`.
 - **A record is a process (timeline).** Each state machine operation appends one fully self-describing trace line (input and output both stored); a record can be replayed to rebuild the recorded state at any point without re-computing anything.
 - **Input is value.** What the model gives is what the state machine stores; a string stays a string.
 
@@ -249,13 +249,13 @@ Rebuilding state replays the lines in order: `set` lines set the slot to the sto
 ## 7. Host endpoints
 
 - `GET /api/dsh-electro-lab/records-index` — the index rows for the Records panel list (`{ rows: [{ id, openedAt, sealedAt, question }] }`). The list polls every 5 s; it never reads trace bodies.
-- `GET /api/dsh-electro-lab/external-tools` — the declaration archive + dirty bit (`{ tools: […], restartRequired }`).
-- `PUT /api/dsh-electro-lab/external-tools?config=<base64url JSON>` — validate and upsert one declaration (sets the dirty bit).
-- `DELETE /api/dsh-electro-lab/external-tools?name=<name>` — delete one declaration.
+- `GET /api/dsh-electro-lab/external-fns` — the declaration archive + dirty bit (`{ fns: […], restartRequired }`).
+- `PUT /api/dsh-electro-lab/external-fns?config=<base64url JSON>` — validate and upsert one declaration (sets the dirty bit).
+- `DELETE /api/dsh-electro-lab/external-fns?name=<name>` — delete one declaration.
 
 ## 8. External functions
 
-External functions are user-owned calculation functions living on a remote endpoint; the state machine reaches them over an **http** or **file** transport. Declarations live in `external-tools.jsonl` under the records home; at state machine start every enabled declaration is registered **verbatim** into the fn registry as an external fn (no compile layer — the transport is wrapped by the state machine itself). Changes apply after a host restart; the UI shows a pending-restart notice while the dirty bit is set.
+External functions are user-owned calculation functions living on a remote endpoint; the state machine reaches them over an **http** or **file** transport. Declarations live in `external-fns.jsonl` under the records home; at state machine start every enabled declaration is registered **verbatim** into the fn registry as an external fn (no compile layer — the transport is wrapped by the state machine itself). Changes apply after a host restart; the UI shows a pending-restart notice while the dirty bit is set.
 
 ### Declaration
 
@@ -314,8 +314,8 @@ failure:  { "requestId": "<uuid>", "error": "<string message>" }
 
 | tool | purpose |
 |---|---|
-| `external_tool_add` | Register a new external function declaration (fails when the name already exists) |
-| `external_tool_update` | Replace an existing declaration (fails when it does not exist) |
-| `external_tool_delete` | Remove a declaration by name |
+| `external_fns_add` | Register a new external function declaration (fails when the name already exists) |
+| `external_fns_update` | Replace an existing declaration (fails when it does not exist) |
+| `external_fns_delete` | Remove a declaration by name |
 
-Writes persist immediately and set the dirty bit; results report `restartRequired: true`. The Records panel's **External tools** tab offers the same actions with form editing. [`external-tool-example/`](../external-tool-example/README.md) is an independent npm project with manual test counterparts for the envelope protocol — `node src/echo.ts http` / `file` echoes it end to end.
+Writes persist immediately and set the dirty bit; results report `restartRequired: true`. The Records panel's **External fns** tab offers the same actions with form editing. [`external-tool-example/`](../external-tool-example/README.md) is an independent npm project with manual test counterparts for the envelope protocol — `node src/echo.ts http` / `file` echoes it end to end.

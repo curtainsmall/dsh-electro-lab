@@ -9,7 +9,7 @@ DeepSeek Harness ElectroLab 插件把全部电气电子计算放在一台确定�
 ## 1. 工作原理
 
 - **每个宿主进程一台全局状态机。** 任何会话的标记都作用于同一台状态机；任何时刻至多有一条未封口记录（单一 open 不变量）。
-- **LLM 使用面只有六个工具**：`set`、`get`、`call`、`record_question`、`record_analyse`、`record_answer`——外加声明管理器 `external_tool_add` / `external_tool_update` / `external_tool_delete`。约 40 个领域工具、`solve_steps` 与文本↔值编解码工具已退役；数学内核住在状态机的 fn 注册表中，由 `call` 调用。
+- **LLM 使用面只有六个工具**：`set`、`get`、`call`、`record_question`、`record_analyse`、`record_answer`——外加声明管理器 `external_fns_add` / `external_fns_update` / `external_fns_delete`。约 40 个领域工具、`solve_steps` 与文本↔值编解码工具已退役；数学内核住在状态机的 fn 注册表中，由 `call` 调用。
 - **记录是一个过程（时间线）。** 每次状态机操作都会追加一行完全自描述的轨迹行（输入与输出都记录在案）；一条记录可以被重放，从而在不重新计算任何东西的前提下重建任意时刻的状态。
 - **输入即值。** 模型给什么，状态机就存什么；字符串永远是字符串。
 
@@ -249,13 +249,13 @@ fn 表面正是在「每 fn 单一返回形状」纪律下迁移后的内核。�
 ## 7. 宿主端点
 
 - `GET /api/dsh-electro-lab/records-index`——供记录面板列表使用的索引行（`{ rows: [{ id, openedAt, sealedAt, question }] }`）。列表每 5 秒轮询一次；从不读取轨迹本体。
-- `GET /api/dsh-electro-lab/external-tools`——声明档案与脏位（`{ tools: […], restartRequired }`）。
-- `PUT /api/dsh-electro-lab/external-tools?config=<base64url JSON>`——校验并写入（upsert）一条声明（置脏位）。
-- `DELETE /api/dsh-electro-lab/external-tools?name=<name>`——删除一条声明。
+- `GET /api/dsh-electro-lab/external-fns`——声明档案与脏位（`{ fns: […], restartRequired }`）。
+- `PUT /api/dsh-electro-lab/external-fns?config=<base64url JSON>`——校验并写入（upsert）一条声明（置脏位）。
+- `DELETE /api/dsh-electro-lab/external-fns?name=<name>`——删除一条声明。
 
 ## 8. 外部函数
 
-外部函数是驻留在远端端点、归用户所有的计算函数；状态机通过 **http** 或 **file** 传输访问它们。声明存放于记录主目录下的 `external-tools.jsonl`；状态机启动时，每条启用的声明都会**原样**注册进 fn 注册表、成为一个外部 fn（没有编译层——传输由状态机自己包装）。更改在宿主重启后生效；脏位置位期间，界面会显示待重启提示。
+外部函数是驻留在远端端点、归用户所有的计算函数；状态机通过 **http** 或 **file** 传输访问它们。声明存放于记录主目录下的 `external-fns.jsonl`；状态机启动时，每条启用的声明都会**原样**注册进 fn 注册表、成为一个外部 fn（没有编译层——传输由状态机自己包装）。更改在宿主重启后生效；脏位置位期间，界面会显示待重启提示。
 
 ### 声明
 
@@ -314,8 +314,8 @@ failure:  { "requestId": "<uuid>", "error": "<string message>" }
 
 | 工具 | 用途 |
 |---|---|
-| `external_tool_add` | 注册一条新的外部函数声明（名称已存在时报错） |
-| `external_tool_update` | 替换一条已有声明（不存在时报错） |
-| `external_tool_delete` | 按名称删除一条声明 |
+| `external_fns_add` | 注册一条新的外部函数声明（名称已存在时报错） |
+| `external_fns_update` | 替换一条已有声明（不存在时报错） |
+| `external_fns_delete` | 按名称删除一条声明 |
 
-写入会立即持久化并置脏位；结果报告 `restartRequired: true`。记录面板的**「外部工具」页**以表单编辑方式提供同样的操作。[`external-tool-example/`](../external-tool-example/README.zh-CN.md) 是独立的 npm 工程，内含该信封协议的手动测试对端——`node src/echo.ts http` / `file` 可将其端到端回显。
+写入会立即持久化并置脏位；结果报告 `restartRequired: true`。记录面板的**「外部函数」页**以表单编辑方式提供同样的操作。[`external-tool-example/`](../external-tool-example/README.zh-CN.md) 是独立的 npm 工程，内含该信封协议的手动测试对端——`node src/echo.ts http` / `file` 可将其端到端回显。

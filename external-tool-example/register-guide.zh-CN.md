@@ -1,8 +1,8 @@
 # 注册示例函数
 
-对端必须先行启动（`node src/echo.ts http --port 8787` 或 `node src/echo.ts file --dir <目录>`）。在插件的记录面板中打开**「外部工具」页**，点击**「添加外部工具」**，然后按下表填写对话框。更改在宿主重启后生效。
+对端必须先行启动（`node src/echo.ts http --port 8787` 或 `node src/echo.ts file --dir <目录>`）。在插件的记录面板中打开**「外部函数」页**，点击**「添加外部函数」**，然后按下表填写对话框。更改在宿主重启后生效。
 
-另一种方式是：在会话中让智能体注册该函数，并把该函数的 `agentDeclaration` JSON 原文粘贴给它；智能体会调用 `external_tool_add`。
+另一种方式是：在会话中让智能体注册该函数，并把该函数的 `agentDeclaration` JSON 原文粘贴给它；智能体会调用 `external_fns_add`。
 
 ## echo_http
 

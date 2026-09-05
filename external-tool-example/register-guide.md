@@ -2,11 +2,11 @@
 
 The peer must be running first (`node src/echo.ts http --port 8787` or
 `node src/echo.ts file --dir <directory>`). In the plugin's Records panel
-open the **External tools** tab and click **Add external tool**, then fill
+open the **External fns** tab and click **Add external fn**, then fill
 the dialog with the values below. Changes apply after a host restart.
 
 Alternatively, ask the agent in a session to register the function and paste
-the tool's `agentDeclaration` JSON; the agent calls `external_tool_add`.
+the tool's `agentDeclaration` JSON; the agent calls `external_fns_add`.
 
 ## echo_http
 
