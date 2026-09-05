@@ -1,6 +1,6 @@
 /**
- * 内核 solver 全集（蓝图 §8「solver 全集」）：math/* 全部内核以 register 注册。
- * 各领域文件由旧工具模块迁移而来；聚合后由宿主注册进引擎注册表。
+ * Kernel solver collection: all math/* kernels are registered via register.
+ * The per-domain files were migrated from the legacy tool modules; once aggregated, the host registers them into the engine registry.
  */
 import type { SolverDef } from '../registry.ts'
 import { expressionSolvers } from './expression-solvers.ts'

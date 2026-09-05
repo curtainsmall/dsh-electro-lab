@@ -1,19 +1,19 @@
 /**
- * ElectroLab 记录列表页 + 共享 UI 组件。
- * 列表读宿主的 /records-index（record-index.jsonl 投影）；记录正文是过程
- * （时间线），其审阅形态留待后续设计，列表不打开正文。
+ * ElectroLab record list page + shared UI components.
+ * The list reads the host's /records-index (a projection of record-index.jsonl); a record body is a process
+ * (timeline), whose review form is left for later design — the list does not open bodies.
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { t, useAppLocale } from './locales.ts'
 
 /* ── Shared dialog shell + buttons ───────────────────────────────────────── */
 
-/** 共享模态框：遮罩、主题面板、标题（可带右侧内容）、主体、脚注。 */
+/** Shared modal: mask, themed panel, title (optionally with right-side content), body, footer. */
 export function Dialog({ open, title, width = 400, height, dismissible = true, headerRight, footer, children, onClose }: {
   open: boolean
   title: string
   width?: number
-  /** 固定面板高度：内容在主体内滚动。 */
+  /** Fixed panel height: content scrolls within the body. */
   height?: number
   dismissible?: boolean
   headerRight?: ReactNode
@@ -95,7 +95,7 @@ function primaryButtonStyle(hovered: boolean, disabled = false): React.CSSProper
   }
 }
 
-/** 幽灵按钮（次要动作）。 */
+/** Ghost button (secondary action). */
 export function GhostButton({ children, onClick, style }: { children: ReactNode; onClick: () => void; style?: React.CSSProperties }): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   return (
@@ -111,7 +111,7 @@ export function GhostButton({ children, onClick, style }: { children: ReactNode;
   )
 }
 
-/** 主按钮（主要动作）。 */
+/** Primary button (primary action). */
 export function PrimaryButton({ children, onClick, disabled = false }: { children: ReactNode; onClick: () => void; disabled?: boolean }): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
   return (
@@ -128,9 +128,9 @@ export function PrimaryButton({ children, onClick, disabled = false }: { childre
   )
 }
 
-/* ── 记录列表 ────────────────────────────────────────────────────────────── */
+/* ── record list ─────────────────────────────────────────────────────────── */
 
-/** 索引行镜像（record-index.jsonl 一行）。 */
+/** Index-row mirror (one line of record-index.jsonl). */
 interface IndexRow {
   id: string
   openedAt: number
@@ -156,7 +156,7 @@ function formatTime(time: number): string {
   })
 }
 
-/** 记录列表页：读索引渲染（标题 = question），未封口标记 incomplete，5s 轮询。 */
+/** Record list page: render from the index (title = question); unsealed rows are marked incomplete; polls every 5s. */
 export function RecordsTab(): React.JSX.Element {
   useAppLocale()
   const [rows, setRows] = useState<IndexRow[] | null>(null)

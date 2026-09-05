@@ -280,23 +280,23 @@ const NAME_PATTERN = /^[a-z][a-z0-9_]{0,63}$/
 type ParamRowType = 'quantity' | 'string' | 'boolean' | 'array'
 type SimpleRowType = 'quantity' | 'string' | 'boolean'
 
-/** Returns 叶子/数组元素形状（字段行与数组行共用）。 */
+/** Returns leaf / array-item shape (shared by field rows and array rows). */
 type ReturnsLeafType = 'quantity' | 'string' | 'boolean' | 'array'
 
-/** 返回形状的可编辑形态：null = void，或 spec 叶子、对象字段、数组元素。 */
+/** Editable form of the return shape: null = void, or spec leaves, object fields, array items. */
 interface ReturnsForm {
   mode: 'void' | 'string' | 'boolean' | 'number' | 'complex' | 'array' | 'object'
-  /** number/complex 叶子与 quantity 数组元素的 kind。 */
+  /** kind for number/complex leaves and quantity array items. */
   kind: string
   itemType: SimpleRowType
   itemKind: string
-  /** object 模式的字段行。 */
+  /** Field rows for object mode. */
   fields: ReturnsFieldRow[]
-  /** 既有 returns 无法用表单表示（嵌套结构等）——保存时原样保留。 */
+  /** Existing returns the form cannot represent (nested structures etc.) — preserved verbatim on save. */
   unmodeled: boolean
 }
 
-/** object 返回的一个字段：叶子或一层数组（与参数行同一限制）。 */
+/** One field of an object return: a leaf or a one-level array (same limit as parameter rows). */
 interface ReturnsFieldRow {
   id: number
   name: string
@@ -336,16 +336,16 @@ interface FormState {
   rows: ParamRow[]
   /** Parameter names preserved verbatim (the row editor cannot model them). */
   unmodeled: string[]
-  /** 返回形状（M3：returns 必填编辑，spec 或显式 null = void）。 */
+  /** Returns shape (M3: returns is a required edit — a spec or an explicit null = void). */
   returns: ReturnsForm
 }
 
-/** 默认表单（新工具）：object 空字段——保存即产出显式 spec。 */
+/** Default form (new tool): object with no fields — saving yields an explicit spec. */
 function defaultReturnsForm(): ReturnsForm {
   return { mode: 'object', kind: 'none', itemType: 'quantity', itemKind: 'none', fields: [], unmodeled: false }
 }
 
-/** 可编辑的简单叶子或数组元素 spec（无 description/enum/required）。 */
+/** An editable simple leaf or array-item spec (no description/enum/required). */
 function parseReturnsLeaf(spec: unknown): { type: SimpleRowType; kind: string } | undefined {
   if (typeof spec !== 'object' || spec === null) return undefined
   const s = spec as Record<string, unknown>
@@ -358,7 +358,7 @@ function parseReturnsLeaf(spec: unknown): { type: SimpleRowType; kind: string } 
   return undefined
 }
 
-/** 解析既有 returns 为表单；undefined = 无法表示（原样保留）。 */
+/** Parse existing returns into a form; undefined = unrepresentable (kept verbatim). */
 function parseReturnsForm(returns: unknown): ReturnsForm {
   const fallback = (): ReturnsForm => ({ ...defaultReturnsForm(), unmodeled: true })
   if (returns === null) return { ...defaultReturnsForm(), mode: 'void' }
@@ -396,7 +396,7 @@ function parseReturnsForm(returns: unknown): ReturnsForm {
           fields.push({ id: fields.length, name, type: leaf.type, kind: leaf.kind, itemType: 'quantity', itemKind: 'none' })
           continue
         }
-        // 一层数组字段（与参数行同限制）。
+        // A one-level array field (same limit as parameter rows).
         if (typeof spec === 'object' && spec !== null && (spec as Record<string, unknown>).type === 'array') {
           const item = parseReturnsLeaf((spec as Record<string, unknown>).items)
           if (item === undefined) return fallback()
@@ -412,7 +412,7 @@ function parseReturnsForm(returns: unknown): ReturnsForm {
   }
 }
 
-/** 由叶子/数组行构建 spec（字段与数组元素共用）。 */
+/** Build a spec from a leaf/array row (shared by fields and array items). */
 function buildReturnsLeaf(row: { type: SimpleRowType | 'array'; kind: string; itemType: SimpleRowType; itemKind: string }): Record<string, unknown> {
   if (row.type === 'array') {
     const items: Record<string, unknown> = { type: row.itemType }
@@ -423,7 +423,7 @@ function buildReturnsLeaf(row: { type: SimpleRowType | 'array'; kind: string; it
   return { type: row.type }
 }
 
-/** 表单 → returns spec；null = void。 */
+/** Form → returns spec; null = void. */
 function buildReturnsSpec(form: ReturnsForm): unknown {
   switch (form.mode) {
     case 'void':
@@ -565,7 +565,7 @@ function buildConfig(state: FormState, original: ExternalSolverView | null): unk
   delete base.returns
   const config: Record<string, unknown> = { ...base, name: state.name.trim(), description: state.description.trim(), enabled: state.enabled }
 
-  // returns：unmodeled 时从 base 原样保留；可编辑形态覆盖为表单产物（null = void）。
+  // returns: when unmodeled, keep verbatim from base; an editable shape is overwritten by the form output (null = void).
   if (!state.returns.unmodeled) config.returns = buildReturnsSpec(state.returns)
   else if (original?.returns !== undefined) config.returns = original.returns
 
@@ -635,7 +635,7 @@ function validateForm(state: FormState): string[] {
     else if (seen.has(name)) errors.push(t('duplicateParamName', { name }))
     else seen.add(name)
   }
-  // returns 对象字段：名称非空、不重复（字段名不强制参数命名规则——如 'low-pass'）。
+  // returns object fields: names must be non-empty and unique (field names are not bound by the parameter naming rule — e.g. 'low-pass').
   if (state.returns.mode === 'object' && !state.returns.unmodeled) {
     const fieldNames = new Set<string>()
     for (const row of state.returns.fields) {
@@ -898,7 +898,7 @@ function EditorDialog({ editor, onClose, onSaved }: {
           <div style={{ fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>{t('parametersLabel')} —</div>
         )}
 
-        {/* Returns：必填编辑——spec（叶子/对象/数组）或显式 void（returns: null）。 */}
+        {/* Returns: required edit — a spec (leaf/object/array) or explicit void (returns: null). */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 4 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)' }}>{t('returnsLabel')}</span>
         </div>

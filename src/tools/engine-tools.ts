@@ -1,6 +1,6 @@
 /**
- * 引擎工具面（蓝图 §2）：set / get / call 三原语 + markers。
- * 薄封装：参数经 schema 校验后交给引擎壳；返回统一收据（ok）。
+ * Engine tool surface: the set / get / call primitives + markers.
+ * Thin wrapper: arguments pass schema validation then go to the engine shell; a uniform receipt (ok) is returned.
  */
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { defineJsonTool } from '../tool.ts'
@@ -12,7 +12,7 @@ declare module 'cordis' {
   }
 }
 
-/** 类型化值语法，教给模型的通用段落（值宇宙 §1.1）。 */
+/** Typed-value syntax: the generic passage taught to the model (value universe). */
 const VALUE_GUIDE =
   'A typed value is a JSON object: ' +
   '{ "type": "number", "value": <number>, "kind": <quantity kind>, "variant"?: <word>, "prefix"?: <word> } or ' +
@@ -27,7 +27,7 @@ const VALUE_GUIDE =
 
 const NAME_DESC = 'slot name: letters, digits, underscore; start with a letter or underscore'
 
-/** 工厂：绑定全局单引擎实例，产出 LLM 可见的工具定义。 */
+/** Factory: binds the global single-engine instance and produces LLM-visible tool definitions. */
 export function createEngineTools(engine: Engine): Array<ReturnType<typeof defineJsonTool>> {
   const solverEnum = engine.registry.ids()
   const solverList = solverEnum.length > 0 ? ` Available solver ids: ${solverEnum.join(', ')}.` : ''
@@ -37,7 +37,7 @@ export function createEngineTools(engine: Engine): Array<ReturnType<typeof defin
       description: `Write one slot in the engine. ${VALUE_GUIDE} Pass value: null to delete the slot (idempotent; re-creating later restarts at rev 1). Writing a slot with a different kind than its pinned kind fails.`,
       parameters: {
         name: { type: 'string', description: NAME_DESC, required: true },
-        value: { type: 'json', description: 'a typed value object, or null to delete the slot', required: true },
+        value: { type: 'json', description: 'a typed value object, or null to delete the slot (slot references cannot be stored)', required: true },
       },
       execute: (args) => engine.opSet(args.name as string, args.value) as never,
     }),
@@ -51,10 +51,10 @@ export function createEngineTools(engine: Engine): Array<ReturnType<typeof defin
     }),
     defineJsonTool({
       name: 'call',
-      description: `Call one registered solver and store its result into a named slot. Arguments are typed values or "@name" / "@name.field" slot references; the engine expands references and kind-checks them against the solver signature. A void solver (declared returns: null) takes target: null; a value solver requires a named target. Overwriting an existing slot replaces its value (rev +1).${solverList}`,
+      description: `Call one registered solver and store its result into a named slot. Arguments are typed values or slot references — { "type": "slot", "value": "name" } where value is the full slot path ("name" or "name.field"); the engine expands references and kind-checks them against the solver signature. A void solver (declared returns: null) takes target: null; a value solver requires a named target. Overwriting an existing slot replaces its value (rev +1).${solverList}`,
       parameters: {
         solver: { type: 'string', enum: solverEnum, description: 'the registered solver to call', required: true },
-        args: { type: 'json', description: `solver arguments: object mapping each parameter name to a typed value or "@name" reference`, required: true },
+        args: { type: 'json', description: `solver arguments: object mapping each parameter name to a typed value or a slot reference ({ "type": "slot", "value": "name" })`, required: true },
         target: { type: 'json', description: 'result slot name (string), or null for void solvers', required: true },
       },
       execute: async (args) => engine.opCall(args.solver as string, args.args as Record<string, unknown> | undefined, args.target as string | null) as never,

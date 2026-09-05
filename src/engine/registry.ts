@@ -1,13 +1,13 @@
 /**
- * solver 注册表（引擎 solver registry）——蓝图 §3。
- * register 替代 defineJsonTool 注册路径：spec 即校验器，run 指向内核。
- * returns 必填且显式：spec 或 null（= void）；缺失 = 注册错误。
+ * Solver registry (engine solver registry).
+ * register replaces the defineJsonTool registration path: the spec is the validator, run points at the kernel.
+ * returns is required and explicit: a spec or null (= void); a missing one = registration error.
  */
 import { ToolError, ToolErrorCode } from '../errors.ts'
 import type { Parameters } from './values.ts'
 import type { DeclarationTransport, DeclarationHttpOptions, DeclarationFileOptions } from '../tool.ts'
 
-/** 外部 solver 的接线块：引擎见它即自动包 http/file 执行器作 run。 */
+/** An external solver's wiring block: when the engine sees one, it automatically wraps an http/file executor as its run. */
 export interface ExternalBlock {
   transport: DeclarationTransport
   transportOptions: DeclarationHttpOptions | DeclarationFileOptions
@@ -18,7 +18,7 @@ export interface SolverDef {
   id: string
   summary: string
   parameters: Parameters
-  /** null = void（显式）。 */
+  /** null = void (explicit). */
   returns: SpecOrVoid
   run: (args: Record<string, unknown>) => unknown | Promise<unknown>
   external?: ExternalBlock

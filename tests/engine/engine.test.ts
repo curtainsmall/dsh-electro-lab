@@ -20,8 +20,8 @@ afterEach(() => {
   if (home.length > 0) rmSync(home, { recursive: true, force: true })
 })
 
-describe('值宇宙 validateValue', () => {
-  it('接受类型化值并拒绝坏形状', () => {
+describe('value universe validateValue', () => {
+  it('accepts typed values and rejects malformed shapes', () => {
     expect(validateValue({ type: 'number', value: 100, kind: 'resistance' })).toBeUndefined()
     expect(validateValue({ type: 'number', value: 25, kind: 'temperature', variant: 'degC' })).toBeUndefined()
     expect(validateValue({ type: 'number', value: 1500, kind: 'resistance', prefix: 'kilo' })).toBeUndefined()
@@ -38,8 +38,8 @@ describe('值宇宙 validateValue', () => {
   })
 })
 
-describe('变量表', () => {
-  it('钉 kind、覆盖 rev、异 kind 拒绝、删除后重建 rev=1', () => {
+describe('variable table', () => {
+  it('pins kind, bumps rev on overwrite, rejects different kinds, restarts rev at 1 after delete', () => {
     const table = new VariableTable()
     const r = table.set('R', { type: 'number', value: 100, kind: QuantityKind.Resistance })
     expect(r.rev).toBe(1)
@@ -51,8 +51,8 @@ describe('变量表', () => {
   })
 })
 
-describe('引擎（set/get/call + markers + 轨迹）', () => {
-  it('生命周期：question 开、answer 结算；重开封旧 duplicate-start', () => {
+describe('engine (set/get/call + markers + trace)', () => {
+  it('lifecycle: question opens, answer settles; reopening seals the old record as duplicate-start', () => {
     const engine = makeEngine()
     const opened = engine.markerQuestion('q1')
     expect(opened.ok).toBe(true)
@@ -60,7 +60,7 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     expect(engine.isOpen()).toBe(false)
     const reopened = engine.markerQuestion('q2')
     const oldId = String((reopened as unknown as { record: string }).record)
-    engine.markerQuestion('q3') // 重开 → q2 被封 duplicate-start
+    engine.markerQuestion('q3') // reopening → q2 is sealed as duplicate-start
     expect(engine.isOpen()).toBe(true)
     const oldRows = engine.store.readRows(oldId)
     expect(oldRows.some((row) => row.tool === 'seal' && row.kind === 'duplicate-start')).toBe(true)
@@ -69,7 +69,7 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     engine.markerAnswer('final')
   })
 
-  it('set/get 往返与删除；get 未声明槽报错且无副作用', () => {
+  it('set/get round-trip and delete; get on an undeclared slot errors with no side effects', () => {
     const engine = makeEngine()
     engine.markerQuestion('q')
     const setReceipt = engine.opSet('R', { type: 'number', value: 100, kind: QuantityKind.Resistance, prefix: 'kilo' })
@@ -77,16 +77,18 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     const get = engine.opGet('R')
     expect(get).toMatchObject({ ok: true })
     expect((get as unknown as { value: { value: number } }).value.value).toBe(100)
-    // 表存原样：get 读回仍带 prefix
+    // The table stores verbatim: get reads back with the prefix still attached
     expect((get as unknown as { value: { prefix: string } }).value.prefix).toBe('kilo')
     const missing = engine.opGet('X')
     expect(missing).toMatchObject({ ok: false, code: 'ENGINE_UNDECLARED' })
+    // Slot references cannot be stored into the table
+    expect(engine.opSet('Y', { type: 'slot', value: 'R' })).toMatchObject({ ok: false, code: 'ENGINE_ARGS' })
     const del = engine.opSet('R', null)
     expect(del).toMatchObject({ ok: true, deleted: true })
     expect(engine.opGet('R')).toMatchObject({ ok: false })
   })
 
-  it('call 执行本地 solver：resolved/result 落行、target 恒覆盖', async () => {
+  it('call executes a local solver: resolved/result land in the trace row, target is always overwritten', async () => {
     const engine = makeEngine()
     engine.registry.register({
       id: 'double_rc',
@@ -97,13 +99,13 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     })
     engine.markerQuestion('q')
     engine.opSet('R', { type: 'number', value: 10, kind: QuantityKind.Resistance })
-    const receipt = await engine.opCall('double_rc', { r: '@R' }, 'D')
+    const receipt = await engine.opCall('double_rc', { r: { type: 'slot', value: 'R' } }, 'D')
     expect(receipt).toMatchObject({ ok: true, target: 'D', rev: 1 })
-    const second = await engine.opCall('double_rc', { r: '@R' }, 'D')
+    const second = await engine.opCall('double_rc', { r: { type: 'slot', value: 'R' } }, 'D')
     expect(second).toMatchObject({ ok: true, rev: 2 })
     const got = engine.opGet('D')
     expect((got as unknown as { value: { value: { re: number } } }).value.value.re).toBe(20)
-    // 轨迹行含 result（输入输出都记录）
+    // Trace rows carry result (both inputs and outputs are recorded)
     const rows = engine.store.readRows(String(engine.openId()))
     const callRow = rows.find((row) => row.tool === 'call' && row.solver === 'double_rc')
     expect(callRow).toBeDefined()
@@ -112,7 +114,7 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     engine.markerAnswer('done')
   })
 
-  it('call 校验：未声明引用、kind 不符、void target、非 void 缺 target', async () => {
+  it('call validation: undeclared reference, kind mismatch, void target, non-void without target', async () => {
     const engine = makeEngine()
     engine.registry.register({
       id: 'needs_r',
@@ -130,15 +132,17 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     })
     engine.markerQuestion('q')
     engine.opSet('C', { type: 'number', value: 5, kind: QuantityKind.Capacitance })
-    await expect(engine.opCall('needs_r', { r: '@X' }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_UNDECLARED' })
-    await expect(engine.opCall('needs_r', { r: '@C' }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_KIND_MISMATCH' })
+    await expect(engine.opCall('needs_r', { r: { type: 'slot', value: 'X' } }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_UNDECLARED' })
+    await expect(engine.opCall('needs_r', { r: { type: 'slot', value: 'C' } }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_KIND_MISMATCH' })
+    // A bare string is a literal, never a reference: it fails the typed-value check
+    await expect(engine.opCall('needs_r', { r: '@X' }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_ARGS' })
     await expect(engine.opCall('does_nothing', {}, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_VOID_TARGET' })
     await expect(engine.opCall('does_nothing', {}, null)).resolves.toMatchObject({ ok: true, target: null })
     await expect(engine.opCall('needs_r', { r: { type: 'number', value: 1, kind: QuantityKind.Resistance } }, null)).resolves.toMatchObject({ ok: false, code: 'ENGINE_TARGET_REQUIRED' })
     await expect(engine.opCall('ghost', {}, null)).resolves.toMatchObject({ ok: false, code: 'ENGINE_UNKNOWN_SOLVER' })
   })
 
-  it('solver run 抛错 → ok:false ENGINE_SOLVER_FAILED，不建槽', async () => {
+  it('solver run throws → ok:false ENGINE_SOLVER_FAILED, no slot is created', async () => {
     const engine = makeEngine()
     engine.registry.register({
       id: 'boom',
@@ -154,12 +158,12 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     expect(engine.opGet('X')).toMatchObject({ ok: false })
   })
 
-  it('中断恢复：重启后重建表并续写同一文件', () => {
+  it('interruption recovery: a restart rebuilds the table and continues the same file', () => {
     const engine = makeEngine()
     engine.markerQuestion('q')
     engine.opSet('R', { type: 'number', value: 100, kind: QuantityKind.Resistance })
     const id = String(engine.openId())
-    // 模拟重启：新引擎同 home
+    // Simulate a restart: a new engine on the same home
     const revived = new Engine(home)
     revived.start()
     expect(revived.openId()).toBe(id)
@@ -170,8 +174,8 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
   })
 })
 
-describe('收据可序列化（工具边界）', () => {
-  it('receipt 都是 JSON 可序列化对象', () => {
+describe('receipts are serializable (tool boundary)', () => {
+  it('every receipt is a JSON-serializable object', () => {
     const engine = makeEngine()
     engine.markerQuestion('q')
     const receipt = engine.opSet('R', { type: 'number', value: 1, kind: QuantityKind.None })

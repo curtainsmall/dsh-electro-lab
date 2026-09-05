@@ -1,7 +1,7 @@
 /**
- * 引擎（engine）——蓝图 §0/§2/§4/§5。
- * 全局单实例：变量表 + solver 注册表 + 记录存储 + 单一 open 生命周期。
- * 原语（set/get/call）与 markers 经此执行；每步落一行轨迹（含输入输出）。
+ * Engine.
+ * Global singleton: variable table + solver registry + record storage + a single open lifecycle.
+ * Primitives (set/get/call) and markers execute through it; every step appends one trace row (with inputs and outputs).
  */
 import { ToolError, ToolErrorCode } from '../errors.ts'
 import { VariableTable } from './table.ts'
@@ -9,7 +9,7 @@ import { SolverRegistry, type SolverDef } from './registry.ts'
 import { RecordStore, type IndexRow, type TraceRow } from './storage.ts'
 import { callExternal } from './external.ts'
 import {
-  fromNative, refPath, toCanonical, validateAgainstSpec, validateValue,
+  fromNative, isSlotValue, refPath, toCanonical, validateAgainstSpec, validateValue,
   type Spec, type TypedValue,
 } from './values.ts'
 
@@ -32,7 +32,7 @@ export class Engine {
     this.store = new RecordStore(home)
   }
 
-  /** 启动：清孤儿；若存在 sealedAt null 且有本体的记录则恢复（续写同文件、重建表）。 */
+  /** Start: clear orphans; if a record with sealedAt null and a body exists, recover it (continue the same file, rebuild the table). */
   start(): void {
     this.store.clearOrphans()
     const row = this.store.readIndex().find((item) => item.sealedAt === null && this.store.hasRecord(item.id))
@@ -55,7 +55,7 @@ export class Engine {
     return this.open?.id ?? null
   }
 
-  /** 重建引擎状态：set/call/set-null 按行应用，marker 跳过。 */
+  /** Rebuild engine state: set/call/set-null are applied per row; markers are skipped. */
   private replayInto(rows: TraceRow[]): void {
     for (const row of rows) {
       if (row.ok !== true) continue
@@ -88,9 +88,9 @@ export class Engine {
     this.store.appendRow(open.id, line)
   }
 
-  /* ── markers（生命周期） ─────────────────────────────────────────────── */
+  /* ── markers (lifecycle) ─────────────────────────────────────────────── */
 
-  /** record_question：open 已存在则封旧（duplicate-start）再开新。 */
+  /** record_question: if open exists, seal it (duplicate-start) then open a new one. */
   markerQuestion(text: string): Receipt {
     if (this.open !== null) this.sealDuplicateStart()
     const created = this.store.createRecord(text)
@@ -105,7 +105,7 @@ export class Engine {
     return { ok: true }
   }
 
-  /** record_answer：提交文本并结算；无 open → duplicate-end 错误记录。 */
+  /** record_answer: submit the text and settle; no open record → duplicate-end error record. */
   markerAnswer(text: string): Receipt {
     if (this.open === null) {
       const created = this.store.createRecord('')
@@ -139,6 +139,9 @@ export class Engine {
         const deleted = this.table.delete(name)
         this.trace({ tool: 'set', ok: true, name, value: null, deleted })
         return { ok: true, name, deleted }
+      }
+      if (isSlotValue(value)) {
+        throw new ToolError('set: slot references cannot be stored — resolve them through call arguments', ToolErrorCode.EngineArgs)
       }
       const error = validateValue(value)
       if (error !== undefined) throw new ToolError(`set: ${error}`, ToolErrorCode.EngineArgs)
@@ -197,7 +200,7 @@ export class Engine {
     }
   }
 
-  /** 解析 args：@ 引用展开 + 类型化值校验 + kind/形态检查 + 换算（resolved = SI rect 终点）。 */
+  /** Resolve args: expand slot references + validate typed values + kind/shape checks + conversion (resolved = SI rect endpoint). */
   private resolveArgs(solver: SolverDef, args: Record<string, unknown>): { resolved: Record<string, TypedValue>; native: Record<string, unknown> } {
     const resolved: Record<string, TypedValue> = {}
     const native: Record<string, unknown> = {}
@@ -217,10 +220,10 @@ export class Engine {
     return { resolved, native }
   }
 
-  /** 一个参数值：@name[.path] 引用或类型化值字面量。 */
+  /** One argument value: a slot reference ({type: 'slot', value: full path}) or a typed-value literal. */
   private resolveValue(raw: unknown): TypedValue {
-    if (typeof raw === 'string' && raw.startsWith('@')) {
-      const reference = raw.slice(1)
+    if (isSlotValue(raw)) {
+      const reference = raw.value
       const dot = reference.indexOf('.')
       const name = dot === -1 ? reference : reference.slice(0, dot)
       const path = dot === -1 ? undefined : reference.slice(dot + 1)
@@ -233,7 +236,7 @@ export class Engine {
     return raw as TypedValue
   }
 
-  /** 执行非 void solver（本地 run 或外部传输）；结果按 returns 定型。 */
+  /** Run a non-void solver (local run or external transport); shape the result per its returns spec. */
   private async execute(solver: SolverDef, resolved: Record<string, TypedValue>, native: Record<string, unknown>): Promise<TypedValue> {
     const spec = solver.returns
     if (spec === null) throw new ToolError(`solver "${solver.id}" is void`, ToolErrorCode.EngineArgs)
@@ -272,7 +275,7 @@ export class Engine {
   }
 }
 
-/** resolved 类型化值 → 内核原生 JS（quantity 实数为 number、复数按声明形态；其余递归）。 */
+/** resolved typed value → kernel-native JS (quantity reals become number, complex per the declared form; the rest recurse). */
 function nativeValue(spec: Spec, canonical: TypedValue): unknown {
   switch (spec.type) {
     case 'quantity': {

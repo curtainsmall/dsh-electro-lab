@@ -1,16 +1,17 @@
 /**
- * 值宇宙（引擎 value universe）——蓝图 §1。
+ * Value universe (engine value universe).
  *
- * 类型化值：{type, value, kind, variant?, prefix?}。kind 是 quantity 类型的
- * 一部分；variant/prefix 字段不存在即基准/乘数 1；词表一律 ASCII 短词；
- * 符号只作展示映射。声明 spec（参数/返回同构、封闭）与类型化值共用此处
- * 的校验与换算。
+ * Typed values: {type, value, kind, variant?, prefix?}. kind is part of a
+ * quantity type; a missing variant/prefix field means the base representation / multiplier of 1;
+ * vocabularies are always ASCII short words; symbols serve display mapping only. Declaration specs
+ * (parameters/returns isomorphic, closed) and typed values share the validation
+ * and conversion here.
  */
 import { QuantityKind, QUANTITY_KIND_NAMES } from '../math/quantity-kind.ts'
 
 export type Kind = QuantityKind
 
-/** 可写类型化值（number/complex 带 kind；string/boolean/array/object 无语纲）。 */
+/** Writable typed value (number/complex carry a kind; string/boolean/array/object carry none). */
 export type TypedValue =
   | { type: 'number'; value: number; kind: Kind; variant?: string; prefix?: string }
   | { type: 'complex'; value: { re: number; im: number } | { mag: number; ang: number }; kind: Kind; variant?: string; prefix?: string }
@@ -19,7 +20,24 @@ export type TypedValue =
   | { type: 'array'; value: TypedValue[] }
   | { type: 'object'; value: Record<string, TypedValue> }
 
-/** 声明 spec：quantity 带 kind（含形态）、string（可带 enum）、boolean、array/object 递归封闭。 */
+/**
+ * A slot reference: a first-class call-argument value that names a slot by
+ * its full path ("R" or "res.points.0"). It is NOT part of TypedValue — it
+ * never enters the variable table, storage or external results; the engine
+ * expands it at the call boundary before spec validation.
+ */
+export interface SlotValue {
+  type: 'slot'
+  value: string
+}
+
+/** Shape guard for slot references (call arguments only). */
+export function isSlotValue(raw: unknown): raw is SlotValue {
+  return typeof raw === 'object' && raw !== null && (raw as { type?: unknown }).type === 'slot'
+    && typeof (raw as { value?: unknown }).value === 'string'
+}
+
+/** Declaration spec: quantity carries kind (with form), string (optional enum), boolean, array/object recursively closed. */
 export type Spec =
   | { type: 'quantity'; kind: Kind; form?: 're-im' | 'mag-ang' | 'either' }
   | { type: 'string'; enum?: readonly string[] }
@@ -27,12 +45,12 @@ export type Spec =
   | { type: 'array'; items: Spec }
   | { type: 'object'; fields: Record<string, Spec> }
 
-/** solver 参数条目：spec + 可选标记（returns 的 object fields 用纯 Spec）。 */
+/** Solver parameter entry: spec + optional flag (returns object fields use plain Spec). */
 export type ParamSpec = Spec & { optional?: boolean }
 
 export type Parameters = Record<string, ParamSpec>
 
-/* ── prefix 词表（§1.1：全小写英文全词；符号仅展示） ───────────────────── */
+/* ── prefix word table (all-lowercase English words; symbols are display-only) ── */
 
 export const PREFIX_SCALES: Readonly<Record<string, number>> = {
   pico: 1e-12,
@@ -45,20 +63,20 @@ export const PREFIX_SCALES: Readonly<Record<string, number>> = {
   tera: 1e12,
 }
 
-/** 展示符号映射（不进值宇宙，仅供展示）。 */
+/** Display symbol mapping (not part of the value universe; display only). */
 export const PREFIX_SYMBOLS: Readonly<Record<string, string>> = {
   pico: 'p', nano: 'n', micro: 'µ', milli: 'm', kilo: 'k', mega: 'M', giga: 'G', tera: 'T',
 }
 
-/* ── variant 词表（§1.2：kind 内唯一、跨 kind 允许重名） ─────────────────── */
+/* ── variant word table (unique within a kind, names may repeat across kinds) ── */
 
-/** 一个 variant：数值相对 SI 基准的换算（factor 乘 + offset 加）。 */
+/** A variant: value conversion relative to the SI base (factor multiply + offset add). */
 export interface VariantInfo {
   factor: number
   offset: number
 }
 
-/** kind → variant 词 → 换算。无词表 = 只有基准表示（variant 键不得出现）。 */
+/** kind → variant word → conversion. No table = base representation only (variant keys must not appear). */
 export const VARIANT_TABLE: Readonly<Partial<Record<Kind, Readonly<Record<string, VariantInfo>>>>> = {
   [QuantityKind.Temperature]: {
     degC: { factor: 1, offset: 273.15 },
@@ -91,14 +109,14 @@ export const VARIANT_TABLE: Readonly<Partial<Record<Kind, Readonly<Record<string
   },
 }
 
-/** 校验 kind 词合法。 */
+/** Check whether a kind word is valid. */
 export function isKind(value: string): value is Kind {
   return QUANTITY_KIND_NAMES.includes(value)
 }
 
 /**
- * 校验一个类型化值（set 入参时的形状/词表检查）。通过返回 void；
- * 不通过返回人类可读错误信息。值只按形状与词表校验，不做 kind 间判断。
+ * Validate a typed value (shape/word-table checks at set-input time). Pass returns void;
+ * failure returns a human-readable error message. Values are validated by shape and word table only, with no cross-kind judgement.
  */
 export function validateValue(value: unknown): string | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return 'value must be a typed-value object'
@@ -145,7 +163,7 @@ export function validateValue(value: unknown): string | undefined {
   }
 }
 
-/** prefix/variant 组合检查：prefix 只对 SI 基准表示（无 variant）有效；variant 词必须在 kind 词表内。 */
+/** prefix/variant combination check: prefix is valid only on the SI base representation (no variant); the variant word must be in the kind's word table. */
 function checkPrefixVariant(v: Record<string, unknown>, allowComplex: boolean): string | undefined {
   const kind = v.kind as Kind
   const variant = v.variant
@@ -163,7 +181,7 @@ function checkPrefixVariant(v: Record<string, unknown>, allowComplex: boolean): 
   return undefined
 }
 
-/** number/complex 值换算到 SI 基准 + rect 归一（调用边界；§1.3）。 */
+/** Convert number/complex values to the SI base + rect normalization (call boundary). */
 export function toCanonical(value: TypedValue): TypedValue {
   if (value.type === 'number') {
     let number = value.value
@@ -190,7 +208,7 @@ export function toCanonical(value: TypedValue): TypedValue {
   return value
 }
 
-/** complex 值转为声明所需的形态（re-im / mag-ang / either→re-im）。 */
+/** Convert a complex value into the form a declaration needs (re-im / mag-ang / either → re-im). */
 export function toShape(value: { re: number; im: number }, form: 're-im' | 'mag-ang' | 'either' | undefined): { re: number; im: number } | { mag: number; ang: number } {
   if (form === 'mag-ang') {
     return { mag: Math.hypot(value.re, value.im), ang: Math.atan2(value.im, value.re) }
@@ -198,9 +216,9 @@ export function toShape(value: { re: number; im: number }, form: 're-im' | 'mag-
   return value
 }
 
-/* ── spec 匹配与原生转换（声明即校验器） ─────────────────────────────────── */
+/* ── spec matching and native conversion (declaration is the validator) ───── */
 
-/** 校验一个类型化值是否匹配声明 spec（quantity 的 kind 必须相等；object 封闭）。 */
+/** Validate that a typed value matches a declaration spec (quantity kinds must match; objects are closed). */
 export function validateAgainstSpec(spec: Spec, value: TypedValue, path: string): string | undefined {
   switch (spec.type) {
     case 'quantity': {
@@ -241,8 +259,8 @@ export function validateAgainstSpec(spec: Spec, value: TypedValue, path: string)
 }
 
 /**
- * 把内核原生输出（number / {re,im} / {mag,ang} / string / boolean / 数组 / 对象）
- * 按 returns spec 转成类型化值（返回定型）。结构不符抛错。
+ * Convert kernel-native output (number / {re,im} / {mag,ang} / string / boolean / array / object)
+ * into a typed value per its returns spec (result shaping). Structural mismatch throws.
  */
 export function fromNative(spec: Spec, raw: unknown, path: string): TypedValue {
   switch (spec.type) {
@@ -284,7 +302,7 @@ export function fromNative(spec: Spec, raw: unknown, path: string): TypedValue {
   }
 }
 
-/** 按 @name 或 @name.path 从对象槽取值（path 只走 object fields）。 */
+/** Read a value out of a slot by dot path (path only walks object fields). */
 export function refPath(value: TypedValue, path: string | undefined): TypedValue {
   if (path === undefined || path.length === 0) return value
   const segments = path.split('.')

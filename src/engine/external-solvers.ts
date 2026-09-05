@@ -1,7 +1,7 @@
 /**
- * 外部 solver 直录（蓝图 §3.4）：声明档案行 → SolverDef（external 块），无编译翻译层。
- * parameters/returns 用同一 spec 语言；returns 显式（spec 或 null = void）；
- * 缺失或 any 无法映射 → 报错跳过。
+ * External solver direct registration: declaration archive row → SolverDef (external block), with no compile/translation layer.
+ * parameters/returns use the same spec language; returns is explicit (a spec or null = void);
+ * a missing one or an unmappable any → report and skip.
  */
 import type { SolverDef, ExternalBlock } from './registry.ts'
 import { isKind, type Spec } from './values.ts'
@@ -22,14 +22,14 @@ function specFromParam(param: DeclarationParamSpec, path: string): Spec {
   }
 }
 
-/** returns → 引擎 spec；null = void（显式）；缺失或 any 无法映射 → 抛错跳过。 */
+/** returns → engine spec; null = void (explicit); a missing or unmappable any → throw and skip. */
 function specFromReturns(returns: ToolReturns | null | undefined, path: string): Spec | null {
   if (returns === null) return null
   if (returns === undefined) throw new Error(`${path}: a declaration needs an explicit returns (a spec, or null for void)`)
   return specFromLeaf(returns, path)
 }
 
-/** 非 void 叶子（递归用；嵌套处不可能出现 null/缺失）。 */
+/** Non-void leaf (recursive use; null/missing cannot appear at nested sites). */
 function specFromLeaf(returns: ToolReturns, path: string): Spec {
   switch (returns.type) {
     case 'any':
@@ -52,7 +52,7 @@ function specFromLeaf(returns: ToolReturns, path: string): Spec {
   }
 }
 
-/** 档案行 → SolverDef。不可映射（returns 缺失/any/坏参数）返回 null 或抛错，由调用方 warn 跳过。 */
+/** Archive row → SolverDef. Unmappable cases (missing/any returns, bad parameters) return null or throw; the caller warns and skips. */
 export function compileExternalSolver(declaration: ToolDeclaration): SolverDef | null {
   const parameters: Record<string, Spec> = {}
   for (const [key, param] of Object.entries(declaration.parameters)) {

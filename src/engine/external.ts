@@ -1,7 +1,7 @@
 /**
- * 外部 solver 传输（蓝图 §3.5 信封协议）：请求 {requestId, args}，成功
- * {requestId, result}（void = result: null），失败 {requestId, error: "字符串"}。
- * 参数与结果都是类型化值（SI、rect、无 variant/prefix）。
+ * External solver transport (envelope protocol): requests are {requestId, args}, success
+ * is {requestId, result} (void = result: null), failure is {requestId, error: "string"}.
+ * Both parameters and results are typed values (SI, rect, no variant/prefix).
  */
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -11,7 +11,7 @@ import { validateValue, type TypedValue } from './values.ts'
 import type { ExternalBlock } from './registry.ts'
 import { DeclarationHttpMethod, DeclarationTransport } from '../tool.ts'
 
-/** 把一个类型化值转成过线 JSON（规范形态，无 variant/prefix）。 */
+/** Convert a typed value into its on-the-wire JSON form (canonical shape, no variant/prefix). */
 function wireValue(value: TypedValue): unknown {
   return value
 }
@@ -34,7 +34,7 @@ function readResult(body: unknown, requestId: string): TypedValue | null {
   return raw as TypedValue
 }
 
-/** 执行一次外部调用；返回响应里的 result（可能为 null，引擎按 solver 签名校验）。 */
+/** Run one external call; return the result from the response (may be null; the engine validates it against the solver signature). */
 export async function callExternal(block: ExternalBlock, args: Record<string, TypedValue>): Promise<TypedValue | null> {
   const timeoutMs = block.timeoutMs ?? 30000
   const requestId = randomUUID()
@@ -103,7 +103,7 @@ export async function callExternal(block: ExternalBlock, args: Record<string, Ty
           try {
             rmSync(file, { force: true })
           } catch {
-            // 尽力清理
+            // best-effort cleanup
           }
         }
       }

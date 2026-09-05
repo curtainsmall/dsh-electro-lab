@@ -1,10 +1,10 @@
 /**
- * Host half of dsh-electro-lab（引擎时代）。
+ * Host half of dsh-electro-lab (engine era).
  *
- * 一台进程级全局引擎（Engine）：变量表 + solver 注册表 + 记录存储。
- * apply 装配：注册内核 solver 与外部 solver、注册 LLM 工具面（set/get/call +
- * markers）与声明管理工具（external_solver_add/update/delete）、挂两个
- * 端点（记录索引、外部 solver 档案管理）。
+ * One process-wide global engine (Engine): variable table + solver registry + record storage.
+ * apply assembly: registers the kernel and external solvers, registers the LLM tool surface (set/get/call +
+ * markers) and the declaration management tools (external_solver_add/update/delete), and mounts two
+ * endpoints (record index, external solver archive management).
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -51,7 +51,7 @@ interface RequestLike {
 /** The records home: records/ + record-index.jsonl live here. */
 const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-electro-lab')
 
-/** 全局单引擎（蓝图 §10）：一个进程一个引擎，任何会话的 marker 都作用于它。 */
+/** Global single engine: one engine per process; any session's markers act on it. */
 export const engine = new Engine(recordsHome)
 
 const RECORDS_INDEX_PATH = '/api/dsh-electro-lab/records-index'
@@ -61,7 +61,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     const disposers: Array<() => void> = []
 
-    // 引擎装配：恢复 open 记录（清孤儿 + 重建表）、注册全部内核 solver 与外部 solver。
+    // Engine wiring: recover the open record (clear orphans + rebuild the table), register all kernel and external solvers.
     engine.start()
     for (const solver of registerKernelSolvers()) {
       if (engine.registry.get(solver.id) === undefined) engine.registry.register(solver)
@@ -75,14 +75,14 @@ export function apply(ctx: Context): void {
         ctx.logger?.warn(`[dsh-electro-lab] failed to register declaration solver "${declaration.name}": ${error instanceof Error ? error.message : String(error)}`)
       }
     }
-    // 声明档案刚注册完：重启 dirty 位清掉。
+    // Declarations have just been registered: clear the restart dirty bit.
     clearRestartRequired(recordsHome)
 
-    // LLM 工具面：引擎原语 + markers。
+    // LLM tool surface: engine primitives + markers.
     for (const tool of createEngineTools(engine)) {
       disposers.push(ctx.tools.register(tool))
     }
-    // 声明管理工具（管理面在引擎外）。
+    // Declaration management tools (the management surface lives outside the engine).
     for (const tool of createDeclarationTools(recordsHome)) {
       disposers.push(ctx.tools.register(tool))
     }
@@ -97,7 +97,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     const disposers: Array<() => void> = []
 
-    // 记录列表：读 record-index.jsonl（列表页唯一数据源）。
+    // Record list: read record-index.jsonl (the list page's only data source).
     disposers.push(ctx.webServer.register({
       kind: 'exact',
       path: RECORDS_INDEX_PATH,
@@ -113,8 +113,8 @@ export function apply(ctx: Context): void {
       },
     }))
 
-    // 外部 solver 档案管理：GET 列表 + dirty 位；PUT 覆盖/新增（base64 JSON 查询参数）；
-    // DELETE ?name= 删除。每次写置 dirty 位（重启后经 compileExternalSolver 注册）。
+    // External solver archive management: GET lists + dirty bit; PUT overwrites/adds (base64 JSON query parameter);
+    // DELETE ?name= removes. Every write sets the dirty bit (registered via compileExternalSolver after a restart).
     disposers.push(ctx.webServer.register({
       kind: 'exact',
       path: EXTERNAL_PATH,

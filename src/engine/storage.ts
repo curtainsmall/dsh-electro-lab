@@ -1,6 +1,6 @@
 /**
- * 记录存储（蓝图 §5）：record-index.jsonl（索引）+ records/<id>.jsonl（按步轨迹）。
- * 索引行 {id, openedAt, sealedAt, question}；孤儿（sealedAt null 且无本体）启动清除。
+ * Record storage: record-index.jsonl (index) + records/<id>.jsonl (per-step trace).
+ * Index rows {id, openedAt, sealedAt, question}; orphans (sealedAt null with no body) are cleared at startup.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -36,7 +36,7 @@ export class RecordStore {
     return join(this.recordsDir(), `${id}.jsonl`)
   }
 
-  /** 读取全部索引行（文件顺序）。 */
+  /** Read all index rows (file order). */
   readIndex(): IndexRow[] {
     const file = this.indexFile()
     if (!existsSync(file)) return []
@@ -48,7 +48,7 @@ export class RecordStore {
         const parsed = JSON.parse(trimmed) as IndexRow
         if (typeof parsed.id === 'string' && typeof parsed.openedAt === 'number') rows.push(parsed)
       } catch {
-        // 坏行跳过
+        // skip corrupt lines
       }
     }
     return rows
@@ -59,13 +59,13 @@ export class RecordStore {
     writeFileSync(this.indexFile(), rows.map((row) => JSON.stringify(row)).join('\n') + (rows.length > 0 ? '\n' : ''), 'utf8')
   }
 
-  /** 追加一行索引（新记录）。 */
+  /** Append an index row (new record). */
   appendIndex(row: IndexRow): void {
     mkdirSync(this.home, { recursive: true })
     appendFileSync(this.indexFile(), JSON.stringify(row) + '\n', 'utf8')
   }
 
-  /** 更新一行索引（封口）。 */
+  /** Update one index row (seal). */
   updateIndex(id: string, patch: Partial<IndexRow>): void {
     const rows = this.readIndex()
     const index = rows.findIndex((row) => row.id === id)
@@ -74,14 +74,14 @@ export class RecordStore {
     this.writeIndex(rows)
   }
 
-  /** 启动一致性：清除 sealedAt null 且无本体文件的孤儿索引行。 */
+  /** Startup consistency: remove orphan index rows whose sealedAt is null and have no body file. */
   clearOrphans(): void {
     const rows = this.readIndex()
     const kept = rows.filter((row) => row.sealedAt !== null || existsSync(this.recordFile(row.id)))
     if (kept.length !== rows.length) this.writeIndex(kept)
   }
 
-  /** 新建记录：建目录、追加索引行；本体首行由调用方写入。返回 id 与 openedAt。 */
+  /** Create a record: create the directory and append the index row; the caller writes the body's first line. Returns id and openedAt. */
   createRecord(question: string): { id: string; openedAt: number } {
     mkdirSync(this.recordsDir(), { recursive: true })
     const id = randomUUID()
@@ -90,12 +90,12 @@ export class RecordStore {
     return { id, openedAt }
   }
 
-  /** 追加一行轨迹（同步落盘）。 */
+  /** Append one trace row (synchronous write). */
   appendRow(id: string, row: TraceRow): void {
     appendFileSync(this.recordFile(id), JSON.stringify(row) + '\n', 'utf8')
   }
 
-  /** 读本体全部行。 */
+  /** Read every row of a body. */
   readRows(id: string): TraceRow[] {
     const file = this.recordFile(id)
     if (!existsSync(file)) return []
@@ -106,24 +106,24 @@ export class RecordStore {
       try {
         rows.push(JSON.parse(trimmed) as TraceRow)
       } catch {
-        // 坏行跳过
+        // skip corrupt lines
       }
     }
     return rows
   }
 
-  /** 本体文件是否存在。 */
+  /** Whether the body file exists. */
   hasRecord(id: string): boolean {
     return existsSync(this.recordFile(id))
   }
 
-  /** 删除一条记录（本体 + 索引行）——非蓝图必需，供未来管理用。 */
+  /** Delete a record (body + index row) — not required by the core design; kept for future administration. */
   deleteRecord(id: string): void {
     rmSync(this.recordFile(id), { force: true })
     this.writeIndex(this.readIndex().filter((row) => row.id !== id))
   }
 
-  /** records/ 目录内全部 id。 */
+  /** Every id inside the records/ directory. */
   recordIds(): string[] {
     if (!existsSync(this.recordsDir())) return []
     return readdirSync(this.recordsDir()).filter((name) => name.endsWith('.jsonl')).map((name) => name.slice(0, -'.jsonl'.length))
