@@ -64,68 +64,12 @@ const zh = {
   urlRequired: '请输入 http(s) URL。',
   fileDirectoryRequired: '请输入目录路径。',
   positiveNumberRequired: '“{label}”须为正数。',
-
   emptyHint: '暂无 ElectroLab 记录——让智能体做一次计算。',
   unreachable: '暂未检测到记录——记录端点未响应,面板会自动重试;若刚更新插件,宿主可能需要重启。',
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  directory: '目录',
-
-
-
-
   confirm: '确定',
-
-
-
-
-
   irreversible: '此操作不可恢复。',
   cancel: '取消',
-
   delete: '删除',
-
-
-
-
-
-
   incomplete: '未完成',
 } as const
 
@@ -184,68 +128,12 @@ const en: Record<keyof typeof zh, string> = {
   urlRequired: 'Enter an http(s) URL.',
   fileDirectoryRequired: 'Enter a directory path.',
   positiveNumberRequired: '“{label}” must be a positive number.',
-
   emptyHint: 'No ElectroLab records yet — ask the agent for a calculation.',
   unreachable: 'No records detected yet — the records endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.',
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  directory: 'Directory',
-
-
-
-
   confirm: 'OK',
-
-
-
-
-
   irreversible: 'This cannot be undone.',
   cancel: 'Cancel',
-
   delete: 'Delete',
-
-
-
-
-
-
   incomplete: 'incomplete',
 }
 
