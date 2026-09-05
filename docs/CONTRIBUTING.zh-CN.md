@@ -39,8 +39,8 @@ main      ← 仅发布（PR 合并、打 tag、GitHub Actions）
   pnpm build
   ```
 
-- 测试位于 `tests/`（与 `src/` 同级，目录结构镜像：`tests/math/`、`tests/tools/`）；每个单元在对应分组内提供 `*.test.ts`。
-- 宿主插件在挂载时注册工具、技能与随包 `electro-lab` 预设；`pnpm build` 重新生成 `lib/`（已 gitignore，发布时全新构建）。
+- 测试位于 `tests/`（与 `src/` 同级，目录结构镜像：`tests/math/`、`tests/machine/`、`tests/tool-declarations/`）；每个单元在对应分组内提供 `*.test.ts`。
+- 宿主插件在挂载时注册状态机工具（`set` / `get` / `call` 与记录标记）、技能与随包 `electro-lab` 预设；`pnpm build` 重新生成 `lib/`（已 gitignore，发布时全新构建）。
 
 ## 发布
 

@@ -39,8 +39,8 @@ main      ← release only (PR merge, tagged, GitHub Actions)
   pnpm build
   ```
 
-- Tests live in `tests/` (sibling of `src/`, layout mirrored: `tests/math/`, `tests/tools/`); each unit ships a `*.test.ts` next to its group.
-- The host plugin registers tools, skills, and the packaged `electro-lab` preset; `pnpm build` regenerates `lib/` (gitignored, built fresh on publish).
+- Tests live in `tests/` (sibling of `src/`, layout mirrored: `tests/math/`, `tests/machine/`, `tests/tool-declarations/`); each unit ships a `*.test.ts` next to its group.
+- The host plugin registers the state machine tools (`set` / `get` / `call` + the record markers), skills, and the packaged `electro-lab` preset; `pnpm build` regenerates `lib/` (gitignored, built fresh on publish).
 
 ## Release
 

@@ -1,137 +1,321 @@
-# Tool Catalog
-
-All tools of the DeepSeek Harness ElectroLab plugin, grouped by domain. Every tool speaks the same value contract: a value parameter is a bare number (a real value) or a compact complex object — `{re, im}` (rectangular) or `{mag, ang}` (polar, angles in radians). Every parameter declaration pins its quantity kind. Outputs are `{re, im, kind, mag, ang}` snapshots in SI base units. ✅ marks combination tools that orchestrate several math kernels in one call.
+# ElectroLab State Machine Manual
 
 [简体中文](tools.zh-CN.md)
 
-## Expression & algebra
+The DeepSeek Harness ElectroLab plugin runs all electrical & electronics calculation inside a deterministic **state machine**. The language model never computes: it operates the state machine through three primitives and three record markers, and the state machine keeps a typed-value table, converts values at calculation boundaries, records every step, and seals each solve into a browsable record.
 
-| Tool | Purpose |
+This manual is the full reference for the state machine surface — typed values, primitives, markers, the function catalog, storage, and external functions. Sessions started in **ElectroLab Mode** carry the same rules in the `electro-lab-interface` skill (state machine manual) and `electro-lab-template` skill (record protocol).
+
+## 1. How it works
+
+- **One global state machine per host process.** Any session's markers act on the same state machine; at most one record is open at a time (single-open invariant).
+- **The LLM surface is six tools**: `set`, `get`, `call`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_tool_add` / `external_tool_update` / `external_tool_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the state machine's fn registry and are invoked by `call`.
+- **A record is a process (timeline).** Each state machine operation appends one fully self-describing trace line (input and output both stored); a record can be replayed to rebuild the recorded state at any point without re-computing anything.
+- **Input is value.** What the model gives is what the state machine stores; a string stays a string.
+
+## 2. Typed values
+
+A typed value is a JSON object. `kind` is part of a quantity:
+
+```json
+{ "type": "number",  "value": 100,  "kind": "resistance" }
+{ "type": "number",  "value": 25,   "kind": "temperature", "variant": "degC" }
+{ "type": "number",  "value": 1500, "kind": "resistance",  "prefix": "kilo" }
+{ "type": "complex", "value": { "re": 100, "im": 0 }, "kind": "voltage" }
+{ "type": "complex", "value": { "mag": 220, "ang": 0.5236 }, "kind": "voltage" }
+{ "type": "string",  "value": "lowpass" }
+{ "type": "boolean", "value": true }
+```
+
+- `type` — the shape discriminator: number / complex / string / boolean / array (items recurse) / object (fields recurse).
+- `kind` — the quantity class (resistance, voltage, time, frequency, temperature, angle, pressure, energy, length, mass, log, none, …). Kind is part of a quantity: a value exists with a kind; a bare number has kind `none`; a plain ratio has kind `log`.
+- `variant` — a representation choice *within* a kind. **Field absent (not null) = the SI base representation**; storage never adds keys. Only the following words are valid, and each only on its own kind:
+
+| kind | variant words | base (no key) |
+|---|---|---|
+| temperature | degC, degF | K |
+| angle | deg | rad |
+| pressure | bar, psi, atm | Pa |
+| energy | cal, Wh | J |
+| power | hp | W |
+| length | inch, foot, yard, mile | m |
+| mass | lb, oz | kg |
+
+- `prefix` — a magnitude multiplier on number/complex. **Field absent = multiplier 1.** Words are full lowercase English words, never symbols: `pico` `nano` `micro` `milli` `kilo` `mega` `giga` `tera`. A prefix is generally only valid on the SI base representation (variant words reject prefixes).
+- Words are short ASCII text everywhere; symbols (Ω, °, µ, …) never enter the value universe.
+
+### Conversion boundary
+
+The table stores values **exactly as given** — `get` returns what `set` wrote, no normalization. Conversion happens only when a value is *referenced by a computation*: at the `call` boundary the state machine converts variants to SI (degC → K, deg → rad, psi → Pa, …) and normalizes complex shapes (`{mag, ang}` → `{re, im}`, angles always radians). The table is untouched; the trace records both the original args and the resolved end values.
+
+## 3. Primitives
+
+```
+set  { name, value }     write one slot: value = a typed value; value: null deletes the slot
+get  { name }            read one slot (the stored typed value, exactly as written)
+call { fn, args, target }  call one registered fn; args values are typed values or "@name" references
+```
+
+Semantics:
+
+- `"100 kΩ"` is always a string; a resistance of 100 kΩ must be given as `{ "type": "number", "value": 100, "kind": "resistance", "prefix": "kilo" }`.
+- `@name` / `@name.path` is a slot reference (`@` prefix = reference, no `@` = literal). The state machine expands it and kind/shape-checks it against the fn signature. A reference to a missing slot fails with `CONTEXT_UNDECLARED`.
+- **Every call returns one receipt** — there is no "exception vs normal return" duality:
+
+```
+success: set  → { ok: true, name, rev }   (delete: { ok: true, name, deleted })
+         get  → { ok: true, name, value }
+         call → { ok: true, target, rev }  (void fn: { ok: true, target: null })
+failure:      → { ok: false, code, error }
+```
+
+  Check `ok` first. Receipts carry no business data (except `get`); read values only through `get`.
+- **target matches the fn signature** (the state machine decides from the registry; the model does not need to remember rules): a void fn (declared `returns: null`) takes `target: null` (a named target → `CONTEXT_VOID_TARGET`); a value fn requires a named target (missing/null → `CONTEXT_TARGET_REQUIRED`).
+- **target always overwrites**: writing an existing slot replaces the whole value (kind check passes) and bumps `rev`; nothing is inherited from the old representation.
+- **Delete = `set` with `value: null`**: the slot disappears from the table, deleting a missing slot is an idempotent ok, re-creating later restarts at rev 1; the trace line carries `deleted: true`.
+- Slot kinds are pinned on first write: overwriting with a different kind fails (`CONTEXT_KIND_MISMATCH`) and does not advance the revision.
+- Failed operations have **no side effects**: no slot is created, the table does not change, revisions do not move. The failure still lands in the trace.
+
+## 4. Records & markers
+
+```
+record_question { text }    open a record (clears the table); a re-open seals the previous record as duplicate-start
+record_analyse  { text }    the analysis: knowns and the approach with formulas — no computed numbers
+record_answer   { text }    the final answer; seals the record
+```
+
+- One open record at most. A second `record_question` seals the open record (duplicate-start) and starts a new one — two open rows can never exist.
+- `record_answer` with no open record keeps a duplicate-end error record.
+- An interrupted record (index `sealedAt: null` with a body file) is resumed at the next state machine start: the trace continues in the same file and the table is rebuilt from it. An incomplete record never completes itself — it is either sealed later (duplicate-start) or stays incomplete forever.
+
+## 5. Function catalog
+
+All functions speak the same value contract: quantity arguments are typed values (see §2); array coefficients of transfer functions are kind-`none` quantities in descending power order. The catalog mirrors the math kernels one-to-one.
+
+### Expression & algebra
+
+| fn | purpose |
 |---|---|
-| `calculate` | Complex expression evaluation (arithmetic, functions, symbol bindings) |
-| `rational_coefficients` | Expression → rational numerator/denominator coefficient pair |
+| `calculate` | Evaluate a string math expression and return the complex result |
+| `rational_coefficients` | Reduce an expression in one variable to a rational function and return numerator/denominator coefficients |
 
-## Series sums
+### Series sums
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| `series_sum` | Arithmetic, geometric (finite or convergent infinite) and power sums (Σk, Σk², Σk³) |
+| `series_sum` | Sum of a number sequence: arithmetic, geometric (finite or convergent infinite), or power sum |
 
-## Transfer functions & frequency domain
+### Transfer functions & frequency domain
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| `poles_zeros` | Poles and zeros of a transfer function |
-| `partial_fraction` | Partial-fraction expansion with polynomial part |
-| `transfer_function_response` | Transfer function evaluated at frequency points |
-| `step_response` | Step response in the s domain |
-| `difference_equation_response` | Difference-equation recursion (Laurent a/b convention) |
-| ✅ `bode_response` | Logarithmic grid + response + dB/phase conversion in one call |
-| `power_series_expansion` | z⁻¹ series of a ratio = impulse response h[n] |
+| `partial_fraction` | Partial-fraction expansion of a ratio-form transfer function |
+| `poles_zeros` | Poles and zeros of a ratio-form transfer function |
+| `transfer_function_response` | Evaluate a transfer function at frequency points (H(jω) or H(e^(jωT))) |
+| `step_response` | Step response of a continuous transfer function at time points |
+| `difference_equation_response` | Difference-equation recursion output y[n] (Laurent a/b convention) |
+| `bode_response` | Bode plot of a ratio-form transfer function on a logarithmic frequency grid |
+| `power_series_expansion` | Power-series expansion of a z-domain transfer function about z⁻¹ (impulse response) |
 
-## Digital signal processing
+### Digital signal processing
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| `discrete_fourier_transform` | DFT (radix-2 FFT with direct-sum fallback), window applied internally |
-| `inverse_discrete_fourier_transform` | IDFT via conjugation |
-| `fourier_series_coefficients` | Coefficients of standard periodic waveforms |
-| ✅ `signal_analysis` | Statistics (RMS/peak/DC) + windowed spectrum in one call |
+| `discrete_fourier_transform` | DFT of a complex sample sequence (optionally windowed) |
+| `inverse_discrete_fourier_transform` | IDFT of a spectrum: recovers the time-domain sequence (round-trip of the DFT) |
+| `fourier_series_coefficients` | Fourier series coefficients (a₀, aₙ, bₙ) of a standard odd-symmetric waveform |
+| `signal_analysis` | Signal statistics plus the windowed spectrum in one call (RMS, peak, peak-to-peak, DC) |
 
-## Signal quality
+### Signal quality
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| `thd` | Total harmonic distortion from sampled signals (spectral folding aware) |
-| `jitter_snr` | Clock-jitter SNR ceiling: −20·log10(2π·f·tⱼ) |
-| ✅ `adc_budget` | Quantization + jitter + thermal noise → total SNR and ENOB |
+| `thd` | Total harmonic distortion of a sampled signal (fraction plus dB) |
+| `jitter_snr` | SNR ceiling set by sampling-clock jitter |
+| `adc_budget` | ADC noise budget: quantization, jitter and optional thermal SNR into a total SNR and ENOB |
 
-## Circuits
+### Circuits
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| `equivalent_impedance` | Combine complex impedances in series or parallel |
-| ✅ `circuit_impedance` | Driving-point impedance of a nested network tree |
-| `resonance` | LC resonance: f₀, Q, bandwidth |
-| `ac_power` | Apparent / real / reactive power and power factor |
-| ✅ `transient_response` | First-/second-order transients (rc/rl/rlc kinds, damping regimes) |
+| `equivalent_impedance` | Total impedance of a set of impedances combined in series (Z = Σ Zi) or in parallel (1/Z = Σ 1/Zi) |
+| `circuit_impedance` | Total driving-point impedance of a (possibly nested) series/parallel network at a frequency; network is JSON text of a tree of element leaves (kind resistance\|inductance\|capacitance) and series/parallel groups |
+| `resonance` | Series/parallel LC resonance: resonantFrequency, qualityFactor and bandwidth |
+| `ac_power` | AC power from RMS values: apparent = V·I, real = apparent·cosφ, reactive = apparent·sinφ, powerFactor = cosφ |
+| `transient_response` | First- or second-order charge/discharge transient at a list of time points; returns one point per time with voltage and current |
 
-## Electronics
+### Electronics
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| ✅ `opamp_configurations` | Seven ideal op-amp configurations (per-configuration dispatch) |
-| `time_constant` | τ = RC or L/R with cutoff frequency |
-| `voltage_divider` | Resistive divider, loaded or unloaded |
-| `led_resistor` | LED series resistor with dissipated power |
+| `opamp_configurations` | Ideal op-amp gain and output for a configuration: inverting, non-inverting, voltage-follower, difference, integrator, differentiator |
+| `time_constant` | Time constant and cutoff frequency: τ = RC (give capacitance) or τ = L/R (give inductance) |
+| `voltage_divider` | Resistive divider, loaded or unloaded, plus the Thévenin output resistance |
+| `led_resistor` | LED series resistor: R = (Vs − Vf)/I and its dissipated power P = I²·R |
 
-## RF & Smith chart
+### RF & Smith chart
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| `impedance_to_reflection` | Impedance → reflection coefficient Γ |
-| `reflection_to_vswr` | Γ → VSWR |
-| `return_loss` | Γ → return loss in dB |
-| `quarter_wave_transformer` | Z1 = √(Z0·ZL) |
-| ✅ `matched_network` | L/π/T matching networks with reactance→L/C conversions |
+| `impedance_to_reflection` | Reflection coefficient Γ = (Z − Z0)/(Z + Z0) |
+| `reflection_to_vswr` | VSWR from a reflection coefficient: vswr = (1+|Γ|)/(1−|Γ|) |
+| `return_loss` | Return loss in dB: −20·log10(|Γ|) |
+| `quarter_wave_transformer` | Quarter-wave transformer characteristic impedance: Z1 = √(Z0·ZL) |
+| `matched_network` | Matching network between two real resistances (topology l/pi/t); returns low-pass/high-pass conjugate solutions as ordered elements |
 
-## Transmission lines
+### Transmission lines
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| `wavelength_frequency` | λ = c·vf/f |
-| `coaxial_parameters` | Coaxial-line impedance, velocity factor, C′/L′ per metre |
-| `rise_time_bandwidth` | tr ≈ 0.35/BW conversion |
+| `wavelength_frequency` | Wavelength from frequency (velocity factor aware) |
+| `coaxial_parameters` | Coaxial-line characterization from geometry (impedance, velocity factor, per-meter C and L) |
+| `rise_time_bandwidth` | Convert between rise time and bandwidth (tr ≈ 0.35/BW) |
 
-## Noise
+### Noise
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| `thermal_noise` | Johnson noise power k·T·B (W) |
-| `cascade_noise_figure` | Friis cascade of stages |
-| `quantization_noise` | Ideal quantizer SNR: 6.02·N + 1.76 dB |
+| `thermal_noise` | Thermal (Johnson) noise power in a bandwidth: P = k·T·B (temperature in kelvin) |
+| `cascade_noise_figure` | Total noise figure of cascaded stages (Friis) from per-stage noise figures and gains in dB |
+| `quantization_noise` | Ideal SNR of a uniform quantizer in dB: SNR = 6.02·N + 1.76 |
 
-## Filters
+### Filters
 
-| Tool | Purpose |
+| fn | purpose |
 |---|---|
-| ✅ `filter_design` | Butterworth low-pass ladder design with attenuation checks |
+| `filter_design` | Butterworth low-pass ladder design: order, cutoff frequency and equal source/load resistance give the element list (series inductors, shunt capacitors), with attenuation at the cutoff and query frequencies |
 
-## Unit conversion
+### Fn surface notes
 
-| Tool | Purpose |
+The fn surface is exactly the migrated kernels under the state machine's one-shape-per-fn returns discipline. The notable consequences:
+
+- `reflection_to_vswr` / `return_loss`: the |Γ| = 1 / |Γ| = 0 extremes are unbounded — the value universe holds no infinity, so those calls throw.
+- `circuit_impedance.network` is a JSON-text string (a closed spec cannot express a recursive heterogeneous tree).
+- `resonance.resistance` is required and the result always carries qualityFactor and bandwidth.
+- `filter_design.queryFrequency` is required (pass the cutoff frequency when only the design is wanted); element magnitudes are kind-`none` values whose unit is carried by the element kind string.
+- `opamp_configurations` covers the six single-input configurations (a summing amplifier has no single gain).
+- `transient_response` returns one fixed point shape ({time, voltage, current}) across rc/rl/rlc; the rlc damping characterization is not returned.
+- `voltage_divider` returns a fixed four-field object; unloaded, `unloadedOutputVoltage` equals `outputVoltage` and `loadCurrent` is 0.
+- `series_sum` returns one fixed shape (kind/power/sum/lastTerm/converges) across all branches; a diverging infinite input errors.
+- Unit-carrying echo fields follow the legacy declarations and use kind `none` (kelvin temperatures, wavelengths, coaxial diameters, echo frequency lists) — typed values for those quantities are SI base numbers.
+
+## 6. Storage
+
+The records home is `~/.dsh-electro-lab` (override with the `DSH_ELECTRO_LAB_HOME` environment variable):
+
+```
+~/.dsh-electro-lab/
+  record-index.jsonl     ← index (outside records/)
+  records/
+    <id>.jsonl           ← the trace body (id is a UUID v4)
+```
+
+### record-index.jsonl (index only)
+
+```json
+{ "id": "…", "openedAt": 1730000000000, "sealedAt": null, "question": "given R = 100ohm…" }
+```
+
+Fields: id, openedAt, sealedAt (null = not sealed), question (immutable title). No errors, no stats, no content; line order is append order. Truncation is the UI's job.
+
+### Trace body (per-step, full)
+
+One line per state machine operation or marker; every line carries everything needed to restore that step — input and output both:
+
+```json
+{ "seq": 1, "tool": "marker", "kind": "question", "ok": true, "text": "…", "at": … }
+{ "seq": 2, "tool": "set", "ok": true, "name": "R", "value": { …typed value as given… }, "rev": 1, "at": … }
+{ "seq": 3, "tool": "call", "ok": true, "fn": "resonance",
+  "args": { …original… }, "resolved": { …expanded + SI/rect end values… },
+  "result": { …typed output… }, "target": "res", "rev": 1, "at": … }
+{ "seq": 4, "tool": "call", "ok": false, "code": "CONTEXT_UNDECLARED", "error": "…", "at": … }
+{ "seq": 5, "tool": "set", "ok": true, "name": "tmp", "value": null, "deleted": true, "at": … }
+{ "seq": 6, "tool": "marker", "kind": "answer", "ok": true, "text": "…", "at": … }
+```
+
+- `call` lines store the result: any call's output enters the line as fact — restoring state uses the stored result directly and **never recomputes** (external fn output comes from the network/files and cannot be recomputed).
+- `resolved` is the argument set that actually entered the run: references expanded and all conversions done (SI, rect). `args` keeps the originals; the two line up per key.
+- No kernel-internal intermediate steps and no model reasoning text are recorded; the granularity is one state machine operation. The reader of a trace is a human — every step shows original input, converted values and result in place, and can be re-verified independently.
+
+### Restore = replay
+
+Rebuilding state replays the lines in order: `set` lines set the slot to the stored value, `call` lines set the target slot to the stored result (non-void), set-null lines delete, marker lines are skipped. Pure state machine — no recompute, no network, no randomness.
+
+### Consistency
+
+- Orphan index rows (sealedAt null without a body file) are cleared at state machine start — the index is a projection and can be safely rebuilt.
+- The new system does not read the old-format `records.jsonl`; the old file is left untouched.
+
+## 7. Host endpoints
+
+- `GET /api/dsh-electro-lab/records-index` — the index rows for the Records panel list (`{ rows: [{ id, openedAt, sealedAt, question }] }`). The list polls every 5 s; it never reads trace bodies.
+- `GET /api/dsh-electro-lab/external-tools` — the declaration archive + dirty bit (`{ tools: […], restartRequired }`).
+- `PUT /api/dsh-electro-lab/external-tools?config=<base64url JSON>` — validate and upsert one declaration (sets the dirty bit).
+- `DELETE /api/dsh-electro-lab/external-tools?name=<name>` — delete one declaration.
+
+## 8. External functions
+
+External functions are user-owned calculation functions living on a remote endpoint; the state machine reaches them over an **http** or **file** transport. Declarations live in `external-tools.jsonl` under the records home; at state machine start every enabled declaration is registered **verbatim** into the fn registry as an external fn (no compile layer — the transport is wrapped by the state machine itself). Changes apply after a host restart; the UI shows a pending-restart notice while the dirty bit is set.
+
+### Declaration
+
+```json
+{
+  "name": "echo_http",
+  "description": "Echo peer over http: returns every parameter it receives, verbatim",
+  "enabled": true,
+  "parameters": {
+    "message": { "type": "string", "description": "a text echoed back verbatim", "required": true },
+    "values":  { "type": "array", "items": { "type": "quantity", "kind": "none" }, "description": "values echoed back verbatim" },
+    "flag":    { "type": "boolean", "description": "a boolean echoed back verbatim" }
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "message": { "type": "string" },
+      "values":  { "type": "array", "items": { "type": "quantity", "kind": "none" } },
+      "flag":    { "type": "boolean" }
+    }
+  },
+  "transport": "http",
+  "transportOptions": { "url": "http://127.0.0.1:8787/echo" },
+  "timeoutMs": 10000
+}
+```
+
+- Parameter specs: `{ "type": "quantity", "kind": <lowercase kind name> }` (a quantity accepts a bare number, `{re, im}` or `{mag, ang}` payloads), `{ "type": "string", "enum"?: [...] }`, `{ "type": "boolean" }`, `{ "type": "array", "items": <spec> }` (homogeneous, items may nest).
+- `returns` is **required for registration**: the same spec leaves (or explicit `null` = void). A declaration without a returns, or with the unmappable `"any"` leaf, is kept in the archive but skipped at start with a warning.
+- http `transportOptions`: `url`, optional `headers`. The archive dialect still accepts a `method` field for compatibility, but the host always sends **POST** — typed args travel as the JSON request body.
+- file `transportOptions`: `directory` (the host writes `in.<id>.json` there and polls for `out.<id>.json`), optional `inPrefix` / `outPrefix` / `pollMs`.
+- Name rules: lowercase start, `a-z0-9_`, max 64, unique among external and built-in fns.
+
+### Wire protocol (typed envelope)
+
+```
+request:  { "requestId": "<uuid>", "args": { "<parameter>": <typed value> } }
+success:  { "requestId": "<uuid>", "result": <typed value> }    // non-void
+success:  { "requestId": "<uuid>", "result": null }             // void: still a result message, just valueless
+failure:  { "requestId": "<uuid>", "error": "<string message>" }
+```
+
+- Typed values are self-describing across the wire: `type` discriminates the shape, `value` carries the content, complex is always rect, `kind` carries the dimension. Variants/prefixes never appear — the state machine has already converted to the SI base. A third-party implementation only implements the five type branches.
+- **The `result` field is always present** (void = null) — it reserves the slot for future message kinds, so `result` and any sibling message can never be confused.
+- The host validates the response against the fn signature: a non-void fn receiving `result: null` (or no result) is a protocol error; a void fn receiving a result is one too.
+- `requestId` echo is verified; timeouts and protocol violations are raised by the host. Failures share one structured error path with local fns — whatever the source, the call surfaces as the same error receipt and is recorded in the trace with its code.
+
+| code | meaning |
 |---|---|
-| `convert_unit` | Convert a value to any unit of the same family (°C/°F/K, bar/psi/atm/Pa, cal/kWh/J, hp/W, inch/mile/m, lb/oz/kg, degree→radian, ratio ↔ dB) |
+| `EXTERNAL_ERROR` | the endpoint itself reported failure (envelope `error` field) |
+| `EXTERNAL_HTTP` | http transport failure (non-2xx status) |
+| `EXTERNAL_TIMEOUT` | the external call timed out |
+| `EXTERNAL_RESPONSE` | protocol violation in the response envelope |
 
-## Text ↔ value codec
+### Manager tools
 
-| Tool | Purpose |
+| tool | purpose |
 |---|---|
-| `parse_value` | Parse a list of text quantities into canonical value payloads in SI base units (per-item, failures reported individually): SI prefixes p…T, units (Hz, Ω/ohm, F, H, V, A, W, s, rad, °/deg, K, °C, °F, dB), complex `1+2j` and polar `3 ∠ 0.5` |
-| `format_value` | Render a list of value payloads as text: engineering prefix (auto/none/explicit) and unit by kind, e.g. `0.1 F` → `100 mF`, `1 + 2j Ω`, `3 ∠ 0.5 rad V` |
+| `external_tool_add` | Register a new external function declaration (fails when the name already exists) |
+| `external_tool_update` | Replace an existing declaration (fails when it does not exist) |
+| `external_tool_delete` | Remove a declaration by name |
 
-## Orchestration
-
-| Tool | Purpose |
-|---|---|
-| `solve_steps` | Meta-tool: runs a chain of steps serially with `@stepN` references |
-
-## Records
-
-| Tool | Purpose |
-|---|---|
-| `record_question` | Open a record and submit the consolidated question; a second open settles the open record as a duplicate-start error record |
-| `record_analyse` | Submit the analysis text into the open record |
-| `record_answer` | Submit the answer text and settle the record; a merged template in the text is split automatically |
-
-## External tools
-
-External tools are user-owned calculation tools that the host reaches over an http or file transport. Declarations live in `external-tools.jsonl` under the plugin home (`~/.dsh-electro-lab`); at plugin start every declaration that is not explicitly disabled is compiled and registered as a tool, so a change applies only after a host restart. Declarations use the same value dialect as the built-in tools: a quantity parameter accepts a bare number or a compact complex object — `{re, im}` (rectangular) or `{mag, ang}` (polar, angles in radians) — and an array parameter declares homogeneous items. Saving a declaration is the authorization for its transport. The manager tools edit the declaration archive; the Records panel's External tools tab offers the same actions.
-
-Failures share **one error path** with the built-in tools. An external endpoint reports a failed computation by returning `{requestId, error: "…"}` — a `result` field present alongside is ignored — and the host raises the error content as a `ToolError` with code `EXTERNAL_ERROR`. Transport failures are raised by the host itself with `EXTERNAL_HTTP` (http status), `EXTERNAL_TIMEOUT` and `EXTERNAL_RESPONSE` (protocol violations: a mismatched requestId, a missing result, a non-string error). Whatever the source — a thrown error or one of these response shapes — the call surfaces as the same structured error result to the agent and is recorded with its name/code.
-
-| Tool | Purpose |
-|---|---|
-| `external_tool_add` | Register a new external tool declaration (fails when the name already exists) |
-| `external_tool_update` | Replace an existing external tool declaration (fails when it does not exist) |
-| `external_tool_delete` | Remove an external tool declaration by name |
+Writes persist immediately and set the dirty bit; results report `restartRequired: true`. The Records panel's **External tools** tab offers the same actions with form editing. [`external-tool-example/`](../external-tool-example/README.md) is an independent npm project with manual test counterparts for the envelope protocol — `node src/echo.ts http` / `file` echoes it end to end.

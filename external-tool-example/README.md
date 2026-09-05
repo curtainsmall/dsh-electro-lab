@@ -1,11 +1,11 @@
-# ElectroLab Echo Peers
+# ElectroLab Echo Peer
 
-Manual test/demo counterparts for the DeepSeek Harness ElectroLab external-tool
-feature. Each peer speaks the plugin's envelope protocol on one transport —
-the request is `{requestId, ...params}` and the response must be
-`{requestId, result}` with the requestId echoed — and echoes every parameter
-back verbatim, so a full registration → restart → model-call round trip can
-be verified by eye.
+Manual test/demo counterpart for the DeepSeek Harness ElectroLab external-fn
+feature. The peer speaks the state machine's typed envelope protocol on one
+transport — the request is `{requestId, args}` where every argument is a
+typed value, the response is `{requestId, result}` with a typed value (or
+`result: null` for void), and it echoes every argument back as typed values,
+so a full register → restart → model-call round trip can be verified by eye.
 
 ## Independent project
 
@@ -14,7 +14,7 @@ not part of the plugin's build: nothing in the plugin's `src/` references it,
 the plugin's typecheck/tests/package do not cover it, and the npm artifact
 never ships it. It only lives inside the repository for convenience.
 
-- **Zero runtime dependencies.** The peers run on the Node.js standard
+- **Zero runtime dependencies.** The peer runs on the Node.js standard
   library only, via Node's built-in TypeScript type stripping — no build
   step. Node ≥ 22.18 or ≥ 23.6 runs `.ts` files natively.
 - **Own quality gate.** `pnpm typecheck` (after `pnpm install` in this
@@ -48,66 +48,73 @@ pnpm echo:file          # uses ./elab-inbox under this directory
 
 ## 2. Register the declarations
 
-[`register-guide.md`](register-guide.md) lists the two tools with the exact
-value for every dialog field. In the Records panel open the **External
-tools** tab → **Add external tool** and fill the form accordingly, or ask the
-agent in a session to register the tool, pasting the tool's
-`agentDeclaration` JSON from the guide; the agent calls `external_tool_add`.
-The `echo_file` directory assumes the peer runs with `--dir C:/elab-inbox` —
-adapt it to the directory you actually use. Changes apply at the next host
-restart.
+[`register-guide.md`](register-guide.md) lists the two functions with the
+exact value for every dialog field, including the **returns** editor (a
+declaration without an explicit returns is archived but never registers). In
+the Records panel open the **External tools** tab → **Add external tool** and
+fill the form accordingly, or ask the agent in a session to register the
+function, pasting the tool's `agentDeclaration` JSON from the guide; the
+agent calls `external_tool_add`. The `echo_file` directory assumes the peer
+runs with `--dir C:/elab-inbox` — adapt it to the directory you actually
+use. Changes apply at the next host restart.
 
 ## 3. Restart the host
 
-Declarations register at plugin start: restart the DSH host process, then
-reload the page. `echo_http` and `echo_file` now appear among the model's
-tools.
+Declarations register at state machine start: restart the DSH host process, then
+reload the page. `echo_http` and `echo_file` now appear among the fns the agent
+can `call`.
 
 ## 4. Call it
 
 Ask the agent to call `echo_http` with a `message`, optional `values` (an
 array of numbers — quantities accept bare numbers, `{re, im}` or `{mag, ang}`)
-and an optional `flag`. The result the agent sees is exactly what the peer
-received, minus the requestId:
+and an optional `flag`. The state machine stores the result in the named target
+slot; `get` returns exactly what the peer echoed back, as typed values:
 
 ```json
 {
-  "message": "round trip ok",
-  "values": [1, 2.5, { "re": 3, "im": -1 }],
-  "flag": true
+  "message": { "type": "string", "value": "round trip ok" },
+  "values": {
+    "type": "array",
+    "value": [
+      { "type": "number", "value": 1, "kind": "none" },
+      { "type": "number", "value": 2.5, "kind": "none" }
+    ]
+  },
+  "flag": { "type": "boolean", "value": true }
 }
 ```
 
 The Records panel shows the call arguments and the echoed result side by
-side, which is the point of the demo. The file transport also exercises the
-host's polling and cleanup (both `in.*.json` and `out.*.json` disappear
-after the call).
+side in the trace, which is the point of the demo. The file transport also
+exercises the host's polling and cleanup (both `in.*.json` and `out.*.json`
+disappear after the call).
 
 ## 5. Self-check without the plugin
 
 HTTP:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8787/echo \
+curl -s -X POST http://127.0.0.1:8787/ \
   -H 'content-type: application/json' \
-  -d '{"requestId":"manual-1","message":"hi","values":[1,2],"flag":true}'
+  -d '{"requestId":"manual-1","args":{"message":{"type":"string","value":"hi"},"flag":{"type":"boolean","value":true}}}'
 ```
 
 ```json
-{ "requestId": "manual-1", "result": { "message": "hi", "values": [1, 2], "flag": true } }
+{ "requestId": "manual-1", "result": { "type": "object", "value": { "message": { "type": "string", "value": "hi" }, "flag": { "type": "boolean", "value": true } } } }
 ```
 
-A response whose requestId does not match is rejected by the host; malformed
-requests get a `400` with an `error` field. GET requests also work, but every
-parameter travels as a query string, so values arrive as strings. An endpoint
-signals a failed computation by returning
-`{ "requestId": "…", "error": "…" }` (a `result` field present alongside is
-ignored) — the host raises it as a tool error (code `EXTERNAL_ERROR`), the
-same structured error any thrown failure produces.
+A response whose requestId does not match is rejected by the host; a
+non-JSON request body gets an `{error: "…"}` response. An endpoint signals a
+failed computation by returning `{ "requestId": "…", "error": "…" }` — the
+host raises it as the fn error (code `EXTERNAL_ERROR`), the same structured
+error any thrown failure produces. The host only ever sends **POST**; the
+typed args travel as the JSON body.
 
 ## Protocol reference
 
-The full declaration grammar (name/description/enabled/parameters/transport/
-transportOptions/returns) and the value payload shapes are documented in the
-plugin's [`docs/tools.md`](../docs/tools.md) (External tools section) and its
+The full declaration grammar (name/description/enabled/parameters/returns/
+transport/transportOptions), the typed-value payload shapes and the wire
+protocol are documented in the plugin's [`docs/tools.md`](../docs/tools.md)
+(ElectroLab State Machine Manual — External functions section) and its
 Chinese mirror [`docs/tools.zh-CN.md`](../docs/tools.zh-CN.md).
