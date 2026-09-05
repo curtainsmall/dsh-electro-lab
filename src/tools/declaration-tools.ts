@@ -27,15 +27,15 @@ const DECLARATION_GUIDE =
   '"transportOptions": for "http" { "url": an http(s) URL, "method": "GET" or "POST", "headers"?: object }, ' +
   'for "file" { "directory": an absolute path the host polls for the response, "inPrefix"?: string, "outPrefix"?: string, "pollMs"?: number }; ' +
   '"timeoutMs"?: positive number (default 30000); ' +
-  '"returns"?: the result shape }. ' +
+  '"returns": the result shape — spec leaves, or null for void; explicit and required: a declaration without it is archived but never registers }. ' +
   'Parameter specs: ' +
   '{ "type": "quantity", "kind": <lowercase kind name, e.g. resistance, voltage, current, frequency, time, angle, log, none, ...> } ' +
   '— the value is a bare number or {re, im} (rectangular) or {mag, ang} (polar, angles in radians); ' +
   '{ "type": "string", "enum"?: string array }; { "type": "boolean" }; ' +
   '{ "type": "array", "items": <any parameter spec> } — a homogeneous array, items may nest. ' +
-  'returns leaves: "any", or { "type": "string" }, { "type": "boolean" }, ' +
+  'returns leaves: { "type": "string" }, { "type": "boolean" }, ' +
   '{ "type": "number", "kind" }, { "type": "complex", "kind" }, { "type": "object", "fields": {...} }, ' +
-  '{ "type": "array", "items": <a returns leaf> }'
+  '{ "type": "array", "items": <a returns leaf> } (never "any")'
 
 const DECLARATION_PARAM = {
   declaration: {
@@ -91,21 +91,18 @@ export function createDeclarationTools(home: string): Array<ReturnType<typeof de
     defineJsonTool({
       name: 'external_tool_add',
       description: `Register a NEW external calculation tool. Pass ${DECLARATION_GUIDE} The change applies after a host restart (the result reports restartRequired).`,
-      returns: { type: 'any' },
       parameters: DECLARATION_PARAM,
       execute: (args) => addExternalTool(home, args.declaration),
     }),
     defineJsonTool({
       name: 'external_tool_update',
       description: `Replace the declaration of an EXISTING external tool. Pass ${DECLARATION_GUIDE} The tool must already be declared (external_tool_add creates it); the change applies after a host restart.`,
-      returns: { type: 'any' },
       parameters: DECLARATION_PARAM,
       execute: (args) => updateExternalTool(home, args.declaration),
     }),
     defineJsonTool({
       name: 'external_tool_delete',
       description: 'Delete an external tool declaration by its name. The change applies after a host restart (the result reports restartRequired).',
-      returns: { type: 'any' },
       parameters: NAME_PARAM,
       execute: (args) => deleteDeclarationByName(home, args.name),
     }),

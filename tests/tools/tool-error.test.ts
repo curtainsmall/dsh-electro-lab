@@ -27,7 +27,12 @@ describe('ToolError', () => {
     expect(error.name).toBe('ToolError')
     expect(error.code).toBe(ToolErrorCode.Tool)
     expect(new ToolError('x', ToolErrorCode.ExternalTimeout).code).toBe('EXTERNAL_TIMEOUT')
-    expect(Object.values(ToolErrorCode)).toEqual(['TOOL_ERROR', 'EXTERNAL_ERROR', 'EXTERNAL_HTTP', 'EXTERNAL_TIMEOUT', 'EXTERNAL_RESPONSE'])
+    expect(Object.values(ToolErrorCode)).toEqual([
+      'TOOL_ERROR', 'EXTERNAL_ERROR', 'EXTERNAL_HTTP', 'EXTERNAL_TIMEOUT', 'EXTERNAL_RESPONSE',
+      'CONTEXT_UNDECLARED', 'CONTEXT_KIND_MISMATCH', 'CONTEXT_UNKNOWN_FN', 'CONTEXT_ARGS',
+      'CONTEXT_VOID_TARGET', 'CONTEXT_TARGET_REQUIRED', 'CONTEXT_UNSUPPORTED_VARIANT',
+      'CONTEXT_UNSUPPORTED_PREFIX', 'CONTEXT_FN_FAILED', 'REGISTER_MISSING_RETURNS', 'REGISTER_DUPLICATE',
+    ])
   })
 })
 

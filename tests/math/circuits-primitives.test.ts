@@ -7,7 +7,6 @@ import {
   combineParallelImpedances,
   combineSeriesImpedances,
 } from '../../src/math/circuits.ts'
-import { validateNetwork } from '../../src/tools/circuit-tools.ts'
 
 function assertClose(z: Complex, re: number, im: number, tol = 1e-6): void {
   expect(z.re).toBeCloseTo(re, tol > 1 ? tol : 6)
@@ -76,26 +75,5 @@ describe('calcNetworkImpedance — nested topologies', () => {
     // 20 ∥ j6.283 = (20·j6.283)/(20+j6.283) ≈ 1.796 + j5.718
     expect(z.re).toBeCloseTo(10 + 1.7964, 3)
     expect(z.im).toBeCloseTo(5.7185, 3)
-  })
-})
-
-describe('validateNetwork', () => {
-  it('accepts valid trees and rejects malformed ones', () => {
-    const leafR = { form: 'rect' as const, re: 10, im: 0, kind: 'resistance' as const }
-    const valid = validateNetwork({ topology: 'series', elements: [leafR] })
-    expect(valid).toEqual({ topology: CircuitMode.Series, elements: [{ kind: ElementKind.Resistance, value: 10 }] })
-    // leaves are complex value objects of kind resistance|inductance|capacitance
-    expect(validateNetwork({ form: 'polar', mag: 20, ang: 0, kind: 'resistance' })).toEqual({
-      kind: ElementKind.Resistance,
-      value: 20,
-    })
-    expect(() => validateNetwork(null)).toThrow(/network must be an object/)
-    expect(() => validateNetwork({ form: 'rect', re: 1, im: 0, kind: 'capacitor' })).toThrow(/unknown element kind/)
-    // the old bare-number DSL {kind, value} is not a value object — rejected as such
-    expect(() => validateNetwork({ kind: 'resistance', value: 5 })).toThrow(/non-negative real resistance value/)
-    expect(() => validateNetwork({ form: 'rect', re: -5, im: 0, kind: 'resistance' })).toThrow(/non-negative/)
-    expect(() => validateNetwork({ form: 'rect', re: 1, im: 1, kind: 'resistance' })).toThrow(/non-negative real resistance value/)
-    expect(() => validateNetwork({ topology: 'series', elements: [] })).toThrow(/non-empty/)
-    expect(() => validateNetwork({ foo: 1 })).toThrow(/unknown element kind/)
   })
 })

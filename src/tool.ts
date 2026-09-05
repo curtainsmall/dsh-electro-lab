@@ -1,113 +1,49 @@
 /**
- * The tool core — everything a tool needs in one module:
+ * The tool core — everything the surface outside the context needs in one
+ * module:
  *
- * 1. Definition: ToolReturns (the declared output shape), TOOL_RETURNS,
- *    createValueParam (the value-payload schema), renderText and
- *    defineJsonTool — the one factory every tool definition goes through.
+ * 1. Definition: ToolReturns (the declared output shape of a declaration),
+ *    renderText and defineJsonTool — the factory used by the manager tools
+ *    (external_tool_*) and the context primitives (set/get/call, markers).
  * 2. Declarations: the archive-authored tool dialect (ToolDeclaration,
  *    Declaration*), the external-tools.jsonl archive with the restart dirty
- *    bit, validation, compilation into the same defineJsonTool definition,
- *    and the http/file transport executors (envelope protocol).
+ *    bit, and validation. Declarations are not compiled into tools anymore —
+ *    at plugin start every enabled declaration is recorded verbatim into the
+ *    context's fn registry as an external fn (machine/external-fns.ts), which
+ *    wraps the http/file transport itself.
  *
- * Code-authored tool modules under tools/ import the factory from here;
- * declarations are the same factory's other author. ToolError/ToolErrorCode
- * are re-exported so tool files import the failure types from one place.
+ * ToolError/ToolErrorCode are re-exported so callers import the failure
+ * types from one place.
  */
-import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { defineTool, type DefineToolOptions, type InferArgs, type ParameterSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { QuantityKind, QUANTITY_KIND_NAMES } from './math/quantity-kind.ts'
 import { ToolError, ToolErrorCode } from './errors.ts'
 
-/** Re-exported so every tool file imports the failure types from one place. */
+/** Re-exported so every caller imports the failure types from one place. */
 export { ToolError, ToolErrorCode }
 
 /**
- * Declared return shape of a tool, used by the record layer to tag stored
- * results with quantity kinds (the values themselves carry no kind — it
- * lives here, in the static tool definition). Tagged forms (never plain
- * shape mirroring): real tool outputs contain fields literally named
- * "kind"/"type", so a mirror-style declaration would collide.
+ * Declared result shape of a declared tool (the context fn's `returns` spec
+ * is mapped from this at registration — machine/external-fns.ts).
  */
 export type ToolReturns =
-  /** Any JSON, stored verbatim (no tagging). */
+  /** Any JSON (cannot be mapped to a typed spec — an external fn needs an explicit shape). */
   | { type: 'any' }
-  /** A plain string passthrough (echo fields: configuration/mode/kind/from/to…). */
+  /** A plain string passthrough. */
   | { type: 'string' }
-  /** A plain boolean passthrough (infinite, converges…). */
+  /** A plain boolean passthrough. */
   | { type: 'boolean' }
-  /** A real quantity (stored as a number) with its kind. */
+  /** A real quantity with its kind. */
   | { type: 'number'; kind: QuantityKind }
-  /** A complex quantity (stored as {re,im}) with its kind. */
+  /** A complex quantity with its kind (either form accepted). */
   | { type: 'complex'; kind: QuantityKind }
   /** A named-fields object; every field declared recursively. */
   | { type: 'object'; fields: Record<string, ToolReturns> }
-  /** A homogeneous array; elements declared recursively (JSON-Schema naming, same as parameter arrays). */
+  /** A homogeneous array; elements declared recursively. */
   | { type: 'array'; items: ToolReturns }
-
-/** Declared return shapes keyed by tool name — the record layer reads these when settling a result. */
-export const TOOL_RETURNS = new Map<string, ToolReturns>()
-
-/**
- * The one parameter shape for any value payload: a bare number (a real
- * value), a compact complex object — {re, im} for the rect form or {mag, ang}
- * (angles in radians) for the polar form. The payload carries no kind and no
- * form: the expected quantity kind is pinned per parameter by this factory's
- * `kind` argument (surfaced in the parameter description). The branches
- * deliberately allow extra keys, so legacy {form,…} payloads and output
- * snapshots (re/im plus mag/ang/kind) still match by key presence — the
- * runtime unwrapper reads re/im or mag/ang and ignores everything else.
- * Angles are radians (SI).
- */
-export function createValueParam<const U extends QuantityKind>(kind: U, description: string): {
-  oneOf: [
-    { type: 'number'; description: string },
-    {
-      type: 'object'
-      additionalProperties: true
-      description: string
-      properties: {
-        re: { type: 'number'; description: string; required: true }
-        im: { type: 'number'; description: string; required: true }
-      }
-    },
-    {
-      type: 'object'
-      additionalProperties: true
-      description: string
-      properties: {
-        mag: { type: 'number'; description: string; required: true }
-        ang: { type: 'number'; description: string; required: true }
-      }
-    },
-  ]
-} {
-  return {
-    oneOf: [
-      { type: 'number', description },
-      {
-        type: 'object',
-        additionalProperties: true,
-        description,
-        properties: {
-          re: { type: 'number', description: 'real part in base SI units', required: true },
-          im: { type: 'number', description: 'imaginary part in base SI units (0 for real values)', required: true },
-        },
-      },
-      {
-        type: 'object',
-        additionalProperties: true,
-        description,
-        properties: {
-          mag: { type: 'number', description: 'magnitude in base SI units', required: true },
-          ang: { type: 'number', description: 'phase angle in radians', required: true },
-        },
-      },
-    ],
-  }
-}
 
 /** Pretty JSON text rendering for the model-facing presentation. */
 export function renderText(value: JsonValue): Array<{ type: 'text'; text: string }> {
@@ -122,20 +58,14 @@ export function renderText(value: JsonValue): Array<{ type: 'text'; text: string
  */
 export function defineJsonTool<S extends ParameterSchemaSpec>(
   options: Omit<DefineToolOptions<S, { type: 'json' }>, 'output' | 'execute'> & {
-    /** Declared return shape for record-side kind tagging (optional; omitted = any). */
-    returns?: ToolReturns
     execute: (args: InferArgs<S>, exec: ToolRunContext) => JsonValue | Promise<JsonValue>
   },
 ) {
-  // `returns` is plugin metadata for the record layer — the framework must
-  // not see it, so it is stripped before defineTool and stored in TOOL_RETURNS.
-  const { returns, ...rest } = options
-  if (returns !== undefined) TOOL_RETURNS.set(rest.name, returns)
   return defineTool({
-    ...rest,
+    ...options,
     execute: async (args, exec) => {
       // One unified failure path at the tool boundary: every failure inside
-      // TypeScript is a throw — math kernels and lower layers throw whatever
+      // TypeScript is a throw — kernels and lower layers throw whatever
       // they want, and any non-ToolError is re-wrapped here so every tool
       // call fails through the same structured channel.
       try {
@@ -157,13 +87,15 @@ export { QUANTITY_KIND_NAMES }
 
 /* ── Dialect ──────────────────────────────────────────────────────────────── */
 
-/** Transports a declared tool can be reached over. */
+/** Transports a declared fn can be reached over. */
 export enum DeclarationTransport {
   Http = 'http',
   File = 'file',
 }
 
-/** HTTP verbs supported by the http transport. */
+/** HTTP verbs accepted by the archive dialect. The host transport is POST
+ *  only (typed args travel as a JSON body), so a non-POST method is accepted
+ *  for archive compatibility but not honored by the executor. */
 export enum DeclarationHttpMethod {
   Get = 'GET',
   Post = 'POST',
@@ -198,11 +130,14 @@ interface DeclarationBase {
   /** Registers at plugin start when not false (a declaration without the flag defaults to enabled). */
   enabled: boolean
   parameters: DeclarationParameters
-  returns?: ToolReturns
+  /** Explicit result shape — required for registration as a context fn:
+   *  a spec, or null = void. A declaration without it (or with the
+   *  unmappable "any" leaf) is kept in the archive but skipped at start. */
+  returns?: ToolReturns | null
   timeoutMs?: number
 }
 
-/** http transport options. */
+/** http transport options. The request is a POST with the typed envelope as body. */
 export interface DeclarationHttpOptions {
   url: string
   method: DeclarationHttpMethod
@@ -289,7 +224,7 @@ export function restartRequired(home: string): boolean {
   }
 }
 
-/** Clear the dirty bit; the host calls this once the tools are (re)registered at start. */
+/** Clear the dirty bit; the host calls this once the fns are (re)registered at start. */
 export function clearRestartRequired(home: string): void {
   setRestartRequired(home, false)
 }
@@ -365,6 +300,9 @@ export function validateDeclaration(config: unknown): string[] {
       validateParamSpec(spec, `parameter "${key}"`, errors)
     }
   }
+  // The registration-side fn needs an explicit returns: a declaration without
+  // one stays in the archive but never registers (validated at registration,
+  // external-fns.ts — reported there, not here).
   if (tool.timeoutMs !== undefined && (!Number.isFinite(tool.timeoutMs) || tool.timeoutMs <= 0)) {
     errors.push('timeoutMs must be a positive number')
   }
@@ -397,192 +335,4 @@ export function validateDeclaration(config: unknown): string[] {
       break
   }
   return errors
-}
-
-/* ── Compilation ──────────────────────────────────────────────────────────── */
-
-/** Resolve a lowercase kind name to its QuantityKind member. */
-export function kindByName(name: string): QuantityKind {
-  const index = QUANTITY_KIND_NAMES.indexOf(name)
-  if (index === -1) throw new ToolError(`unknown kind "${name}"`)
-  return Object.values(QuantityKind)[index] as QuantityKind
-}
-
-/** Common optional keys carried by every compiled parameter. */
-function withOptions(spec: { description?: string; required?: boolean }, schema: Record<string, unknown>): Record<string, unknown> {
-  if (spec.description !== undefined) schema.description = spec.description
-  if (spec.required === true) schema.required = true
-  return schema
-}
-
-/** Build one parameter schema; array items recurse. */
-function buildOne(spec: DeclarationParamSpec): Record<string, unknown> {
-  switch (spec.type) {
-    case DeclarationParamType.Quantity:
-      return {
-        ...createValueParam(kindByName(spec.kind), spec.description ?? ''),
-      }
-    case DeclarationParamType.String: {
-      const schema: Record<string, unknown> = { type: 'string' }
-      if (spec.enum !== undefined) schema.enum = spec.enum
-      return schema
-    }
-    case DeclarationParamType.Boolean:
-      return { type: 'boolean' }
-    case DeclarationParamType.Array:
-      return { type: 'array', items: buildOne(spec.items) }
-  }
-}
-
-/** Build the dsh parameters spec: quantity params encode to the oneOf shape. */
-function buildParameters(declaration: ToolDeclaration): Record<string, unknown> {
-  const parameters: Record<string, unknown> = {}
-  for (const [key, spec] of Object.entries(declaration.parameters)) {
-    parameters[key] = withOptions(spec, buildOne(spec))
-  }
-  return parameters
-}
-
-/** Compile one declaration into a tool definition (registration happens at plugin start). */
-export function compileDeclaration(declaration: ToolDeclaration): ReturnType<typeof defineJsonTool> {
-  // Dynamic schemas cannot be inferred statically; the generic is widened on purpose.
-  return defineJsonTool({
-    name: declaration.name,
-    description: declaration.description,
-    parameters: buildParameters(declaration),
-    returns: declaration.returns,
-    execute: makeExecutor(declaration),
-  } as never)
-}
-
-/** Pick the transport executor for a declaration (the discriminant narrows the options). */
-export function makeExecutor(
-  declaration: ToolDeclaration,
-): (args: Record<string, JsonValue | undefined>, exec: ToolRunContext) => Promise<JsonValue> {
-  const timeoutMs = declaration.timeoutMs ?? 30000
-  switch (declaration.transport) {
-    case DeclarationTransport.Http:
-      return (args, exec) => executeHttp(declaration.parameters, declaration.transportOptions, timeoutMs, args, exec)
-    case DeclarationTransport.File:
-      return (args, exec) => executeFile(declaration.parameters, declaration.transportOptions, timeoutMs, args, exec)
-  }
-}
-
-/* ── Transports (http / file) ─────────────────────────────────────────────── */
-
-/** Build the envelope body from the validated args (params are flat keys). */
-function envelope(args: Record<string, JsonValue | undefined>): Record<string, JsonValue | undefined> {
-  return { requestId: randomUUID(), ...args }
-}
-
-/** Result convention: pick {requestId, result} out of a raw response body.
- *  An `error` field overrides everything: when present, `result` is ignored
- *  and the error content is raised as the tool failure. */
-function readResult(body: unknown, requestId: string): JsonValue {
-  if (typeof body !== 'object' || body === null)
-    throw new ToolError('the tool response must be a JSON object', ToolErrorCode.ExternalResponse)
-  const box = body as { requestId?: unknown; result?: unknown; error?: unknown }
-  if (box.requestId !== requestId)
-    throw new ToolError(`response requestId mismatch (got ${String(box.requestId)})`, ToolErrorCode.ExternalResponse)
-  if ('error' in box) {
-    if (typeof box.error !== 'string' || box.error.length === 0)
-      throw new ToolError('the tool response "error" field must be a non-empty string', ToolErrorCode.ExternalResponse)
-    throw new ToolError(box.error, ToolErrorCode.ExternalError)
-  }
-  if (!('result' in box))
-    throw new ToolError('the tool response must contain a "result" field', ToolErrorCode.ExternalResponse)
-  return box.result as JsonValue
-}
-
-/** http executor: POST (or GET with query) the envelope and read the JSON body. */
-export async function executeHttp(
-  _params: DeclarationParameters,
-  options: DeclarationHttpOptions,
-  timeoutMs: number,
-  args: Record<string, JsonValue | undefined>,
-  _exec: ToolRunContext,
-): Promise<JsonValue> {
-  const body = envelope(args)
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const request: RequestInit = {
-      method: options.method,
-      headers: {
-        'content-type': 'application/json',
-        ...(options.headers ?? {}),
-      },
-      signal: controller.signal,
-      body: options.method === DeclarationHttpMethod.Post ? JSON.stringify(body) : undefined,
-    }
-    const url = options.method === DeclarationHttpMethod.Get
-      ? `${options.url}${options.url.includes('?') ? '&' : '?'}${new URLSearchParams(body as Record<string, string>).toString()}`
-      : options.url
-    const response = await fetch(url, request)
-    if (!response.ok) throw new ToolError(`http ${response.status} from ${options.url}`, ToolErrorCode.ExternalHttp)
-    const text = await response.text()
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(text)
-    } catch {
-      throw new ToolError(`the tool returned non-JSON: ${text.slice(0, 120)}`, ToolErrorCode.ExternalResponse)
-    }
-    return readResult(parsed, String(body.requestId))
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError')
-      throw new ToolError(`http request timed out after ${timeoutMs} ms`, ToolErrorCode.ExternalTimeout)
-    throw error
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-/** file executor: write <dir>/<inPrefix>.<requestId>.json, poll for
- *  <dir>/<outPrefix>.<requestId>.json, then clean both up. */
-export async function executeFile(
-  _params: DeclarationParameters,
-  options: DeclarationFileOptions,
-  timeoutMs: number,
-  args: Record<string, JsonValue | undefined>,
-  _exec: ToolRunContext,
-): Promise<JsonValue> {
-  const requestId = randomUUID()
-  const inPrefix = options.inPrefix ?? 'in'
-  const outPrefix = options.outPrefix ?? 'out'
-  const inFile = join(options.directory, `${inPrefix}.${requestId}.json`)
-  const outFile = join(options.directory, `${outPrefix}.${requestId}.json`)
-  const pollMs = Math.max(20, options.pollMs ?? 200)
-  mkdirSync(options.directory, { recursive: true })
-  writeFileSync(inFile, JSON.stringify({ requestId, ...args }), 'utf8')
-  const deadline = Date.now() + timeoutMs
-  try {
-    for (;;) {
-      if (existsSync(outFile)) {
-        let parsed: unknown
-        try {
-          parsed = JSON.parse(readFileSync(outFile, 'utf8'))
-        } catch (error) {
-          throw new ToolError(
-            `the tool wrote an unreadable out file: ${error instanceof Error ? error.message : String(error)}`,
-            ToolErrorCode.ExternalResponse,
-          )
-        }
-        return readResult(parsed, requestId)
-      }
-      if (Date.now() > deadline)
-        throw new ToolError(
-          `file transport timed out after ${timeoutMs} ms (no ${outPrefix}.* file appeared)`,
-          ToolErrorCode.ExternalTimeout,
-        )
-      await new Promise((resolve) => setTimeout(resolve, pollMs))
-    }
-  } finally {
-    for (const file of [inFile, outFile]) {
-      try {
-        rmSync(file, { force: true })
-      } catch {
-        // best effort cleanup
-      }
-    }
-  }
 }

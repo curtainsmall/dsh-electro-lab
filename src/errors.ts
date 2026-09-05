@@ -1,6 +1,6 @@
 /**
  * Stable machine-readable failure kinds carried by a ToolError. The code is
- * what the record layer, tests and UI match on — the message stays human
+ * what the context trace, tests and UI match on — the message stays human
  * text. Codes travel as JSON strings across the record boundary, hence the
  * string enum.
  */
@@ -15,6 +15,28 @@ export enum ToolErrorCode {
   ExternalTimeout = 'EXTERNAL_TIMEOUT',
   /** Protocol violation in the external response envelope. */
   ExternalResponse = 'EXTERNAL_RESPONSE',
+  /** Context: a referenced slot does not exist. */
+  ContextUndeclared = 'CONTEXT_UNDECLARED',
+  /** Context: slot kind conflicts with the pinned kind (or a parameter kind mismatch). */
+  ContextKindMismatch = 'CONTEXT_KIND_MISMATCH',
+  /** Context: an unknown fn was called. */
+  ContextUnknownFn = 'CONTEXT_UNKNOWN_FN',
+  /** Context: fn signature rejects the argument shape. */
+  ContextArgs = 'CONTEXT_ARGS',
+  /** Context: target given for a void fn. */
+  ContextVoidTarget = 'CONTEXT_VOID_TARGET',
+  /** Context: a non-void fn call without a named target. */
+  ContextTargetRequired = 'CONTEXT_TARGET_REQUIRED',
+  /** Context: variant not supported for the kind (set-time). */
+  ContextUnsupportedVariant = 'CONTEXT_UNSUPPORTED_VARIANT',
+  /** Context: prefix not supported (combination or unknown word). */
+  ContextUnsupportedPrefix = 'CONTEXT_UNSUPPORTED_PREFIX',
+  /** Context: a run (kernel) threw. */
+  ContextFnFailed = 'CONTEXT_FN_FAILED',
+  /** Registry: fn registration without an explicit returns. */
+  RegisterMissingReturns = 'REGISTER_MISSING_RETURNS',
+  /** Registry: duplicate fn id. */
+  RegisterDuplicate = 'REGISTER_DUPLICATE',
 }
 
 /**
