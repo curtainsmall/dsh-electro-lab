@@ -1,7 +1,7 @@
 # ElectroLab Echo Peer
 
 Manual test/demo counterpart for the DeepSeek Harness ElectroLab external-solver
-feature. The peer speaks the state machine's typed envelope protocol on one
+feature. The peer speaks the engine's typed envelope protocol on one
 transport — the request is `{requestId, args}` where every argument is a
 typed value, the response is `{requestId, result}` with a typed value (or
 `result: null` for void), and it echoes every argument back as typed values,
@@ -60,7 +60,7 @@ use. Changes apply at the next host restart.
 
 ## 3. Restart the host
 
-Declarations register at state machine start: restart the DSH host process, then
+Declarations register at engine start: restart the DSH host process, then
 reload the page. `echo_http` and `echo_file` now appear among the solvers the agent
 can `call`.
 
@@ -68,7 +68,7 @@ can `call`.
 
 Ask the agent to call `echo_http` with a `message`, optional `values` (an
 array of numbers — quantities accept bare numbers, `{re, im}` or `{mag, ang}`)
-and an optional `flag`. The state machine stores the result in the named target
+and an optional `flag`. The engine stores the result in the named target
 slot; `get` returns exactly what the peer echoed back, as typed values:
 
 ```json
@@ -116,5 +116,5 @@ typed args travel as the JSON body.
 The full declaration grammar (name/description/enabled/parameters/returns/
 transport/transportOptions), the typed-value payload shapes and the wire
 protocol are documented in the plugin's [`docs/tools.md`](../docs/tools.md)
-(ElectroLab State Machine Manual — External solvers section) and its
+(ElectroLab Engine Manual — External solvers section) and its
 Chinese mirror [`docs/tools.zh-CN.md`](../docs/tools.zh-CN.md).

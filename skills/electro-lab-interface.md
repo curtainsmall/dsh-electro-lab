@@ -1,12 +1,12 @@
 ---
 name: electro-lab-interface
-description: "ElectroLab state machine manual: typed values, the set/get/call primitives, receipts and errors, the solver catalog — independent of any answer protocol"
-whenToUse: "Any session that operates the ElectroLab state machine (set/get/call, record markers)"
+description: "ElectroLab engine manual: typed values, the set/get/call primitives, receipts and errors, the solver catalog — independent of any answer protocol"
+whenToUse: "Any session that operates the ElectroLab engine (set/get/call, record markers)"
 ---
 
-# DeepSeek Harness ElectroLab — State Machine Manual
+# DeepSeek Harness ElectroLab — Engine Manual
 
-All calculation happens inside one deterministic state machine. You operate it with three primitives and the record markers; the state machine keeps a variable table, converts values at calculation boundaries and records every step. You never parse text into numbers and never convert units yourself — you pass typed values and the state machine resolves everything against the solver signatures.
+All calculation happens inside one deterministic engine. You operate it with three primitives and the record markers; the engine keeps a variable table, converts values at calculation boundaries and records every step. You never parse text into numbers and never convert units yourself — you pass typed values and the engine resolves everything against the solver signatures.
 
 ## Typed values
 
@@ -17,6 +17,7 @@ A typed value is a JSON object. kind is part of a quantity:
 - `{ "type": "complex", "value": { "re": 1, "im": 2 } | { "mag": 3, "ang": 0.5 }, "kind": "voltage" }` (angles in radians)
 - `{ "type": "string", "value": "…" }`, `{ "type": "boolean", "value": true }`
 - `{ "type": "array", "value": [<typed values>] }`, `{ "type": "object", "value": { <field>: <typed value> } }`
+- `{ "type": "slot", "value": "name" }` — a slot reference (call arguments only; never stored or returned)
 
 kind names: time, frequency, resistance, capacitance, inductance, voltage, current, power, temperature, angle, pressure, energy, length, mass, log, none, … A bare number is kind `none`; log is a plain ratio. Omit the variant field for the SI base representation; omit prefix for multiplier 1.
 
@@ -26,7 +27,7 @@ variant words: degC/degF (temperature), deg (angle), bar/psi/atm (pressure), cal
 
 - `set { name, value }` — write one slot. `value: null` deletes the slot (idempotent). Re-writing with a different kind than the pinned slot kind fails.
 - `get { name }` — read one slot; you receive the value exactly as written.
-- `call { solver, args, target }` — call one registered solver. Every argument is a typed value or a `"@name"` / `"@name.field"` slot reference. A value solver requires a named `target` (overwriting bumps the slot revision); a void solver takes `target: null`.
+- `call { solver, args, target }` — call one registered solver. Every argument is a typed value or a slot reference — `{ "type": "slot", "value": "name" }` with the full slot path (`"name"` or `"name.field"`). A value solver requires a named `target` (overwriting bumps the slot revision); a void solver takes `target: null`.
 
 Every call returns a receipt: `{ ok: true, … }` or `{ ok: false, code, error }`. Failed calls have no side effects; read values only through `get`.
 
@@ -84,5 +85,5 @@ Conditions from the question are stored with `set` as typed values (translate th
 ## Discipline
 
 - Numbers in an answer ⇔ slot values produced by `call` results (or conditions stored by `set`).
-- Transcription of user wording into typed values is yours; every numerical rule application (prefix, variant, complex conversion) happens inside the state machine at the call boundary — never convert in prose or in arguments by hand.
+- Transcription of user wording into typed values is yours; every numerical rule application (prefix, variant, complex conversion) happens inside the engine at the call boundary — never convert in prose or in arguments by hand.
 - A failed receipt (`ok: false`) leaves no state behind: read the code, fix the call, retry.

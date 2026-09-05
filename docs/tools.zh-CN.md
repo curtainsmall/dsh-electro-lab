@@ -1,17 +1,17 @@
-# ElectroLab 状态机手册
+# ElectroLab 引擎手册
 
 [English](tools.md)
 
-DeepSeek Harness ElectroLab 插件把全部电气电子计算放在一台确定性的**状态机**内完成。语言模型从不亲自计算：它通过三个原语与三个记录标记操作状态机，状态机维护一张类型化值变量表，在计算边界换算数值，记录每一步，并把每次求解封口成一条可浏览的记录。
+DeepSeek Harness ElectroLab 插件把全部电气电子计算放在一台确定性的**引擎**内完成。语言模型从不亲自计算：它通过三个原语与三个记录标记操作引擎，引擎维护一张类型化值变量表，在计算边界换算数值，记录每一步，并把每次求解封口成一条可浏览的记录。
 
-本手册是状态机使用面的完整参考——类型化值、原语、标记、求解器目录、存储与外部求解器。以 **ElectroLab 模式**启动的会话，会经由 `electro-lab-interface` 技能（状态机手册）与 `electro-lab-template` 技能（记录协议）携带同样的规则。
+本手册是引擎使用面的完整参考——类型化值、原语、标记、求解器目录、存储与外部求解器。以 **ElectroLab 模式**启动的会话，会经由 `electro-lab-interface` 技能（引擎手册）与 `electro-lab-template` 技能（记录协议）携带同样的规则。
 
 ## 1. 工作原理
 
-- **每个宿主进程一台全局状态机。** 任何会话的标记都作用于同一台状态机；任何时刻至多有一条未封口记录（单一 open 不变量）。
-- **LLM 使用面只有六个工具**：`set`、`get`、`call`、`record_question`、`record_analyse`、`record_answer`——外加声明管理器 `external_solver_add` / `external_solver_update` / `external_solver_delete`。约 40 个领域工具、`solve_steps` 与文本↔值编解码工具已退役；数学内核住在状态机的 solver 注册表中，由 `call` 调用。
-- **记录是一个过程（时间线）。** 每次状态机操作都会追加一行完全自描述的轨迹行（输入与输出都记录在案）；一条记录可以被重放，从而在不重新计算任何东西的前提下重建任意时刻的状态。
-- **输入即值。** 模型给什么，状态机就存什么；字符串永远是字符串。
+- **每个宿主进程一台全局引擎。** 任何会话的标记都作用于同一台引擎；任何时刻至多有一条未封口记录（单一 open 不变量）。
+- **LLM 使用面只有六个工具**：`set`、`get`、`call`、`record_question`、`record_analyse`、`record_answer`——外加声明管理器 `external_solver_add` / `external_solver_update` / `external_solver_delete`。约 40 个领域工具、`solve_steps` 与文本↔值编解码工具已退役；数学内核住在引擎的 solver 注册表中，由 `call` 调用。
+- **记录是一个过程（时间线）。** 每次引擎操作都会追加一行完全自描述的轨迹行（输入与输出都记录在案）；一条记录可以被重放，从而在不重新计算任何东西的前提下重建任意时刻的状态。
+- **输入即值。** 模型给什么，引擎就存什么；字符串永远是字符串。
 
 ## 2. 类型化值
 
@@ -27,7 +27,7 @@ DeepSeek Harness ElectroLab 插件把全部电气电子计算放在一台确定�
 { "type": "boolean", "value": true }
 ```
 
-- `type`——形状判别符：number / complex / string / boolean / array（items 递归）/ object（fields 递归）。
+- `type`——形状判别符：number / complex / string / boolean / array（items 递归）/ object（fields 递归）。`slot` 值（`{ "type": "slot", "value": "…" }`）是仅用于 call 参数的引用——永不存储、永不返回（§3）。
 - `kind`——量纲类别（resistance、voltage、time、frequency、temperature、angle、pressure、energy、length、mass、log、none……）。kind 是 quantity 的一部分：值一经存在必带 kind；裸数的 kind 为 `none`；纯 ratio 的 kind 为 `log`。
 - `variant`——kind *内部*的一种表示选择。**字段不存在（而非 null）即 SI 基准表示**；存储从不补键。只有下列词是合法的，且每个词只适用于它自己的 kind：
 
@@ -46,20 +46,20 @@ DeepSeek Harness ElectroLab 插件把全部电气电子计算放在一台确定�
 
 ### 换算边界
 
-变量表按**原样**存储值——`get` 返回的正是 `set` 写入的内容，不做归一化。换算只发生在值被计算*引用*时：在 `call` 边界，状态机把 variant 换算为 SI（degC → K、deg → rad、psi → Pa……），并把复数形状归一化（`{mag, ang}` → `{re, im}`，角度恒为弧度）。变量表不受影响；轨迹同时记录原始 args 与换算后的终点值。
+变量表按**原样**存储值——`get` 返回的正是 `set` 写入的内容，不做归一化。换算只发生在值被计算*引用*时：在 `call` 边界，引擎把 variant 换算为 SI（degC → K、deg → rad、psi → Pa……），并把复数形状归一化（`{mag, ang}` → `{re, im}`，角度恒为弧度）。变量表不受影响；轨迹同时记录原始 args 与换算后的终点值。
 
 ## 3. 原语
 
 ```
 set  { name, value }     write one slot: value = a typed value; value: null deletes the slot
 get  { name }            read one slot (the stored typed value, exactly as written)
-call { solver, args, target }  call one registered solver; args values are typed values or "@name" references
+call { solver, args, target }  call one registered solver; args values are typed values or slot references like { "type": "slot", "value": "R" }
 ```
 
 语义：
 
 - `"100 kΩ"` 永远是字符串；表示 100 kΩ 的电阻，必须给 `{ "type": "number", "value": 100, "kind": "resistance", "prefix": "kilo" }`。
-- `@name` / `@name.path` 是槽引用（`@` 前缀即引用记号，无 `@` 即字面量）。状态机展开引用后，按 solver 签名对它做 kind/形状校验。引用不存在的槽会以 `ENGINE_UNDECLARED` 失败。
+- 槽引用是一种独立的类型化值：`{ "type": "slot", "value": "name" }`，其中 `value` 是完整槽路径（`"name"` 或 `"name.field"`）。引擎展开引用后，按 solver 签名对它做 kind/形状校验；引用不存在的槽会以 `ENGINE_UNDECLARED` 失败。槽引用只作为 call 参数存在——永不存入变量表、永不作为结果返回；裸字符串永远是字面量字符串，绝不构成引用。
 - **每次调用都返回一张收据**——不存在「异常 vs 正常返回」的分野：
 
 ```
@@ -70,7 +70,7 @@ failure:      → { ok: false, code, error }
 ```
 
   先看 `ok`。收据不携带业务数据（`get` 除外）；读值只能经由 `get`。
-- **target 与 solver 签名匹配**（由状态机按注册表判别，模型无需记忆规则）：void solver（声明为 `returns: null`）接受 `target: null`（具名 target → `ENGINE_VOID_TARGET`）；有返回值的 solver 必须给具名 target（缺失/null → `ENGINE_TARGET_REQUIRED`）。
+- **target 与 solver 签名匹配**（由引擎按注册表判别，模型无需记忆规则）：void solver（声明为 `returns: null`）接受 `target: null`（具名 target → `ENGINE_VOID_TARGET`）；有返回值的 solver 必须给具名 target（缺失/null → `ENGINE_TARGET_REQUIRED`）。
 - **target 恒覆盖**：写入已存在的槽会用新值整体替换（kind 校验通过后）并推进 `rev`；不继承旧表示的任何部分。
 - **删除 = 以 `value: null` 执行 `set`**：槽从变量表消失；删除不存在的槽是幂等的 ok；之后重建会从 rev 1 重新开始；轨迹行带 `deleted: true`。
 - 槽的 kind 在首次写入时钉死：以不同 kind 覆盖会失败（`ENGINE_KIND_MISMATCH`），且不推进版本号。
@@ -86,7 +86,7 @@ record_answer   { text }    the final answer; seals the record
 
 - 至多一条未封口记录。第二次 `record_question` 会把当前未封口记录封口（duplicate-start）并开启新记录——两条 open 行永不可能并存。
 - 没有未封口记录时的 `record_answer` 会保留一条 duplicate-end 错误记录。
-- 中断的记录（索引中 `sealedAt: null` 且有本体文件）会在下次状态机启动时续写：轨迹在同一文件中继续，变量表据其重建。incomplete（未完成）的记录永远不会自行变完整——它要么日后被封口（duplicate-start），要么永远停在 incomplete。
+- 中断的记录（索引中 `sealedAt: null` 且有本体文件）会在下次引擎启动时续写：轨迹在同一文件中继续，变量表据其重建。incomplete（未完成）的记录永远不会自行变完整——它要么日后被封口（duplicate-start），要么永远停在 incomplete。
 
 ## 5. 求解器目录
 
@@ -220,7 +220,7 @@ solver 表面正是在「每 solver 单一返回形状」纪律下迁移后的�
 
 ### 轨迹本体（按步全量）
 
-每次状态机操作或标记一行；每一行都携带恢复该步所需的全部信息——输入与输出都在：
+每次引擎操作或标记一行；每一行都携带恢复该步所需的全部信息——输入与输出都在：
 
 ```json
 { "seq": 1, "tool": "marker", "kind": "question", "ok": true, "text": "…", "at": … }
@@ -235,15 +235,15 @@ solver 表面正是在「每 solver 单一返回形状」纪律下迁移后的�
 
 - `call` 行存储结果：任何调用的输出都作为事实进入该行——恢复状态时直接用存储的结果，**从不重新计算**（外部 solver 的输出源自网络/文件，无法重算）。
 - `resolved` 是实际进入 run 的参数集：引用已展开，换算全部完成（SI、直角坐标）。`args` 保留原文；两者逐键对照。
-- 内核内部的中间步骤与模型的推理文本都不会被记录；粒度就是一次状态机操作。轨迹的读者是人——每一步都就地呈现原始输入、换算值与结果，并可用任意方式独立复核。
+- 内核内部的中间步骤与模型的推理文本都不会被记录；粒度就是一次引擎操作。轨迹的读者是人——每一步都就地呈现原始输入、换算值与结果，并可用任意方式独立复核。
 
 ### 恢复 = 重放
 
-重建状态按序重放各行：`set` 行把槽置为存储的值，`call` 行把 target 槽置为存储的结果（非 void），set-null 行删除，marker 行跳过。纯状态机——不重算、不发网络、无随机。
+重建状态按序重放各行：`set` 行把槽置为存储的值，`call` 行把 target 槽置为存储的结果（非 void），set-null 行删除，marker 行跳过。纯引擎——不重算、不发网络、无随机。
 
 ### 一致性
 
-- 孤儿索引行（sealedAt 为 null 但没有本体文件）在状态机启动时清除——索引只是投影，可安全重建。
+- 孤儿索引行（sealedAt 为 null 但没有本体文件）在引擎启动时清除——索引只是投影，可安全重建。
 - 新系统不读取旧格式的 `records.jsonl`；旧文件保持原样不动。
 
 ## 7. 宿主端点
@@ -255,7 +255,7 @@ solver 表面正是在「每 solver 单一返回形状」纪律下迁移后的�
 
 ## 8. 外部求解器
 
-外部求解器是驻留在远端端点、归用户所有的计算求解器；状态机通过 **http** 或 **file** 传输访问它们。声明存放于记录主目录下的 `external-solvers.jsonl`；状态机启动时，每条启用的声明都会**原样**注册进 solver 注册表、成为一个外部 solver（没有编译层——传输由状态机自己包装）。更改在宿主重启后生效；脏位置位期间，界面会显示待重启提示。
+外部求解器是驻留在远端端点、归用户所有的计算求解器；引擎通过 **http** 或 **file** 传输访问它们。声明存放于记录主目录下的 `external-solvers.jsonl`；引擎启动时，每条启用的声明都会**原样**注册进 solver 注册表、成为一个外部 solver（没有编译层——传输由引擎自己包装）。更改在宿主重启后生效；脏位置位期间，界面会显示待重启提示。
 
 ### 声明
 
@@ -298,7 +298,7 @@ success:  { "requestId": "<uuid>", "result": null }             // void: still a
 failure:  { "requestId": "<uuid>", "error": "<string message>" }
 ```
 
-- 类型化值在线路上是自描述的：`type` 判别形状，`value` 承载内容，complex 恒为 rect，`kind` 携带量纲。variant/prefix 从不出现——状态机已换算到 SI 基准。第三方实现只需实现五个 type 分支。
+- 类型化值在线路上是自描述的：`type` 判别形状，`value` 承载内容，complex 恒为 rect，`kind` 携带量纲。variant/prefix 从不出现——引擎已换算到 SI 基准。第三方实现只需实现五个 type 分支。
 - **`result` 字段恒在**（void = null）——它为将来的消息种类预留位置，`result` 与任何同级消息永不混淆。
 - 宿主按 solver 签名校验响应：非 void solver 收到 `result: null`（或没有 result）是协议错误；void solver 收到 result 同样是协议错误。
 - `requestId` 回显会被校验；超时与协议违规由宿主抛出。失败与本地 solver 共享同一条结构化错误路径——无论来源如何，调用都以同一种错误收据呈现，并连同其 code 记入轨迹。

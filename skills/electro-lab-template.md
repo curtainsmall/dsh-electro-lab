@@ -1,7 +1,7 @@
 ---
 name: electro-lab-template
 description: "ElectroLab record protocol: record_question opens a record (question verbatim), record_analyse submits the analysis, record_answer submits the answer and seals — the structured content lives in the record, so the chat answer stays natural (no template headings in the session)"
-whenToUse: "An electro-lab workflow is triggered: the answer reports results obtained through the state machine (any set/get/call or marker appears in it). In the electro-lab preset the persona embeds the same protocol"
+whenToUse: "An electro-lab workflow is triggered: the answer reports results obtained through the engine (any set/get/call or marker appears in it). In the electro-lab preset the persona embeds the same protocol"
 ---
 
 # DeepSeek Harness ElectroLab Record Protocol

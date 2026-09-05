@@ -1,17 +1,17 @@
-# ElectroLab State Machine Manual
+# ElectroLab Engine Manual
 
 [简体中文](tools.zh-CN.md)
 
-The DeepSeek Harness ElectroLab plugin runs all electrical & electronics calculation inside a deterministic **state machine**. The language model never computes: it operates the state machine through three primitives and three record markers, and the state machine keeps a typed-value table, converts values at calculation boundaries, records every step, and seals each solve into a browsable record.
+The DeepSeek Harness ElectroLab plugin runs all electrical & electronics calculation inside a deterministic **engine**. The language model never computes: it operates the engine through three primitives and three record markers, and the engine keeps a typed-value table, converts values at calculation boundaries, records every step, and seals each solve into a browsable record.
 
-This manual is the full reference for the state machine surface — typed values, primitives, markers, the solver catalog, storage, and external solvers. Sessions started in **ElectroLab Mode** carry the same rules in the `electro-lab-interface` skill (state machine manual) and `electro-lab-template` skill (record protocol).
+This manual is the full reference for the engine surface — typed values, primitives, markers, the solver catalog, storage, and external solvers. Sessions started in **ElectroLab Mode** carry the same rules in the `electro-lab-interface` skill (engine manual) and `electro-lab-template` skill (record protocol).
 
 ## 1. How it works
 
-- **One global state machine per host process.** Any session's markers act on the same state machine; at most one record is open at a time (single-open invariant).
-- **The LLM surface is six tools**: `set`, `get`, `call`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_solver_add` / `external_solver_update` / `external_solver_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the state machine's solver registry and are invoked by `call`.
-- **A record is a process (timeline).** Each state machine operation appends one fully self-describing trace line (input and output both stored); a record can be replayed to rebuild the recorded state at any point without re-computing anything.
-- **Input is value.** What the model gives is what the state machine stores; a string stays a string.
+- **One global engine per host process.** Any session's markers act on the same engine; at most one record is open at a time (single-open invariant).
+- **The LLM surface is six tools**: `set`, `get`, `call`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_solver_add` / `external_solver_update` / `external_solver_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the engine's solver registry and are invoked by `call`.
+- **A record is a process (timeline).** Each engine operation appends one fully self-describing trace line (input and output both stored); a record can be replayed to rebuild the recorded state at any point without re-computing anything.
+- **Input is value.** What the model gives is what the engine stores; a string stays a string.
 
 ## 2. Typed values
 
@@ -27,7 +27,7 @@ A typed value is a JSON object. `kind` is part of a quantity:
 { "type": "boolean", "value": true }
 ```
 
-- `type` — the shape discriminator: number / complex / string / boolean / array (items recurse) / object (fields recurse).
+- `type` — the shape discriminator: number / complex / string / boolean / array (items recurse) / object (fields recurse). A `slot` value (`{ "type": "slot", "value": "…" }`) is a reference used only in call arguments — it is never stored or returned (§3).
 - `kind` — the quantity class (resistance, voltage, time, frequency, temperature, angle, pressure, energy, length, mass, log, none, …). Kind is part of a quantity: a value exists with a kind; a bare number has kind `none`; a plain ratio has kind `log`.
 - `variant` — a representation choice *within* a kind. **Field absent (not null) = the SI base representation**; storage never adds keys. Only the following words are valid, and each only on its own kind:
 
@@ -46,20 +46,20 @@ A typed value is a JSON object. `kind` is part of a quantity:
 
 ### Conversion boundary
 
-The table stores values **exactly as given** — `get` returns what `set` wrote, no normalization. Conversion happens only when a value is *referenced by a computation*: at the `call` boundary the state machine converts variants to SI (degC → K, deg → rad, psi → Pa, …) and normalizes complex shapes (`{mag, ang}` → `{re, im}`, angles always radians). The table is untouched; the trace records both the original args and the resolved end values.
+The table stores values **exactly as given** — `get` returns what `set` wrote, no normalization. Conversion happens only when a value is *referenced by a computation*: at the `call` boundary the engine converts variants to SI (degC → K, deg → rad, psi → Pa, …) and normalizes complex shapes (`{mag, ang}` → `{re, im}`, angles always radians). The table is untouched; the trace records both the original args and the resolved end values.
 
 ## 3. Primitives
 
 ```
 set  { name, value }     write one slot: value = a typed value; value: null deletes the slot
 get  { name }            read one slot (the stored typed value, exactly as written)
-call { solver, args, target }  call one registered solver; args values are typed values or "@name" references
+call { solver, args, target }  call one registered solver; args values are typed values or slot references like { "type": "slot", "value": "R" }
 ```
 
 Semantics:
 
 - `"100 kΩ"` is always a string; a resistance of 100 kΩ must be given as `{ "type": "number", "value": 100, "kind": "resistance", "prefix": "kilo" }`.
-- `@name` / `@name.path` is a slot reference (`@` prefix = reference, no `@` = literal). The state machine expands it and kind/shape-checks it against the solver signature. A reference to a missing slot fails with `ENGINE_UNDECLARED`.
+- A slot reference is its own typed value: `{ "type": "slot", "value": "name" }`, where `value` is the full slot path (`"name"` or `"name.field"`). The engine expands it and kind/shape-checks it against the solver signature; a reference to a missing slot fails with `ENGINE_UNDECLARED`. Slot references exist only as call arguments — they are never stored in the table, never returned, and a bare string is always a literal string, never a reference.
 - **Every call returns one receipt** — there is no "exception vs normal return" duality:
 
 ```
@@ -70,7 +70,7 @@ failure:      → { ok: false, code, error }
 ```
 
   Check `ok` first. Receipts carry no business data (except `get`); read values only through `get`.
-- **target matches the solver signature** (the state machine decides from the registry; the model does not need to remember rules): a void solver (declared `returns: null`) takes `target: null` (a named target → `ENGINE_VOID_TARGET`); a value solver requires a named target (missing/null → `ENGINE_TARGET_REQUIRED`).
+- **target matches the solver signature** (the engine decides from the registry; the model does not need to remember rules): a void solver (declared `returns: null`) takes `target: null` (a named target → `ENGINE_VOID_TARGET`); a value solver requires a named target (missing/null → `ENGINE_TARGET_REQUIRED`).
 - **target always overwrites**: writing an existing slot replaces the whole value (kind check passes) and bumps `rev`; nothing is inherited from the old representation.
 - **Delete = `set` with `value: null`**: the slot disappears from the table, deleting a missing slot is an idempotent ok, re-creating later restarts at rev 1; the trace line carries `deleted: true`.
 - Slot kinds are pinned on first write: overwriting with a different kind fails (`ENGINE_KIND_MISMATCH`) and does not advance the revision.
@@ -86,7 +86,7 @@ record_answer   { text }    the final answer; seals the record
 
 - One open record at most. A second `record_question` seals the open record (duplicate-start) and starts a new one — two open rows can never exist.
 - `record_answer` with no open record keeps a duplicate-end error record.
-- An interrupted record (index `sealedAt: null` with a body file) is resumed at the next state machine start: the trace continues in the same file and the table is rebuilt from it. An incomplete record never completes itself — it is either sealed later (duplicate-start) or stays incomplete forever.
+- An interrupted record (index `sealedAt: null` with a body file) is resumed at the next engine start: the trace continues in the same file and the table is rebuilt from it. An incomplete record never completes itself — it is either sealed later (duplicate-start) or stays incomplete forever.
 
 ## 5. Solver catalog
 
@@ -187,7 +187,7 @@ All solvers speak the same value contract: quantity arguments are typed values (
 
 ### Solver surface notes
 
-The solver surface is exactly the migrated kernels under the state machine's one-shape-per-solver returns discipline. The notable consequences:
+The solver surface is exactly the migrated kernels under the engine's one-shape-per-solver returns discipline. The notable consequences:
 
 - `reflection_to_vswr` / `return_loss`: the |Γ| = 1 / |Γ| = 0 extremes are unbounded — the value universe holds no infinity, so those calls throw.
 - `circuit_impedance.network` is a JSON-text string (a closed spec cannot express a recursive heterogeneous tree).
@@ -220,7 +220,7 @@ Fields: id, openedAt, sealedAt (null = not sealed), question (immutable title). 
 
 ### Trace body (per-step, full)
 
-One line per state machine operation or marker; every line carries everything needed to restore that step — input and output both:
+One line per engine operation or marker; every line carries everything needed to restore that step — input and output both:
 
 ```json
 { "seq": 1, "tool": "marker", "kind": "question", "ok": true, "text": "…", "at": … }
@@ -235,15 +235,15 @@ One line per state machine operation or marker; every line carries everything ne
 
 - `call` lines store the result: any call's output enters the line as fact — restoring state uses the stored result directly and **never recomputes** (external solver output comes from the network/files and cannot be recomputed).
 - `resolved` is the argument set that actually entered the run: references expanded and all conversions done (SI, rect). `args` keeps the originals; the two line up per key.
-- No kernel-internal intermediate steps and no model reasoning text are recorded; the granularity is one state machine operation. The reader of a trace is a human — every step shows original input, converted values and result in place, and can be re-verified independently.
+- No kernel-internal intermediate steps and no model reasoning text are recorded; the granularity is one engine operation. The reader of a trace is a human — every step shows original input, converted values and result in place, and can be re-verified independently.
 
 ### Restore = replay
 
-Rebuilding state replays the lines in order: `set` lines set the slot to the stored value, `call` lines set the target slot to the stored result (non-void), set-null lines delete, marker lines are skipped. Pure state machine — no recompute, no network, no randomness.
+Rebuilding state replays the lines in order: `set` lines set the slot to the stored value, `call` lines set the target slot to the stored result (non-void), set-null lines delete, marker lines are skipped. Pure engine — no recompute, no network, no randomness.
 
 ### Consistency
 
-- Orphan index rows (sealedAt null without a body file) are cleared at state machine start — the index is a projection and can be safely rebuilt.
+- Orphan index rows (sealedAt null without a body file) are cleared at engine start — the index is a projection and can be safely rebuilt.
 - The new system does not read the old-format `records.jsonl`; the old file is left untouched.
 
 ## 7. Host endpoints
@@ -255,7 +255,7 @@ Rebuilding state replays the lines in order: `set` lines set the slot to the sto
 
 ## 8. External solvers
 
-External solvers are user-owned calculation solvers living on a remote endpoint; the state machine reaches them over an **http** or **file** transport. Declarations live in `external-solvers.jsonl` under the records home; at state machine start every enabled declaration is registered **verbatim** into the solver registry as an external solver (no compile layer — the transport is wrapped by the state machine itself). Changes apply after a host restart; the UI shows a pending-restart notice while the dirty bit is set.
+External solvers are user-owned calculation solvers living on a remote endpoint; the engine reaches them over an **http** or **file** transport. Declarations live in `external-solvers.jsonl` under the records home; at engine start every enabled declaration is registered **verbatim** into the solver registry as an external solver (no compile layer — the transport is wrapped by the engine itself). Changes apply after a host restart; the UI shows a pending-restart notice while the dirty bit is set.
 
 ### Declaration
 
@@ -298,7 +298,7 @@ success:  { "requestId": "<uuid>", "result": null }             // void: still a
 failure:  { "requestId": "<uuid>", "error": "<string message>" }
 ```
 
-- Typed values are self-describing across the wire: `type` discriminates the shape, `value` carries the content, complex is always rect, `kind` carries the dimension. Variants/prefixes never appear — the state machine has already converted to the SI base. A third-party implementation only implements the five type branches.
+- Typed values are self-describing across the wire: `type` discriminates the shape, `value` carries the content, complex is always rect, `kind` carries the dimension. Variants/prefixes never appear — the engine has already converted to the SI base. A third-party implementation only implements the five type branches.
 - **The `result` field is always present** (void = null) — it reserves the slot for future message kinds, so `result` and any sibling message can never be confused.
 - The host validates the response against the solver signature: a non-void solver receiving `result: null` (or no result) is a protocol error; a void solver receiving a result is one too.
 - `requestId` echo is verified; timeouts and protocol violations are raised by the host. Failures share one structured error path with local solvers — whatever the source, the call surfaces as the same error receipt and is recorded in the trace with its code.

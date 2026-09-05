@@ -1,6 +1,6 @@
 # ElectroLab 回声对端
 
-面向 DeepSeek Harness ElectroLab 外部求解器功能的手动测试/演示对端。对端以某一种传输实现状态机的类型化信封协议——请求是 `{requestId, args}`，其中每个参数都是类型化值；响应是 `{requestId, result}`，携带一个类型化值（void 时为 `result: null`）；它把收到的每个参数都以类型化值形式原样回显，因此「注册 → 重启 → 模型调用」的完整闭环可以用肉眼验证。
+面向 DeepSeek Harness ElectroLab 外部求解器功能的手动测试/演示对端。对端以某一种传输实现引擎的类型化信封协议——请求是 `{requestId, args}`，其中每个参数都是类型化值；响应是 `{requestId, result}`，携带一个类型化值（void 时为 `result: null`）；它把收到的每个参数都以类型化值形式原样回显，因此「注册 → 重启 → 模型调用」的完整闭环可以用肉眼验证。
 
 ## 独立工程
 
@@ -39,11 +39,11 @@ pnpm echo:file          # 使用本目录下的 ./elab-inbox
 
 ## 3. 重启宿主
 
-声明在状态机启动时注册：重启 DSH 宿主进程，然后刷新页面。`echo_http` 与 `echo_file` 会出现在智能体可 `call` 的状态机求解器中。
+声明在引擎启动时注册：重启 DSH 宿主进程，然后刷新页面。`echo_http` 与 `echo_file` 会出现在智能体可 `call` 的引擎求解器中。
 
 ## 4. 调用
 
-让智能体调用 `echo_http`，携带 `message`、可选的 `values`（数字数组——quantity 接受裸数字、`{re, im}` 或 `{mag, ang}`）与可选的 `flag`。状态机把结果存入具名 target 槽；`get` 返回的正是对端原样回显的内容——全部是类型化值：
+让智能体调用 `echo_http`，携带 `message`、可选的 `values`（数字数组——quantity 接受裸数字、`{re, im}` 或 `{mag, ang}`）与可选的 `flag`。引擎把结果存入具名 target 槽；`get` 返回的正是对端原样回显的内容——全部是类型化值：
 
 ```json
 {
@@ -79,4 +79,4 @@ requestId 不匹配的响应会被宿主拒绝；非 JSON 的请求体会收到 
 
 ## 协议参考
 
-完整的声明语法（name/description/enabled/parameters/returns/transport/transportOptions）、类型化值载荷形状与线协议见插件的 [`docs/tools.md`](../docs/tools.md)（ElectroLab 状态机手册——外部求解器章节）及其简体中文镜像 [`docs/tools.zh-CN.md`](../docs/tools.zh-CN.md)。
+完整的声明语法（name/description/enabled/parameters/returns/transport/transportOptions）、类型化值载荷形状与线协议见插件的 [`docs/tools.md`](../docs/tools.md)（ElectroLab 引擎手册——外部求解器章节）及其简体中文镜像 [`docs/tools.zh-CN.md`](../docs/tools.zh-CN.md)。
