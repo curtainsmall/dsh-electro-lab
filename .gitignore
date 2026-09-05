@@ -23,6 +23,3 @@ assistant-summary.txt
 npm-debug.log*
 .DS_Store
 Thumbs.db
-
-# --- design blueprints (not versioned) ---
-plan/
