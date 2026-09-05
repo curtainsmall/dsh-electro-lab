@@ -4,12 +4,12 @@
 
 The DeepSeek Harness ElectroLab plugin runs all electrical & electronics calculation inside a deterministic **state machine**. The language model never computes: it operates the state machine through three primitives and three record markers, and the state machine keeps a typed-value table, converts values at calculation boundaries, records every step, and seals each solve into a browsable record.
 
-This manual is the full reference for the state machine surface — typed values, primitives, markers, the function catalog, storage, and external functions. Sessions started in **ElectroLab Mode** carry the same rules in the `electro-lab-interface` skill (state machine manual) and `electro-lab-template` skill (record protocol).
+This manual is the full reference for the state machine surface — typed values, primitives, markers, the solver catalog, storage, and external solvers. Sessions started in **ElectroLab Mode** carry the same rules in the `electro-lab-interface` skill (state machine manual) and `electro-lab-template` skill (record protocol).
 
 ## 1. How it works
 
 - **One global state machine per host process.** Any session's markers act on the same state machine; at most one record is open at a time (single-open invariant).
-- **The LLM surface is six tools**: `set`, `get`, `call`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_fns_add` / `external_fns_update` / `external_fns_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the state machine's fn registry and are invoked by `call`.
+- **The LLM surface is six tools**: `set`, `get`, `call`, `record_question`, `record_analyse`, `record_answer` — plus the declaration managers `external_solver_add` / `external_solver_update` / `external_solver_delete`. The ~40 domain tools, `solve_steps` and the text↔value codecs are gone; the math kernels live in the state machine's solver registry and are invoked by `call`.
 - **A record is a process (timeline).** Each state machine operation appends one fully self-describing trace line (input and output both stored); a record can be replayed to rebuild the recorded state at any point without re-computing anything.
 - **Input is value.** What the model gives is what the state machine stores; a string stays a string.
 
@@ -53,24 +53,24 @@ The table stores values **exactly as given** — `get` returns what `set` wrote,
 ```
 set  { name, value }     write one slot: value = a typed value; value: null deletes the slot
 get  { name }            read one slot (the stored typed value, exactly as written)
-call { fn, args, target }  call one registered fn; args values are typed values or "@name" references
+call { solver, args, target }  call one registered solver; args values are typed values or "@name" references
 ```
 
 Semantics:
 
 - `"100 kΩ"` is always a string; a resistance of 100 kΩ must be given as `{ "type": "number", "value": 100, "kind": "resistance", "prefix": "kilo" }`.
-- `@name` / `@name.path` is a slot reference (`@` prefix = reference, no `@` = literal). The state machine expands it and kind/shape-checks it against the fn signature. A reference to a missing slot fails with `ENGINE_UNDECLARED`.
+- `@name` / `@name.path` is a slot reference (`@` prefix = reference, no `@` = literal). The state machine expands it and kind/shape-checks it against the solver signature. A reference to a missing slot fails with `ENGINE_UNDECLARED`.
 - **Every call returns one receipt** — there is no "exception vs normal return" duality:
 
 ```
 success: set  → { ok: true, name, rev }   (delete: { ok: true, name, deleted })
          get  → { ok: true, name, value }
-         call → { ok: true, target, rev }  (void fn: { ok: true, target: null })
+         call → { ok: true, target, rev }  (void solver: { ok: true, target: null })
 failure:      → { ok: false, code, error }
 ```
 
   Check `ok` first. Receipts carry no business data (except `get`); read values only through `get`.
-- **target matches the fn signature** (the state machine decides from the registry; the model does not need to remember rules): a void fn (declared `returns: null`) takes `target: null` (a named target → `ENGINE_VOID_TARGET`); a value fn requires a named target (missing/null → `ENGINE_TARGET_REQUIRED`).
+- **target matches the solver signature** (the state machine decides from the registry; the model does not need to remember rules): a void solver (declared `returns: null`) takes `target: null` (a named target → `ENGINE_VOID_TARGET`); a value solver requires a named target (missing/null → `ENGINE_TARGET_REQUIRED`).
 - **target always overwrites**: writing an existing slot replaces the whole value (kind check passes) and bumps `rev`; nothing is inherited from the old representation.
 - **Delete = `set` with `value: null`**: the slot disappears from the table, deleting a missing slot is an idempotent ok, re-creating later restarts at rev 1; the trace line carries `deleted: true`.
 - Slot kinds are pinned on first write: overwriting with a different kind fails (`ENGINE_KIND_MISMATCH`) and does not advance the revision.
@@ -88,26 +88,26 @@ record_answer   { text }    the final answer; seals the record
 - `record_answer` with no open record keeps a duplicate-end error record.
 - An interrupted record (index `sealedAt: null` with a body file) is resumed at the next state machine start: the trace continues in the same file and the table is rebuilt from it. An incomplete record never completes itself — it is either sealed later (duplicate-start) or stays incomplete forever.
 
-## 5. Function catalog
+## 5. Solver catalog
 
-All functions speak the same value contract: quantity arguments are typed values (see §2); array coefficients of transfer functions are kind-`none` quantities in descending power order. The catalog mirrors the math kernels one-to-one.
+All solvers speak the same value contract: quantity arguments are typed values (see §2); array coefficients of transfer functions are kind-`none` quantities in descending power order. The catalog mirrors the math kernels one-to-one.
 
 ### Expression & algebra
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `calculate` | Evaluate a string math expression and return the complex result |
 | `rational_coefficients` | Reduce an expression in one variable to a rational function and return numerator/denominator coefficients |
 
 ### Series sums
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `series_sum` | Sum of a number sequence: arithmetic, geometric (finite or convergent infinite), or power sum |
 
 ### Transfer functions & frequency domain
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `partial_fraction` | Partial-fraction expansion of a ratio-form transfer function |
 | `poles_zeros` | Poles and zeros of a ratio-form transfer function |
@@ -119,7 +119,7 @@ All functions speak the same value contract: quantity arguments are typed values
 
 ### Digital signal processing
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `discrete_fourier_transform` | DFT of a complex sample sequence (optionally windowed) |
 | `inverse_discrete_fourier_transform` | IDFT of a spectrum: recovers the time-domain sequence (round-trip of the DFT) |
@@ -128,7 +128,7 @@ All functions speak the same value contract: quantity arguments are typed values
 
 ### Signal quality
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `thd` | Total harmonic distortion of a sampled signal (fraction plus dB) |
 | `jitter_snr` | SNR ceiling set by sampling-clock jitter |
@@ -136,7 +136,7 @@ All functions speak the same value contract: quantity arguments are typed values
 
 ### Circuits
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `equivalent_impedance` | Total impedance of a set of impedances combined in series (Z = Σ Zi) or in parallel (1/Z = Σ 1/Zi) |
 | `circuit_impedance` | Total driving-point impedance of a (possibly nested) series/parallel network at a frequency; network is JSON text of a tree of element leaves (kind resistance\|inductance\|capacitance) and series/parallel groups |
@@ -146,7 +146,7 @@ All functions speak the same value contract: quantity arguments are typed values
 
 ### Electronics
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `opamp_configurations` | Ideal op-amp gain and output for a configuration: inverting, non-inverting, voltage-follower, difference, integrator, differentiator |
 | `time_constant` | Time constant and cutoff frequency: τ = RC (give capacitance) or τ = L/R (give inductance) |
@@ -155,7 +155,7 @@ All functions speak the same value contract: quantity arguments are typed values
 
 ### RF & Smith chart
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `impedance_to_reflection` | Reflection coefficient Γ = (Z − Z0)/(Z + Z0) |
 | `reflection_to_vswr` | VSWR from a reflection coefficient: vswr = (1+|Γ|)/(1−|Γ|) |
@@ -165,7 +165,7 @@ All functions speak the same value contract: quantity arguments are typed values
 
 ### Transmission lines
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `wavelength_frequency` | Wavelength from frequency (velocity factor aware) |
 | `coaxial_parameters` | Coaxial-line characterization from geometry (impedance, velocity factor, per-meter C and L) |
@@ -173,7 +173,7 @@ All functions speak the same value contract: quantity arguments are typed values
 
 ### Noise
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `thermal_noise` | Thermal (Johnson) noise power in a bandwidth: P = k·T·B (temperature in kelvin) |
 | `cascade_noise_figure` | Total noise figure of cascaded stages (Friis) from per-stage noise figures and gains in dB |
@@ -181,13 +181,13 @@ All functions speak the same value contract: quantity arguments are typed values
 
 ### Filters
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `filter_design` | Butterworth low-pass ladder design: order, cutoff frequency and equal source/load resistance give the element list (series inductors, shunt capacitors), with attenuation at the cutoff and query frequencies |
 
-### Fn surface notes
+### Solver surface notes
 
-The fn surface is exactly the migrated kernels under the state machine's one-shape-per-fn returns discipline. The notable consequences:
+The solver surface is exactly the migrated kernels under the state machine's one-shape-per-solver returns discipline. The notable consequences:
 
 - `reflection_to_vswr` / `return_loss`: the |Γ| = 1 / |Γ| = 0 extremes are unbounded — the value universe holds no infinity, so those calls throw.
 - `circuit_impedance.network` is a JSON-text string (a closed spec cannot express a recursive heterogeneous tree).
@@ -225,7 +225,7 @@ One line per state machine operation or marker; every line carries everything ne
 ```json
 { "seq": 1, "tool": "marker", "kind": "question", "ok": true, "text": "…", "at": … }
 { "seq": 2, "tool": "set", "ok": true, "name": "R", "value": { …typed value as given… }, "rev": 1, "at": … }
-{ "seq": 3, "tool": "call", "ok": true, "fn": "resonance",
+{ "seq": 3, "tool": "call", "ok": true, "solver": "resonance",
   "args": { …original… }, "resolved": { …expanded + SI/rect end values… },
   "result": { …typed output… }, "target": "res", "rev": 1, "at": … }
 { "seq": 4, "tool": "call", "ok": false, "code": "ENGINE_UNDECLARED", "error": "…", "at": … }
@@ -233,7 +233,7 @@ One line per state machine operation or marker; every line carries everything ne
 { "seq": 6, "tool": "marker", "kind": "answer", "ok": true, "text": "…", "at": … }
 ```
 
-- `call` lines store the result: any call's output enters the line as fact — restoring state uses the stored result directly and **never recomputes** (external fn output comes from the network/files and cannot be recomputed).
+- `call` lines store the result: any call's output enters the line as fact — restoring state uses the stored result directly and **never recomputes** (external solver output comes from the network/files and cannot be recomputed).
 - `resolved` is the argument set that actually entered the run: references expanded and all conversions done (SI, rect). `args` keeps the originals; the two line up per key.
 - No kernel-internal intermediate steps and no model reasoning text are recorded; the granularity is one state machine operation. The reader of a trace is a human — every step shows original input, converted values and result in place, and can be re-verified independently.
 
@@ -249,13 +249,13 @@ Rebuilding state replays the lines in order: `set` lines set the slot to the sto
 ## 7. Host endpoints
 
 - `GET /api/dsh-electro-lab/records-index` — the index rows for the Records panel list (`{ rows: [{ id, openedAt, sealedAt, question }] }`). The list polls every 5 s; it never reads trace bodies.
-- `GET /api/dsh-electro-lab/external-fns` — the declaration archive + dirty bit (`{ fns: […], restartRequired }`).
-- `PUT /api/dsh-electro-lab/external-fns?config=<base64url JSON>` — validate and upsert one declaration (sets the dirty bit).
-- `DELETE /api/dsh-electro-lab/external-fns?name=<name>` — delete one declaration.
+- `GET /api/dsh-electro-lab/external-solvers` — the declaration archive + dirty bit (`{ solvers: […], restartRequired }`).
+- `PUT /api/dsh-electro-lab/external-solvers?config=<base64url JSON>` — validate and upsert one declaration (sets the dirty bit).
+- `DELETE /api/dsh-electro-lab/external-solvers?name=<name>` — delete one declaration.
 
-## 8. External functions
+## 8. External solvers
 
-External functions are user-owned calculation functions living on a remote endpoint; the state machine reaches them over an **http** or **file** transport. Declarations live in `external-fns.jsonl` under the records home; at state machine start every enabled declaration is registered **verbatim** into the fn registry as an external fn (no compile layer — the transport is wrapped by the state machine itself). Changes apply after a host restart; the UI shows a pending-restart notice while the dirty bit is set.
+External solvers are user-owned calculation solvers living on a remote endpoint; the state machine reaches them over an **http** or **file** transport. Declarations live in `external-solvers.jsonl` under the records home; at state machine start every enabled declaration is registered **verbatim** into the solver registry as an external solver (no compile layer — the transport is wrapped by the state machine itself). Changes apply after a host restart; the UI shows a pending-restart notice while the dirty bit is set.
 
 ### Declaration
 
@@ -287,7 +287,7 @@ External functions are user-owned calculation functions living on a remote endpo
 - `returns` is **required for registration**: the same spec leaves (or explicit `null` = void). A declaration without a returns, or with the unmappable `"any"` leaf, is kept in the archive but skipped at start with a warning.
 - http `transportOptions`: `url`, optional `headers`. The archive dialect still accepts a `method` field for compatibility, but the host always sends **POST** — typed args travel as the JSON request body.
 - file `transportOptions`: `directory` (the host writes `in.<id>.json` there and polls for `out.<id>.json`), optional `inPrefix` / `outPrefix` / `pollMs`.
-- Name rules: lowercase start, `a-z0-9_`, max 64, unique among external and built-in fns.
+- Name rules: lowercase start, `a-z0-9_`, max 64, unique among external and built-in solvers.
 
 ### Wire protocol (typed envelope)
 
@@ -300,8 +300,8 @@ failure:  { "requestId": "<uuid>", "error": "<string message>" }
 
 - Typed values are self-describing across the wire: `type` discriminates the shape, `value` carries the content, complex is always rect, `kind` carries the dimension. Variants/prefixes never appear — the state machine has already converted to the SI base. A third-party implementation only implements the five type branches.
 - **The `result` field is always present** (void = null) — it reserves the slot for future message kinds, so `result` and any sibling message can never be confused.
-- The host validates the response against the fn signature: a non-void fn receiving `result: null` (or no result) is a protocol error; a void fn receiving a result is one too.
-- `requestId` echo is verified; timeouts and protocol violations are raised by the host. Failures share one structured error path with local fns — whatever the source, the call surfaces as the same error receipt and is recorded in the trace with its code.
+- The host validates the response against the solver signature: a non-void solver receiving `result: null` (or no result) is a protocol error; a void solver receiving a result is one too.
+- `requestId` echo is verified; timeouts and protocol violations are raised by the host. Failures share one structured error path with local solvers — whatever the source, the call surfaces as the same error receipt and is recorded in the trace with its code.
 
 | code | meaning |
 |---|---|
@@ -314,8 +314,8 @@ failure:  { "requestId": "<uuid>", "error": "<string message>" }
 
 | tool | purpose |
 |---|---|
-| `external_fns_add` | Register a new external function declaration (fails when the name already exists) |
-| `external_fns_update` | Replace an existing declaration (fails when it does not exist) |
-| `external_fns_delete` | Remove a declaration by name |
+| `external_solver_add` | Register a new external solver declaration (fails when the name already exists) |
+| `external_solver_update` | Replace an existing declaration (fails when it does not exist) |
+| `external_solver_delete` | Remove a declaration by name |
 
-Writes persist immediately and set the dirty bit; results report `restartRequired: true`. The Records panel's **External fns** tab offers the same actions with form editing. [`external-fns-example/`](../external-fns-example/README.md) is an independent npm project with manual test counterparts for the envelope protocol — `node src/echo.ts http` / `file` echoes it end to end.
+Writes persist immediately and set the dirty bit; results report `restartRequired: true`. The Records panel's **External solvers** tab offers the same actions with form editing. [`external-solvers-example/`](../external-solvers-example/README.md) is an independent npm project with manual test counterparts for the envelope protocol — `node src/echo.ts http` / `file` echoes it end to end.

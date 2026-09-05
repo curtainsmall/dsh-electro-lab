@@ -1,6 +1,6 @@
 # ElectroLab 回声对端
 
-面向 DeepSeek Harness ElectroLab 外部函数功能的手动测试/演示对端。对端以某一种传输实现状态机的类型化信封协议——请求是 `{requestId, args}`，其中每个参数都是类型化值；响应是 `{requestId, result}`，携带一个类型化值（void 时为 `result: null`）；它把收到的每个参数都以类型化值形式原样回显，因此「注册 → 重启 → 模型调用」的完整闭环可以用肉眼验证。
+面向 DeepSeek Harness ElectroLab 外部求解器功能的手动测试/演示对端。对端以某一种传输实现状态机的类型化信封协议——请求是 `{requestId, args}`，其中每个参数都是类型化值；响应是 `{requestId, result}`，携带一个类型化值（void 时为 `result: null`）；它把收到的每个参数都以类型化值形式原样回显，因此「注册 → 重启 → 模型调用」的完整闭环可以用肉眼验证。
 
 ## 独立工程
 
@@ -11,7 +11,7 @@
 
 ## 1. 启动对端
 
-在本目录（`external-fns-example/`）下执行：
+在本目录（`external-solvers-example/`）下执行：
 
 ```bash
 node src/echo.ts http --port 8787
@@ -35,11 +35,11 @@ pnpm echo:file          # 使用本目录下的 ./elab-inbox
 
 ## 2. 注册声明
 
-[`register-guide.zh-CN.md`](register-guide.zh-CN.md) 列出两个函数及对话框每个字段应填的确切值，包括 **returns** 编辑器（没有显式 returns 的声明只会被存档、永远不会注册）。在记录面板中打开**「外部函数」页** → **「添加外部函数」**，按指南填写表单；或在会话中让智能体注册该函数，把指南中该函数的 `agentDeclaration` JSON 原文粘贴给它；智能体会调用 `external_fns_add`。`echo_file` 的目录假定对端以 `--dir C:/elab-inbox` 运行——请改成你实际使用的目录。更改在下次宿主重启时生效。
+[`register-guide.zh-CN.md`](register-guide.zh-CN.md) 列出两个求解器及对话框每个字段应填的确切值，包括 **returns** 编辑器（没有显式 returns 的声明只会被存档、永远不会注册）。在记录面板中打开**「外部求解器」页** → **「添加外部求解器」**，按指南填写表单；或在会话中让智能体注册该求解器，把指南中该求解器的 `agentDeclaration` JSON 原文粘贴给它；智能体会调用 `external_solver_add`。`echo_file` 的目录假定对端以 `--dir C:/elab-inbox` 运行——请改成你实际使用的目录。更改在下次宿主重启时生效。
 
 ## 3. 重启宿主
 
-声明在状态机启动时注册：重启 DSH 宿主进程，然后刷新页面。`echo_http` 与 `echo_file` 会出现在智能体可 `call` 的状态机函数中。
+声明在状态机启动时注册：重启 DSH 宿主进程，然后刷新页面。`echo_http` 与 `echo_file` 会出现在智能体可 `call` 的状态机求解器中。
 
 ## 4. 调用
 
@@ -75,8 +75,8 @@ curl -s -X POST http://127.0.0.1:8787/ \
 { "requestId": "manual-1", "result": { "type": "object", "value": { "message": { "type": "string", "value": "hi" }, "flag": { "type": "boolean", "value": true } } } }
 ```
 
-requestId 不匹配的响应会被宿主拒绝；非 JSON 的请求体会收到 `{error: "…"}` 响应。端点通过返回 `{ "requestId": "…", "error": "…" }` 表示计算失败——宿主会把它提升为 fn 错误（code 为 `EXTERNAL_ERROR`），与任何抛出的失败所产生的是同一种结构化错误。宿主永远只发 **POST**；类型化参数以 JSON 请求体的形式传输。
+requestId 不匹配的响应会被宿主拒绝；非 JSON 的请求体会收到 `{error: "…"}` 响应。端点通过返回 `{ "requestId": "…", "error": "…" }` 表示计算失败——宿主会把它提升为 solver 错误（code 为 `EXTERNAL_ERROR`），与任何抛出的失败所产生的是同一种结构化错误。宿主永远只发 **POST**；类型化参数以 JSON 请求体的形式传输。
 
 ## 协议参考
 
-完整的声明语法（name/description/enabled/parameters/returns/transport/transportOptions）、类型化值载荷形状与线协议见插件的 [`docs/tools.md`](../docs/tools.md)（ElectroLab 状态机手册——外部函数章节）及其简体中文镜像 [`docs/tools.zh-CN.md`](../docs/tools.zh-CN.md)。
+完整的声明语法（name/description/enabled/parameters/returns/transport/transportOptions）、类型化值载荷形状与线协议见插件的 [`docs/tools.md`](../docs/tools.md)（ElectroLab 状态机手册——外部求解器章节）及其简体中文镜像 [`docs/tools.zh-CN.md`](../docs/tools.zh-CN.md)。

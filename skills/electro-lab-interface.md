@@ -1,12 +1,12 @@
 ---
 name: electro-lab-interface
-description: "ElectroLab state machine manual: typed values, the set/get/call primitives, receipts and errors, the fn catalog — independent of any answer protocol"
+description: "ElectroLab state machine manual: typed values, the set/get/call primitives, receipts and errors, the solver catalog — independent of any answer protocol"
 whenToUse: "Any session that operates the ElectroLab state machine (set/get/call, record markers)"
 ---
 
 # DeepSeek Harness ElectroLab — State Machine Manual
 
-All calculation happens inside one deterministic state machine. You operate it with three primitives and the record markers; the state machine keeps a variable table, converts values at calculation boundaries and records every step. You never parse text into numbers and never convert units yourself — you pass typed values and the state machine resolves everything against the function signatures.
+All calculation happens inside one deterministic state machine. You operate it with three primitives and the record markers; the state machine keeps a variable table, converts values at calculation boundaries and records every step. You never parse text into numbers and never convert units yourself — you pass typed values and the state machine resolves everything against the solver signatures.
 
 ## Typed values
 
@@ -26,7 +26,7 @@ variant words: degC/degF (temperature), deg (angle), bar/psi/atm (pressure), cal
 
 - `set { name, value }` — write one slot. `value: null` deletes the slot (idempotent). Re-writing with a different kind than the pinned slot kind fails.
 - `get { name }` — read one slot; you receive the value exactly as written.
-- `call { fn, args, target }` — call one registered fn. Every argument is a typed value or a `"@name"` / `"@name.field"` slot reference. A value function requires a named `target` (overwriting bumps the slot revision); a void function takes `target: null`.
+- `call { solver, args, target }` — call one registered solver. Every argument is a typed value or a `"@name"` / `"@name.field"` slot reference. A value solver requires a named `target` (overwriting bumps the slot revision); a void solver takes `target: null`.
 
 Every call returns a receipt: `{ ok: true, … }` or `{ ok: false, code, error }`. Failed calls have no side effects; read values only through `get`.
 
@@ -38,9 +38,9 @@ Every call returns a receipt: `{ ok: true, … }` or `{ ok: false, code, error }
 
 Conditions from the question are stored with `set` as typed values (translate the user's wording into typed values yourself — transcription, not calculation). Computed numbers appear only after the `call` that produced them; answers quote slot values or `get` results.
 
-## Fn catalog
+## Solver catalog
 
-| fn | purpose |
+| solver | purpose |
 |---|---|
 | `ac_power` | AC power from RMS values: apparent = V·I, real = apparent·cosφ, reactive = apparent·sinφ, powerFactor = cosφ; phaseAngle (radians) is the V–I phase angle |
 | `adc_budget` | ADC noise budget: quantization, jitter and optional thermal SNR into a total SNR and ENOB |

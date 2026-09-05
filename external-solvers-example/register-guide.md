@@ -1,23 +1,23 @@
-# Registering the Example Functions
+# Registering the Example Solvers
 
 The peer must be running first (`node src/echo.ts http --port 8787` or
 `node src/echo.ts file --dir <directory>`). In the plugin's Records panel
-open the **External fns** tab and click **Add external fn**, then fill
+open the **External solvers** tab and click **Add external solver**, then fill
 the dialog with the values below. Changes apply after a host restart.
 
-Alternatively, ask the agent in a session to register the function and paste
-the fn's `agentDeclaration` JSON; the agent calls `external_fns_add`.
+Alternatively, ask the agent in a session to register the solver and paste
+the solver's `agentDeclaration` JSON; the agent calls `external_solver_add`.
 
 ## echo_http
 
 | Dialog field | Enter | Note |
 |---|---|---|
-| Name | `echo_http` | the fn name the agent will call; starts lowercase, `a-z0-9_` only |
+| Name | `echo_http` | the solver name the agent will call; starts lowercase, `a-z0-9_` only |
 | Transport | `http` | http calls a URL; file exchanges request/response files in a directory |
 | Method | `POST` | the host always sends POST — the typed envelope rides the request body |
 | URL | `http://127.0.0.1:8787/` | where the peer listens; `--port` overrides 8787 |
 | Timeout (ms) | `10000` | optional; empty keeps the 30000 default |
-| Description | `Echo peer over http (ElectroLab external-fn manual test): returns every parameter it receives, verbatim` | what the agent reads to decide when to call the fn |
+| Description | `Echo peer over http (ElectroLab external-solver manual test): returns every parameter it receives, verbatim` | what the agent reads to decide when to call the solver |
 | Enabled | on | a disabled declaration is kept but not registered |
 
 Parameters — click **Add parameter** once per row:
@@ -42,7 +42,7 @@ registers): type `object`, then add one field per returned key:
 ```json
 {
   "name": "echo_http",
-  "description": "Echo peer over http (ElectroLab external-fn manual test): returns every parameter it receives, verbatim",
+  "description": "Echo peer over http (ElectroLab external-solver manual test): returns every parameter it receives, verbatim",
   "enabled": true,
   "parameters": {
     "message": { "type": "string", "description": "a text echoed back verbatim", "required": true },
@@ -67,13 +67,13 @@ registers): type `object`, then add one field per returned key:
 
 | Dialog field | Enter | Note |
 |---|---|---|
-| Name | `echo_file` | the fn name the agent will call; starts lowercase, `a-z0-9_` only |
+| Name | `echo_file` | the solver name the agent will call; starts lowercase, `a-z0-9_` only |
 | Transport | `file` | http calls a URL; file exchanges request/response files in a directory |
 | Directory | `C:/elab-inbox` | the directory passed to the peer; the host writes `in.<id>.json` there |
 | Poll interval (ms) | `200` | optional; empty keeps the 200 default |
 | Request / Response file prefix | (empty) | empty keeps the `in` / `out` defaults |
 | Timeout (ms) | `10000` | optional; empty keeps the 30000 default |
-| Description | `Echo peer over file transport (ElectroLab external-fn manual test): returns every parameter it receives, verbatim` | what the agent reads to decide when to call the fn |
+| Description | `Echo peer over file transport (ElectroLab external-solver manual test): returns every parameter it receives, verbatim` | what the agent reads to decide when to call the solver |
 | Enabled | on | a disabled declaration is kept but not registered |
 
 Parameters and Returns: the same rows as `echo_http` above.
@@ -83,7 +83,7 @@ Parameters and Returns: the same rows as `echo_http` above.
 ```json
 {
   "name": "echo_file",
-  "description": "Echo peer over file transport (ElectroLab external-fn manual test): returns every parameter it receives, verbatim",
+  "description": "Echo peer over file transport (ElectroLab external-solver manual test): returns every parameter it receives, verbatim",
   "enabled": true,
   "parameters": {
     "message": { "type": "string", "description": "a text echoed back verbatim", "required": true },

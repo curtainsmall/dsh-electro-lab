@@ -23,10 +23,10 @@ A second `record_question` while a record is open seals the open one as a duplic
 
 ## Operational details
 
-Typed values, the fn catalog and the set/get/call discipline live in the electro-lab-interface skill — follow it alongside this template.
+Typed values, the solver catalog and the set/get/call discipline live in the electro-lab-interface skill — follow it alongside this template.
 
 ## Discipline
 
-- Gate first: before any tool call, check that every quantity the computation needs was actually given by the user. If anything is missing, stop: no tool calls, no markers — state exactly what is missing and which fn would be needed (see the fn catalog in the electro-lab-interface skill).
+- Gate first: before any tool call, check that every quantity the computation needs was actually given by the user. If anything is missing, stop: no tool calls, no markers — state exactly what is missing and which solver would be needed (see the solver catalog in the electro-lab-interface skill).
 - Never convert units, prefixes or complex notation yourself and never do arithmetic by hand: conditions are stored as typed values via `set`, and every derived number comes from a `call` receipt.
 - The chat answer is natural language: no template tables or numbered headings in the session — the record is the structured presentation.

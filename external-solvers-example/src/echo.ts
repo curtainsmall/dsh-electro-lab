@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ElectroLab external-fn echo peer — a manual test/demo counterpart.
+ * ElectroLab external-solver echo peer — a manual test/demo counterpart.
  *
  * Context envelope protocol (typed values): the request carries
  * {requestId, args} where every argument is a typed value; the response is
@@ -115,7 +115,7 @@ function serveFile(directory: string, pollMs: number): void {
 }
 
 function usage(): void {
-  console.log('ElectroLab external-fn echo peer (http or file transport)')
+  console.log('ElectroLab external-solver echo peer (http or file transport)')
   console.log('')
   console.log('  node src/echo.ts http [--host 127.0.0.1] [--port 8787]')
   console.log('  node src/echo.ts file --dir <directory> [--poll 200]')

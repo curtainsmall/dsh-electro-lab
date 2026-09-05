@@ -1,6 +1,6 @@
 # ElectroLab Echo Peer
 
-Manual test/demo counterpart for the DeepSeek Harness ElectroLab external-fn
+Manual test/demo counterpart for the DeepSeek Harness ElectroLab external-solver
 feature. The peer speaks the state machine's typed envelope protocol on one
 transport — the request is `{requestId, args}` where every argument is a
 typed value, the response is `{requestId, result}` with a typed value (or
@@ -23,7 +23,7 @@ never ships it. It only lives inside the repository for convenience.
 
 ## 1. Run a peer
 
-From this directory (`external-fns-example/`):
+From this directory (`external-solvers-example/`):
 
 ```bash
 node src/echo.ts http --port 8787
@@ -48,20 +48,20 @@ pnpm echo:file          # uses ./elab-inbox under this directory
 
 ## 2. Register the declarations
 
-[`register-guide.md`](register-guide.md) lists the two functions with the
+[`register-guide.md`](register-guide.md) lists the two solvers with the
 exact value for every dialog field, including the **returns** editor (a
 declaration without an explicit returns is archived but never registers). In
-the Records panel open the **External fns** tab → **Add external fn** and
+the Records panel open the **External solvers** tab → **Add external solver** and
 fill the form accordingly, or ask the agent in a session to register the
-function, pasting the fn's `agentDeclaration` JSON from the guide; the
-agent calls `external_fns_add`. The `echo_file` directory assumes the peer
+solver, pasting the solver's `agentDeclaration` JSON from the guide; the
+agent calls `external_solver_add`. The `echo_file` directory assumes the peer
 runs with `--dir C:/elab-inbox` — adapt it to the directory you actually
 use. Changes apply at the next host restart.
 
 ## 3. Restart the host
 
 Declarations register at state machine start: restart the DSH host process, then
-reload the page. `echo_http` and `echo_file` now appear among the fns the agent
+reload the page. `echo_http` and `echo_file` now appear among the solvers the agent
 can `call`.
 
 ## 4. Call it
@@ -107,7 +107,7 @@ curl -s -X POST http://127.0.0.1:8787/ \
 A response whose requestId does not match is rejected by the host; a
 non-JSON request body gets an `{error: "…"}` response. An endpoint signals a
 failed computation by returning `{ "requestId": "…", "error": "…" }` — the
-host raises it as the fn error (code `EXTERNAL_ERROR`), the same structured
+host raises it as the solver error (code `EXTERNAL_ERROR`), the same structured
 error any thrown failure produces. The host only ever sends **POST**; the
 typed args travel as the JSON body.
 
@@ -116,5 +116,5 @@ typed args travel as the JSON body.
 The full declaration grammar (name/description/enabled/parameters/returns/
 transport/transportOptions), the typed-value payload shapes and the wire
 protocol are documented in the plugin's [`docs/tools.md`](../docs/tools.md)
-(ElectroLab State Machine Manual — External functions section) and its
+(ElectroLab State Machine Manual — External solvers section) and its
 Chinese mirror [`docs/tools.zh-CN.md`](../docs/tools.zh-CN.md).
