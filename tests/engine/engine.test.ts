@@ -80,7 +80,7 @@ describe('engine (set/get/call + markers + trace)', () => {
     // The table stores verbatim: get reads back with the prefix still attached
     expect((get as unknown as { value: { prefix: string } }).value.prefix).toBe('kilo')
     const missing = engine.opGet('X')
-    expect(missing).toMatchObject({ ok: false, code: 'ENGINE_UNDECLARED' })
+    expect(missing).toMatchObject({ ok: false, code: 'ENGINE_SLOT_UNDECLARED' })
     // Slot references cannot be stored into the table
     expect(engine.opSet('Y', { type: 'slot', value: 'R' })).toMatchObject({ ok: false, code: 'ENGINE_ARGS' })
     const del = engine.opSet('R', null)
@@ -132,7 +132,7 @@ describe('engine (set/get/call + markers + trace)', () => {
     })
     engine.markerQuestion('q')
     engine.opSet('C', { type: 'number', value: 5, kind: QuantityKind.Capacitance })
-    await expect(engine.opCall('needs_r', { r: { type: 'slot', value: 'X' } }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_UNDECLARED' })
+    await expect(engine.opCall('needs_r', { r: { type: 'slot', value: 'X' } }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_SLOT_UNDECLARED' })
     await expect(engine.opCall('needs_r', { r: { type: 'slot', value: 'C' } }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_KIND_MISMATCH' })
     // A bare string is a literal, never a reference: it fails the typed-value check
     await expect(engine.opCall('needs_r', { r: '@X' }, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_ARGS' })

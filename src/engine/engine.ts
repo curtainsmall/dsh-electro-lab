@@ -77,7 +77,7 @@ export class Engine {
   }
 
   private requireOpen(): OpenState {
-    if (this.open === null) throw new ToolError('no open record — call record_question first', ToolErrorCode.EngineUndeclared)
+    if (this.open === null) throw new ToolError('no open record — call record_question first', ToolErrorCode.SlotUndeclared)
     return this.open
   }
 
@@ -141,10 +141,10 @@ export class Engine {
         return { ok: true, name, deleted }
       }
       if (isSlotValue(value)) {
-        throw new ToolError('set: slot references cannot be stored — resolve them through call arguments', ToolErrorCode.EngineArgs)
+        throw new ToolError('set: slot references cannot be stored — resolve them through call arguments', ToolErrorCode.InvalidArgs)
       }
       const error = validateValue(value)
-      if (error !== undefined) throw new ToolError(`set: ${error}`, ToolErrorCode.EngineArgs)
+      if (error !== undefined) throw new ToolError(`set: ${error}`, ToolErrorCode.InvalidArgs)
       const typed = value as TypedValue
       const slot = this.table.set(name, typed)
       this.trace({ tool: 'set', ok: true, name, value: typed, rev: slot.rev })
@@ -157,7 +157,7 @@ export class Engine {
   opGet(name: string): Receipt {
     try {
       const slot = this.table.get(name)
-      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.EngineUndeclared)
+      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.SlotUndeclared)
       this.trace({ tool: 'get', ok: true, name, value: slot.value })
       return { ok: true, name, value: slot.value }
     } catch (error) {
@@ -171,12 +171,12 @@ export class Engine {
       const solver = this.registry.require(solverId)
       const { resolved, native } = this.resolveArgs(solver, args)
       if (solver.returns === null) {
-        if (target !== null) throw new ToolError(`solver "${solverId}" returns void — target must be null`, ToolErrorCode.EngineVoidTarget)
+        if (target !== null) throw new ToolError(`solver "${solverId}" returns void — target must be null`, ToolErrorCode.VoidTarget)
         await this.runVoid(solver, resolved, native)
         this.trace({ tool: 'call', ok: true, solver: solverId, args, resolved, result: null, target: null })
         return { ok: true, target: null }
       }
-      if (target === null) throw new ToolError(`solver "${solverId}" returns a value — a named target is required`, ToolErrorCode.EngineTargetRequired)
+      if (target === null) throw new ToolError(`solver "${solverId}" returns a value — a named target is required`, ToolErrorCode.TargetRequired)
       const result = await this.execute(solver, resolved, native)
       const slot = this.table.set(target, result)
       this.trace({ tool: 'call', ok: true, solver: solverId, args, resolved, result, target, rev: slot.rev })
@@ -196,7 +196,7 @@ export class Engine {
       await solver.run(native)
     } catch (error) {
       if (error instanceof ToolError) throw error
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineSolverFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.SolverFailed)
     }
   }
 
@@ -208,11 +208,11 @@ export class Engine {
       const raw = args[name]
       if (raw === undefined) {
         if (spec.optional === true) continue
-        throw new ToolError(`solver "${solver.id}" is missing argument "${name}"`, ToolErrorCode.EngineArgs)
+        throw new ToolError(`solver "${solver.id}" is missing argument "${name}"`, ToolErrorCode.InvalidArgs)
       }
       const typed = this.resolveValue(raw)
       const error = validateAgainstSpec(spec, typed, `argument "${name}"`)
-      if (error !== undefined) throw new ToolError(`solver "${solver.id}": ${error}`, ToolErrorCode.EngineKindMismatch)
+      if (error !== undefined) throw new ToolError(`solver "${solver.id}": ${error}`, ToolErrorCode.KindMismatch)
       const canonical = toCanonical(typed)
       resolved[name] = canonical
       native[name] = nativeValue(spec, canonical)
@@ -228,18 +228,18 @@ export class Engine {
       const name = dot === -1 ? reference : reference.slice(0, dot)
       const path = dot === -1 ? undefined : reference.slice(dot + 1)
       const slot = this.table.get(name)
-      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.EngineUndeclared)
+      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.SlotUndeclared)
       return refPath(slot.value, path)
     }
     const error = validateValue(raw)
-    if (error !== undefined) throw new ToolError(`argument value: ${error}`, ToolErrorCode.EngineArgs)
+    if (error !== undefined) throw new ToolError(`argument value: ${error}`, ToolErrorCode.InvalidArgs)
     return raw as TypedValue
   }
 
   /** Run a non-void solver (local run or external transport); shape the result per its returns spec. */
   private async execute(solver: SolverDef, resolved: Record<string, TypedValue>, native: Record<string, unknown>): Promise<TypedValue> {
     const spec = solver.returns
-    if (spec === null) throw new ToolError(`solver "${solver.id}" is void`, ToolErrorCode.EngineArgs)
+    if (spec === null) throw new ToolError(`solver "${solver.id}" is void`, ToolErrorCode.InvalidArgs)
     let raw: unknown
     try {
       if (solver.external !== undefined) {
@@ -252,17 +252,17 @@ export class Engine {
       raw = await solver.run(native)
     } catch (error) {
       if (error instanceof ToolError) throw error
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineSolverFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.SolverFailed)
     }
     try {
       return fromNative(spec, raw, `solver "${solver.id}" result`)
     } catch (error) {
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineSolverFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.SolverFailed)
     }
   }
 
   private validateName(name: string): void {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new ToolError(`slot name "${name}" must match ^[A-Za-z_][A-Za-z0-9_]*$`, ToolErrorCode.EngineArgs)
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new ToolError(`slot name "${name}" must match ^[A-Za-z_][A-Za-z0-9_]*$`, ToolErrorCode.InvalidArgs)
   }
 
   private failure(tool: string, error: unknown): Receipt {

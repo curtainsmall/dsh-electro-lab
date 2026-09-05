@@ -59,7 +59,7 @@ call { solver, args, target }  call one registered solver; args values are typed
 语义：
 
 - `"100 kΩ"` 永远是字符串；表示 100 kΩ 的电阻，必须给 `{ "type": "number", "value": 100, "kind": "resistance", "prefix": "kilo" }`。
-- 槽引用是一种独立的类型化值：`{ "type": "slot", "value": "name" }`，其中 `value` 是完整槽路径（`"name"` 或 `"name.field"`）。引擎展开引用后，按 solver 签名对它做 kind/形状校验；引用不存在的槽会以 `ENGINE_UNDECLARED` 失败。槽引用只作为 call 参数存在——永不存入变量表、永不作为结果返回；裸字符串永远是字面量字符串，绝不构成引用。
+- 槽引用是一种独立的类型化值：`{ "type": "slot", "value": "name" }`，其中 `value` 是完整槽路径（`"name"` 或 `"name.field"`）。引擎展开引用后，按 solver 签名对它做 kind/形状校验；引用不存在的槽会以 `ENGINE_SLOT_UNDECLARED` 失败。槽引用只作为 call 参数存在——永不存入变量表、永不作为结果返回；裸字符串永远是字面量字符串，绝不构成引用。
 - **每次调用都返回一张收据**——不存在「异常 vs 正常返回」的分野：
 
 ```
@@ -228,7 +228,7 @@ solver 表面正是在「每 solver 单一返回形状」纪律下迁移后的�
 { "seq": 3, "tool": "call", "ok": true, "solver": "resonance",
   "args": { …original… }, "resolved": { …expanded + SI/rect end values… },
   "result": { …typed output… }, "target": "res", "rev": 1, "at": … }
-{ "seq": 4, "tool": "call", "ok": false, "code": "ENGINE_UNDECLARED", "error": "…", "at": … }
+{ "seq": 4, "tool": "call", "ok": false, "code": "ENGINE_SLOT_UNDECLARED", "error": "…", "at": … }
 { "seq": 5, "tool": "set", "ok": true, "name": "tmp", "value": null, "deleted": true, "at": … }
 { "seq": 6, "tool": "marker", "kind": "answer", "ok": true, "text": "…", "at": … }
 ```

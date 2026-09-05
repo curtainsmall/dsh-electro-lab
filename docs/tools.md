@@ -59,7 +59,7 @@ call { solver, args, target }  call one registered solver; args values are typed
 Semantics:
 
 - `"100 kΩ"` is always a string; a resistance of 100 kΩ must be given as `{ "type": "number", "value": 100, "kind": "resistance", "prefix": "kilo" }`.
-- A slot reference is its own typed value: `{ "type": "slot", "value": "name" }`, where `value` is the full slot path (`"name"` or `"name.field"`). The engine expands it and kind/shape-checks it against the solver signature; a reference to a missing slot fails with `ENGINE_UNDECLARED`. Slot references exist only as call arguments — they are never stored in the table, never returned, and a bare string is always a literal string, never a reference.
+- A slot reference is its own typed value: `{ "type": "slot", "value": "name" }`, where `value` is the full slot path (`"name"` or `"name.field"`). The engine expands it and kind/shape-checks it against the solver signature; a reference to a missing slot fails with `ENGINE_SLOT_UNDECLARED`. Slot references exist only as call arguments — they are never stored in the table, never returned, and a bare string is always a literal string, never a reference.
 - **Every call returns one receipt** — there is no "exception vs normal return" duality:
 
 ```
@@ -228,7 +228,7 @@ One line per engine operation or marker; every line carries everything needed to
 { "seq": 3, "tool": "call", "ok": true, "solver": "resonance",
   "args": { …original… }, "resolved": { …expanded + SI/rect end values… },
   "result": { …typed output… }, "target": "res", "rev": 1, "at": … }
-{ "seq": 4, "tool": "call", "ok": false, "code": "ENGINE_UNDECLARED", "error": "…", "at": … }
+{ "seq": 4, "tool": "call", "ok": false, "code": "ENGINE_SLOT_UNDECLARED", "error": "…", "at": … }
 { "seq": 5, "tool": "set", "ok": true, "name": "tmp", "value": null, "deleted": true, "at": … }
 { "seq": 6, "tool": "marker", "kind": "answer", "ok": true, "text": "…", "at": … }
 ```

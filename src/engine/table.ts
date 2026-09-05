@@ -37,7 +37,7 @@ export class VariableTable {
       return slot
     }
     if (VariableTable.identity(existing.value) !== VariableTable.identity(value)) {
-      throw new ToolError(`slot "${name}" is pinned to ${VariableTable.identity(existing.value)}, got ${VariableTable.identity(value)}`, ToolErrorCode.EngineKindMismatch)
+      throw new ToolError(`slot "${name}" is pinned to ${VariableTable.identity(existing.value)}, got ${VariableTable.identity(value)}`, ToolErrorCode.KindMismatch)
     }
     const slot = { value, rev: existing.rev + 1 }
     this.slots.set(name, slot)

@@ -15,24 +15,24 @@ export enum ToolErrorCode {
   ExternalTimeout = 'EXTERNAL_TIMEOUT',
   /** Protocol violation in the external response envelope. */
   ExternalResponse = 'EXTERNAL_RESPONSE',
-  /** Engine: a referenced slot does not exist. */
-  EngineUndeclared = 'ENGINE_UNDECLARED',
-  /** Engine: slot kind conflicts with the pinned kind (or a parameter kind mismatch). */
-  EngineKindMismatch = 'ENGINE_KIND_MISMATCH',
-  /** Engine: an unknown solver was called. */
-  EngineUnknownSolver = 'ENGINE_UNKNOWN_SOLVER',
-  /** Engine: solver signature rejects the argument shape. */
-  EngineArgs = 'ENGINE_ARGS',
-  /** Engine: target given for a void solver. */
-  EngineVoidTarget = 'ENGINE_VOID_TARGET',
-  /** Engine: a non-void solver call without a named target. */
-  EngineTargetRequired = 'ENGINE_TARGET_REQUIRED',
-  /** Engine: variant not supported for the kind (set-time). */
-  EngineUnsupportedVariant = 'ENGINE_UNSUPPORTED_VARIANT',
-  /** Engine: prefix not supported (combination or unknown word). */
-  EngineUnsupportedPrefix = 'ENGINE_UNSUPPORTED_PREFIX',
-  /** Engine: a run (kernel) threw. */
-  EngineSolverFailed = 'ENGINE_SOLVER_FAILED',
+  /** Slot: a referenced slot does not exist. */
+  SlotUndeclared = 'ENGINE_SLOT_UNDECLARED',
+  /** Kind: the argument kind conflicts with the solver parameter or the pinned kind of a slot. */
+  KindMismatch = 'ENGINE_KIND_MISMATCH',
+  /** Solver: an unknown solver id was called. */
+  UnknownSolver = 'ENGINE_UNKNOWN_SOLVER',
+  /** Args: the solver signature rejects the argument shape. */
+  InvalidArgs = 'ENGINE_ARGS',
+  /** Target: a named target was given for a void solver. */
+  VoidTarget = 'ENGINE_VOID_TARGET',
+  /** Target: a non-void solver call without a named target. */
+  TargetRequired = 'ENGINE_TARGET_REQUIRED',
+  /** Variant: not supported for the kind (set-time). */
+  UnsupportedVariant = 'ENGINE_UNSUPPORTED_VARIANT',
+  /** Prefix: not supported (combination or unknown word). */
+  UnsupportedPrefix = 'ENGINE_UNSUPPORTED_PREFIX',
+  /** Solver: a run (kernel) threw. */
+  SolverFailed = 'ENGINE_SOLVER_FAILED',
   /** Registry: solver registration without an explicit returns. */
   RegisterMissingReturns = 'REGISTER_MISSING_RETURNS',
   /** Registry: duplicate solver id. */
