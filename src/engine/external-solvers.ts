@@ -1,9 +1,9 @@
 /**
- * 外部 fn 直录（蓝图 §3.4）：声明档案行 → FnDef（external 块），无编译翻译层。
+ * 外部 solver 直录（蓝图 §3.4）：声明档案行 → SolverDef（external 块），无编译翻译层。
  * parameters/returns 用同一 spec 语言；returns 显式（spec 或 null = void）；
  * 缺失或 any 无法映射 → 报错跳过。
  */
-import type { FnDef, ExternalBlock } from './registry.ts'
+import type { SolverDef, ExternalBlock } from './registry.ts'
 import { isKind, type Spec } from './values.ts'
 import { DeclarationParamType } from '../tool.ts'
 import type { DeclarationParamSpec, ToolDeclaration, ToolReturns } from '../tool.ts'
@@ -52,8 +52,8 @@ function specFromLeaf(returns: ToolReturns, path: string): Spec {
   }
 }
 
-/** 档案行 → FnDef。不可映射（returns 缺失/any/坏参数）返回 null 或抛错，由调用方 warn 跳过。 */
-export function compileExternalFn(declaration: ToolDeclaration): FnDef | null {
+/** 档案行 → SolverDef。不可映射（returns 缺失/any/坏参数）返回 null 或抛错，由调用方 warn 跳过。 */
+export function compileExternalSolver(declaration: ToolDeclaration): SolverDef | null {
   const parameters: Record<string, Spec> = {}
   for (const [key, param] of Object.entries(declaration.parameters)) {
     parameters[key] = specFromParam(param, `parameter "${key}"`)
@@ -70,7 +70,7 @@ export function compileExternalFn(declaration: ToolDeclaration): FnDef | null {
     parameters,
     returns,
     run: () => {
-      throw new Error('external fn runs through the transport — this run is never called')
+      throw new Error('external solver runs through the transport — this run is never called')
     },
     external,
   }

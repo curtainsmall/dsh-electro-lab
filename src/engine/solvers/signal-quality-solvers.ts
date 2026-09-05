@@ -1,14 +1,14 @@
 /**
- * Signal-quality fns (migrated from tools/signal-quality-tools.ts): THD,
+ * Signal-quality solvers (migrated from tools/signal-quality-tools.ts): THD,
  * clock-jitter SNR ceiling, and the combined ADC noise budget. Kinds mirror
  * the old tool declarations (thd is a fraction → none, SNR values → log).
  */
 import { calcAdcBudget, calcJitterSnr, calcThd } from '../../math/signal-quality.ts'
 import { toScalar, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
-export const signalQualityFns: FnDef[] = [
+export const signalQualitySolvers: SolverDef[] = [
   {
     id: 'thd',
     summary: 'Total harmonic distortion of a sampled signal (fraction plus dB)',

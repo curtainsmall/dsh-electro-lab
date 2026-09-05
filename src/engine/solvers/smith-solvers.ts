@@ -1,6 +1,6 @@
 /**
- * Engine fn definitions migrated from src/tools/smith-tools.ts —
- * one FnDef per legacy defineJsonTool. run bodies mirror the old executes
+ * Engine solver definitions migrated from src/tools/smith-tools.ts —
+ * one SolverDef per legacy defineJsonTool. run bodies mirror the old executes
  * (SI base units; toScalar/toComplex unwrapping preserved); real results
  * come back as plain numbers, complex ones as rect complex values.
  *
@@ -9,7 +9,7 @@
  *   boolean for the |Γ| = 1 / |Γ| = 0 extremes, but their serializers threw
  *   on non-finite numbers before that flag could ever be returned (and the
  *   engine value universe cannot carry Infinity either), so the migrated
- *   fns return only the finite vswr / returnLossDb and those extremes throw.
+ *   solvers return only the finite vswr / returnLossDb and those extremes throw.
  * - matched_network: each legacy element carried reactance plus exactly one
  *   of inductance (H, positive reactance) or capacitance (F, negative
  *   reactance) — an engine quantity has one fixed kind per field, so each
@@ -32,7 +32,7 @@ import {
 } from '../../math/smith.ts'
 import { toComplex, toScalar, serializeComplex, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
 /** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
@@ -40,7 +40,7 @@ function rectOf(value: Complex): { re: number; im: number } {
   return { re: snapshot.re, im: snapshot.im }
 }
 
-export const smithFns: FnDef[] = [
+export const smithSolvers: SolverDef[] = [
   {
     id: 'impedance_to_reflection',
     summary: 'Reflection coefficient Γ = (Z − Z0) / (Z + Z0) for an impedance on a referenceImpedance line (default 50 Ω)',

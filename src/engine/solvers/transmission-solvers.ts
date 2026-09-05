@@ -1,5 +1,5 @@
 /**
- * Transmission-line fns (migrated from tools/transmission-tools.ts):
+ * Transmission-line solvers (migrated from tools/transmission-tools.ts):
  * wavelength, coaxial-line characterization, and rise-time/bandwidth
  * conversion. Kinds mirror the old tool declarations.
  */
@@ -11,9 +11,9 @@ import {
 } from '../../math/transmission.ts'
 import { toScalar, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
-export const transmissionFns: FnDef[] = [
+export const transmissionSolvers: SolverDef[] = [
   {
     id: 'wavelength_frequency',
     summary: 'Wavelength from frequency (velocity factor aware)',

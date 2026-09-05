@@ -4,12 +4,12 @@
  *
  * 1. Definition: ToolReturns (the declared output shape of a declaration),
  *    renderText and defineJsonTool — the factory used by the manager tools
- *    (external_fns_*) and the engine primitives (set/get/call, markers).
+ *    (external_solver_*) and the engine primitives (set/get/call, markers).
  * 2. Declarations: the archive-authored tool dialect (ToolDeclaration,
- *    Declaration*), the external-fns.jsonl archive with the restart dirty
+ *    Declaration*), the external-solvers.jsonl archive with the restart dirty
  *    bit, and validation. Declarations are not compiled into tools anymore —
  *    at plugin start every enabled declaration is recorded verbatim into the
- *    engine's fn registry as an external fn (engine/external-fns.ts), which
+ *    engine's solver registry as an external solver (engine/external-solvers.ts), which
  *    wraps the http/file transport itself.
  *
  * ToolError/ToolErrorCode are re-exported so callers import the failure
@@ -26,11 +26,11 @@ import { ToolError, ToolErrorCode } from './errors.ts'
 export { ToolError, ToolErrorCode }
 
 /**
- * Declared result shape of a declared tool (the engine fn's `returns` spec
- * is mapped from this at registration — engine/external-fns.ts).
+ * Declared result shape of a declared tool (the engine solver's `returns` spec
+ * is mapped from this at registration — engine/external-solvers.ts).
  */
 export type ToolReturns =
-  /** Any JSON (cannot be mapped to a typed spec — an external fn needs an explicit shape). */
+  /** Any JSON (cannot be mapped to a typed spec — an external solver needs an explicit shape). */
   | { type: 'any' }
   /** A plain string passthrough. */
   | { type: 'string' }
@@ -87,7 +87,7 @@ export { QUANTITY_KIND_NAMES }
 
 /* ── Dialect ──────────────────────────────────────────────────────────────── */
 
-/** Transports a declared fn can be reached over. */
+/** Transports a declared solver can be reached over. */
 export enum DeclarationTransport {
   Http = 'http',
   File = 'file',
@@ -130,7 +130,7 @@ interface DeclarationBase {
   /** Registers at plugin start when not false (a declaration without the flag defaults to enabled). */
   enabled: boolean
   parameters: DeclarationParameters
-  /** Explicit result shape — required for registration as an engine fn:
+  /** Explicit result shape — required for registration as an engine solver:
    *  a spec, or null = void. A declaration without it (or with the
    *  unmappable "any" leaf) is kept in the archive but skipped at start. */
   returns?: ToolReturns | null
@@ -162,8 +162,8 @@ export type ToolDeclaration = DeclarationBase & (
 
 /* ── Archive ──────────────────────────────────────────────────────────────── */
 
-/** The external-fn declaration archive (one JSON declaration per line). */
-export const DECLARATIONS_FILE = 'external-fns.jsonl'
+/** The external-solver declaration archive (one JSON declaration per line). */
+export const DECLARATIONS_FILE = 'external-solvers.jsonl'
 /** Non-config serialized state (the restart dirty bit lives here). */
 export const STATE_FILE = 'state.json'
 
@@ -224,7 +224,7 @@ export function restartRequired(home: string): boolean {
   }
 }
 
-/** Clear the dirty bit; the host calls this once the fns are (re)registered at start. */
+/** Clear the dirty bit; the host calls this once the solvers are (re)registered at start. */
 export function clearRestartRequired(home: string): void {
   setRestartRequired(home, false)
 }
@@ -300,9 +300,9 @@ export function validateDeclaration(config: unknown): string[] {
       validateParamSpec(spec, `parameter "${key}"`, errors)
     }
   }
-  // The registration-side fn needs an explicit returns: a declaration without
+  // The registration-side solver needs an explicit returns: a declaration without
   // one stays in the archive but never registers (validated at registration,
-  // external-fns.ts — reported there, not here).
+  // external-solvers.ts — reported there, not here).
   if (tool.timeoutMs !== undefined && (!Number.isFinite(tool.timeoutMs) || tool.timeoutMs <= 0)) {
     errors.push('timeoutMs must be a positive number')
   }

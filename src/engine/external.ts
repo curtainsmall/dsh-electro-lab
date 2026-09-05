@@ -1,5 +1,5 @@
 /**
- * 外部 fn 传输（蓝图 §3.5 信封协议）：请求 {requestId, args}，成功
+ * 外部 solver 传输（蓝图 §3.5 信封协议）：请求 {requestId, args}，成功
  * {requestId, result}（void = result: null），失败 {requestId, error: "字符串"}。
  * 参数与结果都是类型化值（SI、rect、无 variant/prefix）。
  */
@@ -34,7 +34,7 @@ function readResult(body: unknown, requestId: string): TypedValue | null {
   return raw as TypedValue
 }
 
-/** 执行一次外部调用；返回响应里的 result（可能为 null，引擎按 fn 签名校验）。 */
+/** 执行一次外部调用；返回响应里的 result（可能为 null，引擎按 solver 签名校验）。 */
 export async function callExternal(block: ExternalBlock, args: Record<string, TypedValue>): Promise<TypedValue | null> {
   const timeoutMs = block.timeoutMs ?? 30000
   const requestId = randomUUID()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compileExternalFn } from '../../src/engine/external-fns.ts'
+import { compileExternalSolver } from '../../src/engine/external-solvers.ts'
 import { QuantityKind } from '../../src/math/quantity-kind.ts'
 import { DeclarationHttpMethod, DeclarationParamType, DeclarationTransport, type ToolDeclaration } from '../../src/tool.ts'
 
@@ -15,37 +15,37 @@ const BASE: ToolDeclaration = {
   transportOptions: { url: 'http://127.0.0.1:1/x', method: DeclarationHttpMethod.Post },
 }
 
-describe('compileExternalFn', () => {
-  it('maps a declaration with an object returns into an external FnDef', () => {
-    const fn = compileExternalFn({
+describe('compileExternalSolver', () => {
+  it('maps a declaration with an object returns into an external SolverDef', () => {
+    const solver = compileExternalSolver({
       ...BASE,
       returns: { type: 'object', fields: { message: { type: 'string' }, count: { type: 'number', kind: QuantityKind.None } } },
     })
-    expect(fn).not.toBeNull()
-    expect(fn!.id).toBe('sample_echo')
-    expect(fn!.external).toMatchObject({ transport: 'http' })
-    expect(fn!.returns).toEqual({
+    expect(solver).not.toBeNull()
+    expect(solver!.id).toBe('sample_echo')
+    expect(solver!.external).toMatchObject({ transport: 'http' })
+    expect(solver!.returns).toEqual({
       type: 'object',
       fields: { message: { type: 'string' }, count: { type: 'quantity', kind: 'none' } },
     })
   })
 
-  it('registers returns: null as a void fn (explicit)', () => {
-    const fn = compileExternalFn({ ...BASE, returns: null })
-    expect(fn).not.toBeNull()
-    expect(fn!.returns).toBeNull()
+  it('registers returns: null as a void solver (explicit)', () => {
+    const solver = compileExternalSolver({ ...BASE, returns: null })
+    expect(solver).not.toBeNull()
+    expect(solver!.returns).toBeNull()
   })
 
   it('rejects a missing returns (a declaration without one never registers)', () => {
-    expect(() => compileExternalFn(BASE)).toThrow(/needs an explicit returns/)
+    expect(() => compileExternalSolver(BASE)).toThrow(/needs an explicit returns/)
   })
 
   it('rejects the unmappable any leaf', () => {
-    expect(() => compileExternalFn({ ...BASE, returns: { type: 'any' } })).toThrow(/cannot be mapped/)
+    expect(() => compileExternalSolver({ ...BASE, returns: { type: 'any' } })).toThrow(/cannot be mapped/)
   })
 
   it('maps a complex leaf with kind and the either form', () => {
-    const fn = compileExternalFn({ ...BASE, returns: { type: 'complex', kind: QuantityKind.Voltage } })
-    expect(fn!.returns).toEqual({ type: 'quantity', kind: 'voltage', form: 'either' })
+    const solver = compileExternalSolver({ ...BASE, returns: { type: 'complex', kind: QuantityKind.Voltage } })
+    expect(solver!.returns).toEqual({ type: 'quantity', kind: 'voltage', form: 'either' })
   })
 })

@@ -17,7 +17,7 @@ import { installLocale, LOCALE_NS, dictionaries } from './locales.ts'
 interface LocaleLike {
   register(namespace: string, dicts: unknown): () => void
   getSnapshot(): { active: string; revision: number }
-  subscribe(fn: () => void): () => void
+  subscribe(solver: () => void): () => void
 }
 
 declare module 'cordis' {

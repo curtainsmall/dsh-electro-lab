@@ -29,8 +29,8 @@ const NAME_DESC = 'slot name: letters, digits, underscore; start with a letter o
 
 /** 工厂：绑定全局单引擎实例，产出 LLM 可见的工具定义。 */
 export function createEngineTools(engine: Engine): Array<ReturnType<typeof defineJsonTool>> {
-  const fnEnum = engine.registry.ids()
-  const fnList = fnEnum.length > 0 ? ` Available fn ids: ${fnEnum.join(', ')}.` : ''
+  const solverEnum = engine.registry.ids()
+  const solverList = solverEnum.length > 0 ? ` Available solver ids: ${solverEnum.join(', ')}.` : ''
   return [
     defineJsonTool({
       name: 'set',
@@ -51,13 +51,13 @@ export function createEngineTools(engine: Engine): Array<ReturnType<typeof defin
     }),
     defineJsonTool({
       name: 'call',
-      description: `Call one registered fn and store its result into a named slot. Arguments are typed values or "@name" / "@name.field" slot references; the engine expands references and kind-checks them against the fn signature. A void fn (declared returns: null) takes target: null; a value fn requires a named target. Overwriting an existing slot replaces its value (rev +1).${fnList}`,
+      description: `Call one registered solver and store its result into a named slot. Arguments are typed values or "@name" / "@name.field" slot references; the engine expands references and kind-checks them against the solver signature. A void solver (declared returns: null) takes target: null; a value solver requires a named target. Overwriting an existing slot replaces its value (rev +1).${solverList}`,
       parameters: {
-        fn: { type: 'string', enum: fnEnum, description: 'the registered fn to call', required: true },
-        args: { type: 'json', description: `fn arguments: object mapping each parameter name to a typed value or "@name" reference`, required: true },
-        target: { type: 'json', description: 'result slot name (string), or null for void fns', required: true },
+        solver: { type: 'string', enum: solverEnum, description: 'the registered solver to call', required: true },
+        args: { type: 'json', description: `solver arguments: object mapping each parameter name to a typed value or "@name" reference`, required: true },
+        target: { type: 'json', description: 'result slot name (string), or null for void solvers', required: true },
       },
-      execute: async (args) => engine.opCall(args.fn as string, args.args as Record<string, unknown> | undefined, args.target as string | null) as never,
+      execute: async (args) => engine.opCall(args.solver as string, args.args as Record<string, unknown> | undefined, args.target as string | null) as never,
     }),
     defineJsonTool({
       name: 'record_question',

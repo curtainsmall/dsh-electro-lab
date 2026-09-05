@@ -1,6 +1,6 @@
 /**
- * Engine fn definitions migrated from src/tools/electronics-tools.ts —
- * one FnDef per legacy defineJsonTool. run bodies mirror the old executes
+ * Engine solver definitions migrated from src/tools/electronics-tools.ts —
+ * one SolverDef per legacy defineJsonTool. run bodies mirror the old executes
  * (SI base units; toScalar unwrapping preserved); real results come back as
  * plain numbers, complex ones (op-amp gain/output) as rect complex values,
  * which the engine types against `returns`.
@@ -9,7 +9,7 @@
  * - opamp_configurations: the legacy 'summing' configuration returned only
  *   { configuration, outputVoltage } (a summing amplifier has no single gain),
  *   while every other configuration also returned gain. An engine returns
- *   object has one exact shape per fn, so the migrated fn keeps the six
+ *   object has one exact shape per solver, so the migrated solver keeps the six
  *   single-input configurations (each returning gain + outputVoltage) and
  *   drops 'summing' from the enum.
  * - voltage_divider: loadResistance stays optional; the result always carries
@@ -31,7 +31,7 @@ import {
 } from '../../math/electronics.ts'
 import { toScalar, serializeComplex, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
 /** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
@@ -39,7 +39,7 @@ function rectOf(value: Complex): { re: number; im: number } {
   return { re: snapshot.re, im: snapshot.im }
 }
 
-export const electronicsFns: FnDef[] = [
+export const electronicsSolvers: SolverDef[] = [
   {
     id: 'opamp_configurations',
     summary: 'Ideal op-amp gain and output for a configuration: inverting −Rf/Rin, non-inverting 1+Rf/Rin, voltage-follower 1, difference (Rf/R1)(V₂−V₁), integrator −1/(jωRC) and differentiator −jωRC at a frequency',

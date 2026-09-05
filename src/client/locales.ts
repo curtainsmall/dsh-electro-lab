@@ -12,17 +12,17 @@ export const LOCALE_NS = 'dsh-electro-lab'
 const zh = {
   backToSession: '返回会话',
   tabRecords: '记录',
-  tabExternal: '外部函数',
-  addExternalFn: '添加外部函数',
-  editExternalFn: '编辑外部函数',
-  editFn: '编辑',
-  deleteFn: '删除',
-  deleteFnTitle: '删除外部函数 “{name}”?',
+  tabExternal: '外部求解器',
+  addExternalSolver: '添加外部求解器',
+  editExternalSolver: '编辑外部求解器',
+  editSolver: '编辑',
+  deleteSolver: '删除',
+  deleteSolverTitle: '删除外部求解器 “{name}”?',
   enabled: '已启用',
   disabled: '已停用',
-  restartRequired: '有更改待生效——重启宿主后，外部函数将按最新声明注册。',
-  externalEmptyHint: '暂无外部函数。可通过 LLM 的 external_fns_add，或点击“添加外部函数”注册。',
-  externalUnreachable: '外部函数端点未响应，面板会自动重试；若刚更新插件，宿主可能需要重启。',
+  restartRequired: '有更改待生效——重启宿主后，外部求解器将按最新声明注册。',
+  externalEmptyHint: '暂无外部求解器。可通过 LLM 的 external_solver_add，或点击“添加外部求解器”注册。',
+  externalUnreachable: '外部求解器端点未响应，面板会自动重试；若刚更新插件，宿主可能需要重启。',
   saveFailed: '保存失败：{message}',
   warnHttp: '注意：启用后，该工具可向 {url} 发起网络请求。',
   warnFile: '注意：启用后，该工具可读写 {directory} 下的请求与响应文件。',
@@ -132,17 +132,17 @@ const zh = {
 const en: Record<keyof typeof zh, string> = {
   backToSession: 'Back to session',
   tabRecords: 'Records',
-  tabExternal: 'External fns',
-  addExternalFn: 'Add external fn',
-  editExternalFn: 'Edit external fn',
-  editFn: 'Edit',
-  deleteFn: 'Delete',
-  deleteFnTitle: 'Delete external fn “{name}”?',
+  tabExternal: 'External solvers',
+  addExternalSolver: 'Add external solver',
+  editExternalSolver: 'Edit external solver',
+  editSolver: 'Edit',
+  deleteSolver: 'Delete',
+  deleteSolverTitle: 'Delete external solver “{name}”?',
   enabled: 'Enabled',
   disabled: 'Disabled',
-  restartRequired: 'Changes are pending — after a host restart, external fns register from the latest declarations.',
-  externalEmptyHint: 'No external fns yet. Register one through the LLM’s external_fns_add, or click “Add external fn”.',
-  externalUnreachable: 'The external-fns endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.',
+  restartRequired: 'Changes are pending — after a host restart, external solvers register from the latest declarations.',
+  externalEmptyHint: 'No external solvers yet. Register one through the LLM’s external_solver_add, or click “Add external solver”.',
+  externalUnreachable: 'The external-solvers endpoint is not responding; the panel keeps retrying automatically. If you just updated the plugin, the host process may need a restart.',
   saveFailed: 'Save failed: {message}',
   warnHttp: 'Caution: once enabled, this tool may send requests to {url}.',
   warnFile: 'Caution: once enabled, this tool may read and write request/response files under {directory}.',
@@ -264,7 +264,7 @@ let current: LocaleSnapshot = { active: 'zh', revision: 0 }
 const listeners = new Set<() => void>()
 
 /** Wire the DSH locale service (LocaleFace getSnapshot/subscribe) into this module. */
-export function installLocale(locale: { getSnapshot(): LocaleSnapshot; subscribe(fn: () => void): () => void }): void {
+export function installLocale(locale: { getSnapshot(): LocaleSnapshot; subscribe(solver: () => void): () => void }): void {
   current = locale.getSnapshot()
   locale.subscribe(() => {
     current = locale.getSnapshot()
@@ -272,10 +272,10 @@ export function installLocale(locale: { getSnapshot(): LocaleSnapshot; subscribe
   })
 }
 
-function subscribe(fn: () => void): () => void {
-  listeners.add(fn)
+function subscribe(solver: () => void): () => void {
+  listeners.add(solver)
   return () => {
-    listeners.delete(fn)
+    listeners.delete(solver)
   }
 }
 

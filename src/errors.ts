@@ -19,23 +19,23 @@ export enum ToolErrorCode {
   EngineUndeclared = 'ENGINE_UNDECLARED',
   /** Engine: slot kind conflicts with the pinned kind (or a parameter kind mismatch). */
   EngineKindMismatch = 'ENGINE_KIND_MISMATCH',
-  /** Engine: an unknown fn was called. */
-  EngineUnknownFn = 'ENGINE_UNKNOWN_FN',
-  /** Engine: fn signature rejects the argument shape. */
+  /** Engine: an unknown solver was called. */
+  EngineUnknownSolver = 'ENGINE_UNKNOWN_SOLVER',
+  /** Engine: solver signature rejects the argument shape. */
   EngineArgs = 'ENGINE_ARGS',
-  /** Engine: target given for a void fn. */
+  /** Engine: target given for a void solver. */
   EngineVoidTarget = 'ENGINE_VOID_TARGET',
-  /** Engine: a non-void fn call without a named target. */
+  /** Engine: a non-void solver call without a named target. */
   EngineTargetRequired = 'ENGINE_TARGET_REQUIRED',
   /** Engine: variant not supported for the kind (set-time). */
   EngineUnsupportedVariant = 'ENGINE_UNSUPPORTED_VARIANT',
   /** Engine: prefix not supported (combination or unknown word). */
   EngineUnsupportedPrefix = 'ENGINE_UNSUPPORTED_PREFIX',
   /** Engine: a run (kernel) threw. */
-  EngineFnFailed = 'ENGINE_FN_FAILED',
-  /** Registry: fn registration without an explicit returns. */
+  EngineSolverFailed = 'ENGINE_SOLVER_FAILED',
+  /** Registry: solver registration without an explicit returns. */
   RegisterMissingReturns = 'REGISTER_MISSING_RETURNS',
-  /** Registry: duplicate fn id. */
+  /** Registry: duplicate solver id. */
   RegisterDuplicate = 'REGISTER_DUPLICATE',
 }
 

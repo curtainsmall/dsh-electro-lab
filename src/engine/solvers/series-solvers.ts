@@ -1,5 +1,5 @@
 /**
- * Series fns (migrated from tools/series-tools.ts): series_sum with an
+ * Series solvers (migrated from tools/series-tools.ts): series_sum with an
  * arithmetic / geometric / power kind discriminator.
  *
  * Engine object returns are closed and require every declared field, so the
@@ -14,7 +14,7 @@
 import { PowerSumKind, calcArithmeticSeries, calcGeometricSeries, calcPowerSum } from '../../math/series.ts'
 import { toScalar, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
 /** Last summed term of a power sum Σk^p over the first n naturals = n^p. */
 function powerLastTerm(power: PowerSumKind, count: number): number {
@@ -22,7 +22,7 @@ function powerLastTerm(power: PowerSumKind, count: number): number {
   return count ** exponent
 }
 
-export const seriesFns: FnDef[] = [
+export const seriesSolvers: SolverDef[] = [
   {
     id: 'series_sum',
     summary: 'Sum of a number sequence: arithmetic, geometric (finite or convergent infinite), or power sum',

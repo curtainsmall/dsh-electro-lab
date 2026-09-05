@@ -1,5 +1,5 @@
 /**
- * Expression fns (migrated from tools/expression-tools.ts): string-expression
+ * Expression solvers (migrated from tools/expression-tools.ts): string-expression
  * evaluation and rational reduction. Expression values are kind-none
  * quantities; variable/symbol bindings are kind-none quantities too.
  */
@@ -7,7 +7,7 @@ import type { Complex } from 'complex.js'
 import { calcExpression, reduceRational } from '../../math/expression.ts'
 import { serializeComplex, toComplex, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
 /** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
@@ -21,7 +21,7 @@ interface Binding {
   value: ValuePayload
 }
 
-export const expressionFns: FnDef[] = [
+export const expressionSolvers: SolverDef[] = [
   {
     id: 'calculate',
     summary: 'Evaluate a string math expression and return the complex result',

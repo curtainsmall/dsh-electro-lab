@@ -1,10 +1,10 @@
 /**
  * Host half of dsh-electro-lab（引擎时代）。
  *
- * 一台进程级全局引擎（Engine）：变量表 + fn 注册表 + 记录存储。
- * apply 装配：注册内核 fn 与外部 fn、注册 LLM 工具面（set/get/call +
- * markers）与声明管理工具（external_fns_add/update/delete）、挂两个
- * 端点（记录索引、外部 fn 档案管理）。
+ * 一台进程级全局引擎（Engine）：变量表 + solver 注册表 + 记录存储。
+ * apply 装配：注册内核 solver 与外部 solver、注册 LLM 工具面（set/get/call +
+ * markers）与声明管理工具（external_solver_add/update/delete）、挂两个
+ * 端点（记录索引、外部 solver 档案管理）。
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -12,8 +12,8 @@ import type { Context } from 'cordis'
 import { Engine } from './engine/engine.ts'
 import { createEngineTools } from './tools/engine-tools.ts'
 import { createDeclarationTools } from './tools/declaration-tools.ts'
-import { compileExternalFn } from './engine/external-fns.ts'
-import { registerKernelFns } from './engine/fns/index.ts'
+import { compileExternalSolver } from './engine/external-solvers.ts'
+import { registerKernelSolvers } from './engine/solvers/index.ts'
 import { clearRestartRequired, deleteDeclaration, readDeclarations, restartRequired, upsertDeclaration, validateDeclaration } from './tool.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
@@ -55,24 +55,24 @@ const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-el
 export const engine = new Engine(recordsHome)
 
 const RECORDS_INDEX_PATH = '/api/dsh-electro-lab/records-index'
-const EXTERNAL_PATH = '/api/dsh-electro-lab/external-fns'
+const EXTERNAL_PATH = '/api/dsh-electro-lab/external-solvers'
 
 export function apply(ctx: Context): void {
   ctx.effect(() => {
     const disposers: Array<() => void> = []
 
-    // 引擎装配：恢复 open 记录（清孤儿 + 重建表）、注册全部内核 fn 与外部 fn。
+    // 引擎装配：恢复 open 记录（清孤儿 + 重建表）、注册全部内核 solver 与外部 solver。
     engine.start()
-    for (const fn of registerKernelFns()) {
-      if (engine.registry.get(fn.id) === undefined) engine.registry.register(fn)
+    for (const solver of registerKernelSolvers()) {
+      if (engine.registry.get(solver.id) === undefined) engine.registry.register(solver)
     }
     for (const declaration of readDeclarations(recordsHome)) {
       if (declaration.enabled === false) continue
       try {
-        const fn = compileExternalFn(declaration)
-        if (fn !== null && engine.registry.get(fn.id) === undefined) engine.registry.register(fn)
+        const solver = compileExternalSolver(declaration)
+        if (solver !== null && engine.registry.get(solver.id) === undefined) engine.registry.register(solver)
       } catch (error) {
-        ctx.logger?.warn(`[dsh-electro-lab] failed to register declaration fn "${declaration.name}": ${error instanceof Error ? error.message : String(error)}`)
+        ctx.logger?.warn(`[dsh-electro-lab] failed to register declaration solver "${declaration.name}": ${error instanceof Error ? error.message : String(error)}`)
       }
     }
     // 声明档案刚注册完：重启 dirty 位清掉。
@@ -113,8 +113,8 @@ export function apply(ctx: Context): void {
       },
     }))
 
-    // 外部 fn 档案管理：GET 列表 + dirty 位；PUT 覆盖/新增（base64 JSON 查询参数）；
-    // DELETE ?name= 删除。每次写置 dirty 位（重启后经 compileExternalFn 注册）。
+    // 外部 solver 档案管理：GET 列表 + dirty 位；PUT 覆盖/新增（base64 JSON 查询参数）；
+    // DELETE ?name= 删除。每次写置 dirty 位（重启后经 compileExternalSolver 注册）。
     disposers.push(ctx.webServer.register({
       kind: 'exact',
       path: EXTERNAL_PATH,
@@ -158,7 +158,7 @@ export function apply(ctx: Context): void {
           res.end('method not allowed')
           return
         }
-        res.end(JSON.stringify({ fns: readDeclarations(recordsHome), restartRequired: restartRequired(recordsHome) }))
+        res.end(JSON.stringify({ solvers: readDeclarations(recordsHome), restartRequired: restartRequired(recordsHome) }))
       },
     }))
 

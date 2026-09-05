@@ -1,6 +1,6 @@
 /**
- * Engine fn definitions migrated from src/tools/noise-tools.ts —
- * one FnDef per legacy defineJsonTool. run bodies mirror the old executes
+ * Engine solver definitions migrated from src/tools/noise-tools.ts —
+ * one SolverDef per legacy defineJsonTool. run bodies mirror the old executes
  * (SI base units; toScalar unwrapping preserved); real results come back as
  * plain numbers.
  */
@@ -11,9 +11,9 @@ import {
 } from '../../math/noise.ts'
 import { toScalar, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
-export const noiseFns: FnDef[] = [
+export const noiseSolvers: SolverDef[] = [
   {
     id: 'thermal_noise',
     summary: 'Thermal (Johnson) noise power in a bandwidth: P = k·T·B (k = 1.380649e−23 J/K), temperature in kelvin; returns watts',

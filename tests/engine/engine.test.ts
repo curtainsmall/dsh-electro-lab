@@ -86,7 +86,7 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     expect(engine.opGet('R')).toMatchObject({ ok: false })
   })
 
-  it('call 执行本地 fn：resolved/result 落行、target 恒覆盖', async () => {
+  it('call 执行本地 solver：resolved/result 落行、target 恒覆盖', async () => {
     const engine = makeEngine()
     engine.registry.register({
       id: 'double_rc',
@@ -105,7 +105,7 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     expect((got as unknown as { value: { value: { re: number } } }).value.value.re).toBe(20)
     // 轨迹行含 result（输入输出都记录）
     const rows = engine.store.readRows(String(engine.openId()))
-    const callRow = rows.find((row) => row.tool === 'call' && row.fn === 'double_rc')
+    const callRow = rows.find((row) => row.tool === 'call' && row.solver === 'double_rc')
     expect(callRow).toBeDefined()
     expect(callRow!.result).toBeDefined()
     expect((callRow!.resolved as { r: { value: number } }).r.value).toBe(10)
@@ -135,10 +135,10 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
     await expect(engine.opCall('does_nothing', {}, 'D')).resolves.toMatchObject({ ok: false, code: 'ENGINE_VOID_TARGET' })
     await expect(engine.opCall('does_nothing', {}, null)).resolves.toMatchObject({ ok: true, target: null })
     await expect(engine.opCall('needs_r', { r: { type: 'number', value: 1, kind: QuantityKind.Resistance } }, null)).resolves.toMatchObject({ ok: false, code: 'ENGINE_TARGET_REQUIRED' })
-    await expect(engine.opCall('ghost', {}, null)).resolves.toMatchObject({ ok: false, code: 'ENGINE_UNKNOWN_FN' })
+    await expect(engine.opCall('ghost', {}, null)).resolves.toMatchObject({ ok: false, code: 'ENGINE_UNKNOWN_SOLVER' })
   })
 
-  it('fn run 抛错 → ok:false ENGINE_FN_FAILED，不建槽', async () => {
+  it('solver run 抛错 → ok:false ENGINE_SOLVER_FAILED，不建槽', async () => {
     const engine = makeEngine()
     engine.registry.register({
       id: 'boom',
@@ -150,7 +150,7 @@ describe('引擎（set/get/call + markers + 轨迹）', () => {
       },
     })
     engine.markerQuestion('q')
-    await expect(engine.opCall('boom', {}, 'X')).resolves.toMatchObject({ ok: false, code: 'ENGINE_FN_FAILED', error: 'singular system' })
+    await expect(engine.opCall('boom', {}, 'X')).resolves.toMatchObject({ ok: false, code: 'ENGINE_SOLVER_FAILED', error: 'singular system' })
     expect(engine.opGet('X')).toMatchObject({ ok: false })
   })
 

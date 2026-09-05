@@ -1,6 +1,6 @@
 /**
- * Engine fn definitions migrated from src/tools/circuit-tools.ts —
- * one FnDef per legacy defineJsonTool. run bodies mirror the old executes
+ * Engine solver definitions migrated from src/tools/circuit-tools.ts —
+ * one SolverDef per legacy defineJsonTool. run bodies mirror the old executes
  * (SI base units; the toScalar/toComplex unwrapping is preserved) but return
  * plain numbers for real results and rect complex values for complex ones,
  * which the engine types against `returns`.
@@ -14,7 +14,7 @@
  *   below) and the run parses + validates it.
  * - resonance.resistance was optional (a call without it returned only the
  *   resonant frequency). The engine returns spec is one exact object shape
- *   per fn, so resistance is required here and the object always carries
+ *   per solver, so resistance is required here and the object always carries
  *   qualityFactor and bandwidth.
  * - transient_response: the legacy rlc branch additionally reported alpha/
  *   omega0/dampingRatio/damping. An engine returns object has a fixed shape
@@ -38,7 +38,7 @@ import {
 } from '../../math/circuits.ts'
 import { toComplex, toScalar, serializeComplex, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
 /** Element kind → quantity kind: the leaf value object's kind must match. */
 const ELEMENT_QUANTITY_KINDS: Record<ElementKind, QuantityKind> = {
@@ -98,7 +98,7 @@ function parseNetwork(text: string): NetworkElement {
   return validateNetwork(raw)
 }
 
-export const circuitFns: FnDef[] = [
+export const circuitSolvers: SolverDef[] = [
   {
     id: 'equivalent_impedance',
     summary: 'Total impedance of a set of impedances combined in series (Z = Σ Zi) or in parallel (1/Z = Σ 1/Zi)',
@@ -273,7 +273,7 @@ export const circuitFns: FnDef[] = [
             throw new Error('discharge mode requires initialVoltage or initialCurrent')
           }
           // Second-order characterization (alpha/omega0/dampingRatio/damping) is
-          // intentionally not returned: this fn keeps one fixed object shape
+          // intentionally not returned: this solver keeps one fixed object shape
           // across rc/rl/rlc (see module header).
           const result = calcRlcTransientSeries(mode, sourceVoltage, initialVoltage, initialCurrent, resistance, capacitance, inductance, times)
           return { kind, mode, points: result.points.map(serialize) }

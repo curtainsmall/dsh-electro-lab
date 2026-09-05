@@ -27,7 +27,7 @@ export type Spec =
   | { type: 'array'; items: Spec }
   | { type: 'object'; fields: Record<string, Spec> }
 
-/** fn 参数条目：spec + 可选标记（returns 的 object fields 用纯 Spec）。 */
+/** solver 参数条目：spec + 可选标记（returns 的 object fields 用纯 Spec）。 */
 export type ParamSpec = Spec & { optional?: boolean }
 
 export type Parameters = Record<string, ParamSpec>

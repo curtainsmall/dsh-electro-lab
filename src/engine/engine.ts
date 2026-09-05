@@ -1,11 +1,11 @@
 /**
  * 引擎（engine）——蓝图 §0/§2/§4/§5。
- * 全局单实例：变量表 + fn 注册表 + 记录存储 + 单一 open 生命周期。
+ * 全局单实例：变量表 + solver 注册表 + 记录存储 + 单一 open 生命周期。
  * 原语（set/get/call）与 markers 经此执行；每步落一行轨迹（含输入输出）。
  */
 import { ToolError, ToolErrorCode } from '../errors.ts'
 import { VariableTable } from './table.ts'
-import { FnRegistry, type FnDef } from './registry.ts'
+import { SolverRegistry, type SolverDef } from './registry.ts'
 import { RecordStore, type IndexRow, type TraceRow } from './storage.ts'
 import { callExternal } from './external.ts'
 import {
@@ -24,7 +24,7 @@ interface OpenState {
 
 export class Engine {
   readonly table = new VariableTable()
-  readonly registry = new FnRegistry()
+  readonly registry = new SolverRegistry()
   readonly store: RecordStore
   private open: OpenState | null = null
 
@@ -162,54 +162,54 @@ export class Engine {
     }
   }
 
-  async opCall(fnId: string, rawArgs: Record<string, unknown> | undefined, target: string | null): Promise<Receipt> {
+  async opCall(solverId: string, rawArgs: Record<string, unknown> | undefined, target: string | null): Promise<Receipt> {
     const args: Record<string, unknown> = rawArgs ?? {}
     try {
-      const fn = this.registry.require(fnId)
-      const { resolved, native } = this.resolveArgs(fn, args)
-      if (fn.returns === null) {
-        if (target !== null) throw new ToolError(`fn "${fnId}" returns void — target must be null`, ToolErrorCode.EngineVoidTarget)
-        await this.runVoid(fn, resolved, native)
-        this.trace({ tool: 'call', ok: true, fn: fnId, args, resolved, result: null, target: null })
+      const solver = this.registry.require(solverId)
+      const { resolved, native } = this.resolveArgs(solver, args)
+      if (solver.returns === null) {
+        if (target !== null) throw new ToolError(`solver "${solverId}" returns void — target must be null`, ToolErrorCode.EngineVoidTarget)
+        await this.runVoid(solver, resolved, native)
+        this.trace({ tool: 'call', ok: true, solver: solverId, args, resolved, result: null, target: null })
         return { ok: true, target: null }
       }
-      if (target === null) throw new ToolError(`fn "${fnId}" returns a value — a named target is required`, ToolErrorCode.EngineTargetRequired)
-      const result = await this.execute(fn, resolved, native)
+      if (target === null) throw new ToolError(`solver "${solverId}" returns a value — a named target is required`, ToolErrorCode.EngineTargetRequired)
+      const result = await this.execute(solver, resolved, native)
       const slot = this.table.set(target, result)
-      this.trace({ tool: 'call', ok: true, fn: fnId, args, resolved, result, target, rev: slot.rev })
+      this.trace({ tool: 'call', ok: true, solver: solverId, args, resolved, result, target, rev: slot.rev })
       return { ok: true, target, rev: slot.rev }
     } catch (error) {
       return this.failure('call', error)
     }
   }
 
-  private async runVoid(fn: FnDef, resolved: Record<string, TypedValue>, native: Record<string, unknown>): Promise<void> {
+  private async runVoid(solver: SolverDef, resolved: Record<string, TypedValue>, native: Record<string, unknown>): Promise<void> {
     try {
-      if (fn.external !== undefined) {
-        const result = await callExternal(fn.external, resolved)
-        if (result !== null) throw new ToolError(`fn "${fn.id}" is void but the endpoint returned a result`, ToolErrorCode.ExternalResponse)
+      if (solver.external !== undefined) {
+        const result = await callExternal(solver.external, resolved)
+        if (result !== null) throw new ToolError(`solver "${solver.id}" is void but the endpoint returned a result`, ToolErrorCode.ExternalResponse)
         return
       }
-      await fn.run(native)
+      await solver.run(native)
     } catch (error) {
       if (error instanceof ToolError) throw error
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineFnFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineSolverFailed)
     }
   }
 
   /** 解析 args：@ 引用展开 + 类型化值校验 + kind/形态检查 + 换算（resolved = SI rect 终点）。 */
-  private resolveArgs(fn: FnDef, args: Record<string, unknown>): { resolved: Record<string, TypedValue>; native: Record<string, unknown> } {
+  private resolveArgs(solver: SolverDef, args: Record<string, unknown>): { resolved: Record<string, TypedValue>; native: Record<string, unknown> } {
     const resolved: Record<string, TypedValue> = {}
     const native: Record<string, unknown> = {}
-    for (const [name, spec] of Object.entries(fn.parameters)) {
+    for (const [name, spec] of Object.entries(solver.parameters)) {
       const raw = args[name]
       if (raw === undefined) {
         if (spec.optional === true) continue
-        throw new ToolError(`fn "${fn.id}" is missing argument "${name}"`, ToolErrorCode.EngineArgs)
+        throw new ToolError(`solver "${solver.id}" is missing argument "${name}"`, ToolErrorCode.EngineArgs)
       }
       const typed = this.resolveValue(raw)
       const error = validateAgainstSpec(spec, typed, `argument "${name}"`)
-      if (error !== undefined) throw new ToolError(`fn "${fn.id}": ${error}`, ToolErrorCode.EngineKindMismatch)
+      if (error !== undefined) throw new ToolError(`solver "${solver.id}": ${error}`, ToolErrorCode.EngineKindMismatch)
       const canonical = toCanonical(typed)
       resolved[name] = canonical
       native[name] = nativeValue(spec, canonical)
@@ -233,28 +233,28 @@ export class Engine {
     return raw as TypedValue
   }
 
-  /** 执行非 void fn（本地 run 或外部传输）；结果按 returns 定型。 */
-  private async execute(fn: FnDef, resolved: Record<string, TypedValue>, native: Record<string, unknown>): Promise<TypedValue> {
-    const spec = fn.returns
-    if (spec === null) throw new ToolError(`fn "${fn.id}" is void`, ToolErrorCode.EngineArgs)
+  /** 执行非 void solver（本地 run 或外部传输）；结果按 returns 定型。 */
+  private async execute(solver: SolverDef, resolved: Record<string, TypedValue>, native: Record<string, unknown>): Promise<TypedValue> {
+    const spec = solver.returns
+    if (spec === null) throw new ToolError(`solver "${solver.id}" is void`, ToolErrorCode.EngineArgs)
     let raw: unknown
     try {
-      if (fn.external !== undefined) {
-        const result = await callExternal(fn.external, resolved)
-        if (result === null) throw new ToolError(`fn "${fn.id}" is not void but the endpoint returned result: null`, ToolErrorCode.ExternalResponse)
-        const error = validateAgainstSpec(spec, result, `fn "${fn.id}" result`)
-        if (error !== undefined) throw new ToolError(`fn "${fn.id}": ${error}`, ToolErrorCode.ExternalResponse)
+      if (solver.external !== undefined) {
+        const result = await callExternal(solver.external, resolved)
+        if (result === null) throw new ToolError(`solver "${solver.id}" is not void but the endpoint returned result: null`, ToolErrorCode.ExternalResponse)
+        const error = validateAgainstSpec(spec, result, `solver "${solver.id}" result`)
+        if (error !== undefined) throw new ToolError(`solver "${solver.id}": ${error}`, ToolErrorCode.ExternalResponse)
         return result
       }
-      raw = await fn.run(native)
+      raw = await solver.run(native)
     } catch (error) {
       if (error instanceof ToolError) throw error
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineFnFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineSolverFailed)
     }
     try {
-      return fromNative(spec, raw, `fn "${fn.id}" result`)
+      return fromNative(spec, raw, `solver "${solver.id}" result`)
     } catch (error) {
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineFnFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineSolverFailed)
     }
   }
 

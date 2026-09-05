@@ -1,5 +1,5 @@
 /**
- * Polynomial fns (migrated from tools/polynomial-tools.ts): poles/zeros and
+ * Polynomial solvers (migrated from tools/polynomial-tools.ts): poles/zeros and
  * power-series expansion of a ratio-form transfer function. Coefficient
  * arrays are kind-none quantities in descending power order.
  */
@@ -7,7 +7,7 @@ import type { Complex } from 'complex.js'
 import { expandPowerSeries, findPolesZeros } from '../../math/polynomial.ts'
 import { serializeComplex, toComplex, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
 /** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
@@ -17,7 +17,7 @@ function rectOf(value: Complex): { re: number; im: number } {
 
 const coefficientArray = { type: 'array' as const, items: { type: 'quantity' as const, kind: QuantityKind.None } }
 
-export const polynomialFns: FnDef[] = [
+export const polynomialSolvers: SolverDef[] = [
   {
     id: 'poles_zeros',
     summary: 'Poles and zeros of a ratio-form transfer function',

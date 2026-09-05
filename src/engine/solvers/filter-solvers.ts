@@ -1,11 +1,11 @@
 /**
- * Engine fn definitions migrated from src/tools/filter-tool.ts —
- * one FnDef for the legacy filter_design tool. run mirrors the old execute;
+ * Engine solver definitions migrated from src/tools/filter-tool.ts —
+ * one SolverDef for the legacy filter_design tool. run mirrors the old execute;
  * real results come back as plain numbers.
  *
  * Migration notes (documented deviations from the legacy tool surface):
  * - queryFrequency was optional in the legacy tool (attenuationAtQueryDb was
- *   then omitted). An engine returns object has one exact shape per fn, so
+ *   then omitted). An engine returns object has one exact shape per solver, so
  *   queryFrequency is required here and attenuationAtQueryDb is always
  *   present; pass the cutoff frequency as queryFrequency when only the design
  *   is wanted (both attenuation fields then report the −3 dB point).
@@ -17,9 +17,9 @@
 import { designButterworthLowpass, calcButterworthAttenuation } from '../../math/filter.ts'
 import { toScalar, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
-export const filterFns: FnDef[] = [
+export const filterSolvers: SolverDef[] = [
   {
     id: 'filter_design',
     summary: 'Design a Butterworth low-pass ladder: order, cutoffFrequency and equal source/load resistance give the element list (series inductors, shunt capacitors); attenuation in dB at the cutoff and at the query frequency',

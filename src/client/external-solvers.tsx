@@ -1,9 +1,9 @@
 /**
- * ElectroLab External fns tab: one page with every external fn
- * declaration (external-fns.jsonl), read through the
- * `/api/dsh-electro-lab/external-fns` endpoint and polled while the tab
+ * ElectroLab External solvers tab: one page with every external solver
+ * declaration (external-solvers.jsonl), read through the
+ * `/api/dsh-electro-lab/external-solvers` endpoint and polled while the tab
  * is open. Declarations are edited through a guided form (add/edit dialog)
- * or through the LLM manager tools (external_fns_add/update/delete); both
+ * or through the LLM manager tools (external_solver_add/update/delete); both
  * paths only register the tools at the next host restart, so the dirty bit
  * returned by the endpoint drives the pending-restart banner. Saving a
  * declaration IS the authorization for its transport — the form shows the
@@ -22,7 +22,7 @@ import { QUANTITY_KIND_NAMES } from '../math/quantity-kind.ts'
 
 /* ── Data shapes (mirror of the host declaration + endpoint) ──────────────── */
 
-interface ExternalFnView {
+interface ExternalSolverView {
   name: string
   description: string
   enabled: boolean
@@ -33,16 +33,16 @@ interface ExternalFnView {
   timeoutMs?: number
 }
 
-interface ExternalFnsResponse {
-  fns: ExternalFnView[]
+interface ExternalSolversResponse {
+  solvers: ExternalSolverView[]
   restartRequired: boolean
 }
 
-const EXTERNAL_ENDPOINT = '/api/dsh-electro-lab/external-fns'
+const EXTERNAL_ENDPOINT = '/api/dsh-electro-lab/external-solvers'
 const POLL_MS = 5000
 
 /** The transport target line: "http · GET <url>" or "file · <directory>". */
-function transportLine(tool: ExternalFnView): string {
+function transportLine(tool: ExternalSolverView): string {
   const options = tool.transportOptions ?? {}
   if (tool.transport === 'http') {
     const method = typeof options.method === 'string' ? options.method : 'POST'
@@ -81,12 +81,12 @@ const codeFont: React.CSSProperties = {
 
 /* ── The tab ──────────────────────────────────────────────────────────────── */
 
-export function ExternalFnsTab(): React.JSX.Element {
+export function ExternalSolversTab(): React.JSX.Element {
   useAppLocale() // Re-render when the active language changes.
-  const [response, setResponse] = useState<ExternalFnsResponse | null>(null)
+  const [response, setResponse] = useState<ExternalSolversResponse | null>(null)
   const [failed, setFailed] = useState(false)
-  const [editor, setEditor] = useState<{ tool: ExternalFnView | null } | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<ExternalFnView | null>(null)
+  const [editor, setEditor] = useState<{ tool: ExternalSolverView | null } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ExternalSolverView | null>(null)
   const [actionError, setActionError] = useState('')
   const [refreshTick, setRefreshTick] = useState(0)
   // Pending changes show their banner immediately after a save/delete
@@ -98,8 +98,8 @@ export function ExternalFnsTab(): React.JSX.Element {
     const load = async (): Promise<void> => {
       try {
         const res = await fetch(EXTERNAL_ENDPOINT)
-        if (!res.ok) throw new Error(`external-fns endpoint returned ${res.status}`)
-        const body = (await res.json()) as ExternalFnsResponse
+        if (!res.ok) throw new Error(`external-solvers endpoint returned ${res.status}`)
+        const body = (await res.json()) as ExternalSolversResponse
         if (!alive) return
         setResponse(body)
         setPendingRestart(body.restartRequired)
@@ -124,7 +124,7 @@ export function ExternalFnsTab(): React.JSX.Element {
     )
   }
 
-  const tools = response?.fns ?? []
+  const tools = response?.solvers ?? []
   const restartRequired = pendingRestart || (response?.restartRequired ?? false)
 
   return (
@@ -133,7 +133,7 @@ export function ExternalFnsTab(): React.JSX.Element {
         <span style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 12 }}>
           {t('tabExternal')} · {tools.length}
         </span>
-        <PrimaryButton onClick={() => setEditor({ tool: null })}>{t('addExternalFn')}</PrimaryButton>
+        <PrimaryButton onClick={() => setEditor({ tool: null })}>{t('addExternalSolver')}</PrimaryButton>
       </div>
       {restartRequired && (
         <div style={{ ...rowStyle, borderColor: 'var(--dsw-alias-state-warn-primary)', color: 'var(--dsw-alias-state-warn-primary)' }}>
@@ -182,14 +182,14 @@ export function ExternalFnsTab(): React.JSX.Element {
                   {tool.enabled ? t('enabled') : t('disabled')}
                 </button>
                 <button type="button" style={headerButtonStyle} onClick={() => setEditor({ tool })}>
-                  {t('editFn')}
+                  {t('editSolver')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setDeleteTarget(tool)}
                   style={{ ...headerButtonStyle, color: 'var(--dsw-alias-state-error-primary)', borderColor: 'var(--dsw-alias-state-error-primary)' }}
                 >
-                  {t('deleteFn')}
+                  {t('deleteSolver')}
                 </button>
               </span>
             </div>
@@ -201,7 +201,7 @@ export function ExternalFnsTab(): React.JSX.Element {
       <EditorDialog editor={editor} onClose={() => setEditor(null)} onSaved={() => { setPendingRestart(true); setEditor(null); setRefreshTick((tick) => tick + 1) }} />
       <Dialog
         open={deleteTarget !== null}
-        title={deleteTarget === null ? '' : t('deleteFnTitle', { name: deleteTarget.name })}
+        title={deleteTarget === null ? '' : t('deleteSolverTitle', { name: deleteTarget.name })}
         width={360}
         onClose={() => setDeleteTarget(null)}
         footer={deleteTarget === null ? undefined : [
@@ -517,7 +517,7 @@ function buildParamSpec(row: ParamRow): Record<string, unknown> {
 }
 
 /** Seed the form from a declaration (or defaults for a new tool). */
-function seedForm(tool: ExternalFnView | null): FormState {
+function seedForm(tool: ExternalSolverView | null): FormState {
   const options = (tool?.transportOptions ?? {}) as Record<string, unknown>
   const rows: ParamRow[] = []
   const unmodeled: string[] = []
@@ -556,7 +556,7 @@ function parsePositive(text: string): number | undefined {
 }
 
 /** Rebuild the declaration JSON from the form; unknown fields survive edits. */
-function buildConfig(state: FormState, original: ExternalFnView | null): unknown {
+function buildConfig(state: FormState, original: ExternalSolverView | null): unknown {
   const base: Record<string, unknown> = original !== null ? { ...original } : {}
   delete base.parameters
   delete base.transport
@@ -681,7 +681,7 @@ function Field({ label, style, children }: { label: string; style?: React.CSSPro
 
 /** The add/edit dialog: a guided form — no raw JSON. */
 function EditorDialog({ editor, onClose, onSaved }: {
-  editor: { tool: ExternalFnView | null } | null
+  editor: { tool: ExternalSolverView | null } | null
   onClose: () => void
   onSaved: () => void
 }): React.JSX.Element | null {
@@ -751,7 +751,7 @@ function EditorDialog({ editor, onClose, onSaved }: {
       open
       width={620}
       height={560}
-      title={editor.tool === null ? t('addExternalFn') : t('editExternalFn')}
+      title={editor.tool === null ? t('addExternalSolver') : t('editExternalSolver')}
       onClose={() => { if (!saving) onClose() }}
       footer={[
         <GhostButton key="cancel" onClick={onClose}>{t('cancel')}</GhostButton>,

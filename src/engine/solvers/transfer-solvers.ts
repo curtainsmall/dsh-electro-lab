@@ -1,5 +1,5 @@
 /**
- * System-analysis fns (migrated from tools/transfer-tools.ts): partial
+ * System-analysis solvers (migrated from tools/transfer-tools.ts): partial
  * fractions, frequency and step response of a ratio-form transfer function,
  * difference-equation recursion, and the bode_response combo. Coefficient
  * arrays are kind-none quantities in descending power order.
@@ -16,7 +16,7 @@ import {
 } from '../../math/transfer.ts'
 import { serializeComplex, toComplex, toScalar, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
 /** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
@@ -26,7 +26,7 @@ function rectOf(value: Complex): { re: number; im: number } {
 
 const coefficientArray = { type: 'array' as const, items: { type: 'quantity' as const, kind: QuantityKind.None } }
 
-export const transferFns: FnDef[] = [
+export const transferSolvers: SolverDef[] = [
   {
     id: 'partial_fraction',
     summary: 'Partial-fraction expansion of a ratio-form transfer function',

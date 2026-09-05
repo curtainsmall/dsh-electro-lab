@@ -1,5 +1,5 @@
 /**
- * Frequency-domain fns (migrated from tools/dft-tools.ts): DFT/IDFT over
+ * Frequency-domain solvers (migrated from tools/dft-tools.ts): DFT/IDFT over
  * complex sequences, Fourier series of standard waveforms, and the combined
  * signal-analysis stats + spectrum call. Sequences are arrays of kind-none
  * quantities; stats values are kind none too.
@@ -17,7 +17,7 @@ import {
 } from '../../math/dft.ts'
 import { serializeComplex, toComplex, toScalar, type ValuePayload } from '../../math/convert.ts'
 import { QuantityKind } from '../../math/quantity-kind.ts'
-import type { FnDef } from '../registry.ts'
+import type { SolverDef } from '../registry.ts'
 
 /** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
@@ -33,7 +33,7 @@ const windowParam = {
   optional: true as const,
 }
 
-export const dftFns: FnDef[] = [
+export const dftSolvers: SolverDef[] = [
   {
     id: 'discrete_fourier_transform',
     summary: 'DFT of a complex sample sequence (optionally windowed)',
