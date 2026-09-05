@@ -1,15 +1,15 @@
 /**
- * The tool core — everything the surface outside the context needs in one
+ * The tool core — everything the surface outside the engine needs in one
  * module:
  *
  * 1. Definition: ToolReturns (the declared output shape of a declaration),
  *    renderText and defineJsonTool — the factory used by the manager tools
- *    (external_tool_*) and the context primitives (set/get/call, markers).
+ *    (external_tool_*) and the engine primitives (set/get/call, markers).
  * 2. Declarations: the archive-authored tool dialect (ToolDeclaration,
  *    Declaration*), the external-tools.jsonl archive with the restart dirty
  *    bit, and validation. Declarations are not compiled into tools anymore —
  *    at plugin start every enabled declaration is recorded verbatim into the
- *    context's fn registry as an external fn (machine/external-fns.ts), which
+ *    engine's fn registry as an external fn (engine/external-fns.ts), which
  *    wraps the http/file transport itself.
  *
  * ToolError/ToolErrorCode are re-exported so callers import the failure
@@ -26,8 +26,8 @@ import { ToolError, ToolErrorCode } from './errors.ts'
 export { ToolError, ToolErrorCode }
 
 /**
- * Declared result shape of a declared tool (the context fn's `returns` spec
- * is mapped from this at registration — machine/external-fns.ts).
+ * Declared result shape of a declared tool (the engine fn's `returns` spec
+ * is mapped from this at registration — engine/external-fns.ts).
  */
 export type ToolReturns =
   /** Any JSON (cannot be mapped to a typed spec — an external fn needs an explicit shape). */
@@ -130,7 +130,7 @@ interface DeclarationBase {
   /** Registers at plugin start when not false (a declaration without the flag defaults to enabled). */
   enabled: boolean
   parameters: DeclarationParameters
-  /** Explicit result shape — required for registration as a context fn:
+  /** Explicit result shape — required for registration as an engine fn:
    *  a spec, or null = void. A declaration without it (or with the
    *  unmappable "any" leaf) is kept in the archive but skipped at start. */
   returns?: ToolReturns | null

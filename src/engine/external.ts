@@ -34,7 +34,7 @@ function readResult(body: unknown, requestId: string): TypedValue | null {
   return raw as TypedValue
 }
 
-/** 执行一次外部调用；返回响应里的 result（可能为 null，语境按 fn 签名校验）。 */
+/** 执行一次外部调用；返回响应里的 result（可能为 null，引擎按 fn 签名校验）。 */
 export async function callExternal(block: ExternalBlock, args: Record<string, TypedValue>): Promise<TypedValue | null> {
   const timeoutMs = block.timeoutMs ?? 30000
   const requestId = randomUUID()

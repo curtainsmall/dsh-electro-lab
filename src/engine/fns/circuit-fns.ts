@@ -1,23 +1,23 @@
 /**
- * Context fn definitions migrated from src/tools/circuit-tools.ts —
+ * Engine fn definitions migrated from src/tools/circuit-tools.ts —
  * one FnDef per legacy defineJsonTool. run bodies mirror the old executes
  * (SI base units; the toScalar/toComplex unwrapping is preserved) but return
  * plain numbers for real results and rect complex values for complex ones,
- * which the context types against `returns`.
+ * which the engine types against `returns`.
  *
  * Migration notes (documented deviations from the legacy tool surface):
  * - circuit_impedance.network: the legacy schema took a recursive JSON tree
  *   (element leaves of kind resistance|inductance|capacitance, plus nested
- *   series/parallel groups). The context spec language is a closed spec that
+ *   series/parallel groups). The engine spec language is a closed spec that
  *   cannot express a recursive heterogeneous tree, so the parameter is
  *   declared as a string carrying the same JSON text (see validateNetwork
  *   below) and the run parses + validates it.
  * - resonance.resistance was optional (a call without it returned only the
- *   resonant frequency). The context returns spec is one exact object shape
+ *   resonant frequency). The engine returns spec is one exact object shape
  *   per fn, so resistance is required here and the object always carries
  *   qualityFactor and bandwidth.
  * - transient_response: the legacy rlc branch additionally reported alpha/
- *   omega0/dampingRatio/damping. A context returns object has a fixed shape
+ *   omega0/dampingRatio/damping. An engine returns object has a fixed shape
  *   across rc/rl/rlc, so those rlc characterization fields are not returned
  *   (the per-time voltage/current curve still is).
  */
@@ -50,7 +50,7 @@ const ELEMENT_QUANTITY_KINDS: Record<ElementKind, QuantityKind> = {
 /** The three element kinds accepted as leaves (explicit set: enum reverse mappings are not emitted at runtime). */
 const ELEMENT_KINDS = new Set<string>([ElementKind.Resistance, ElementKind.Inductance, ElementKind.Capacitance])
 
-/** Kernel complex value → context-native rect (finite-checked, -0 folded). */
+/** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
   const snapshot = serializeComplex(value, QuantityKind.None)
   return { re: snapshot.re, im: snapshot.im }

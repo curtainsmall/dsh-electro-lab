@@ -1,5 +1,5 @@
 /**
- * Context fn definitions migrated from src/tools/smith-tools.ts —
+ * Engine fn definitions migrated from src/tools/smith-tools.ts —
  * one FnDef per legacy defineJsonTool. run bodies mirror the old executes
  * (SI base units; toScalar/toComplex unwrapping preserved); real results
  * come back as plain numbers, complex ones as rect complex values.
@@ -8,11 +8,11 @@
  * - reflection_to_vswr / return_loss: the legacy tools declared an `infinite`
  *   boolean for the |Γ| = 1 / |Γ| = 0 extremes, but their serializers threw
  *   on non-finite numbers before that flag could ever be returned (and the
- *   context value universe cannot carry Infinity either), so the migrated
+ *   engine value universe cannot carry Infinity either), so the migrated
  *   fns return only the finite vswr / returnLossDb and those extremes throw.
  * - matched_network: each legacy element carried reactance plus exactly one
  *   of inductance (H, positive reactance) or capacitance (F, negative
- *   reactance) — a context quantity has one fixed kind per field, so each
+ *   reactance) — an engine quantity has one fixed kind per field, so each
  *   element now carries role, reactance, a kind string (inductance or
  *   capacitance) and the component magnitude as a kind-None value.
  */
@@ -34,7 +34,7 @@ import { toComplex, toScalar, serializeComplex, type ValuePayload } from '../../
 import { QuantityKind } from '../../math/quantity-kind.ts'
 import type { FnDef } from '../registry.ts'
 
-/** Kernel complex value → context-native rect (finite-checked, -0 folded). */
+/** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
   const snapshot = serializeComplex(value, QuantityKind.None)
   return { re: snapshot.re, im: snapshot.im }

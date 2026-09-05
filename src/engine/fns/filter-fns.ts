@@ -1,16 +1,16 @@
 /**
- * Context fn definitions migrated from src/tools/filter-tool.ts —
+ * Engine fn definitions migrated from src/tools/filter-tool.ts —
  * one FnDef for the legacy filter_design tool. run mirrors the old execute;
  * real results come back as plain numbers.
  *
  * Migration notes (documented deviations from the legacy tool surface):
  * - queryFrequency was optional in the legacy tool (attenuationAtQueryDb was
- *   then omitted). A context returns object has one exact shape per fn, so
+ *   then omitted). An engine returns object has one exact shape per fn, so
  *   queryFrequency is required here and attenuationAtQueryDb is always
  *   present; pass the cutoff frequency as queryFrequency when only the design
  *   is wanted (both attenuation fields then report the −3 dB point).
  * - elements[].value is the series-inductance (H) or shunt-capacitance (F)
- *   magnitude; a context quantity has one fixed kind per field while the
+ *   magnitude; an engine quantity has one fixed kind per field while the
  *   element kind alternates, so the magnitude is declared kind None and the
  *   unit is carried by the element kind string.
  */

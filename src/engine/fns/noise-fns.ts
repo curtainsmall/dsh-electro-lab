@@ -1,5 +1,5 @@
 /**
- * Context fn definitions migrated from src/tools/noise-tools.ts —
+ * Engine fn definitions migrated from src/tools/noise-tools.ts —
  * one FnDef per legacy defineJsonTool. run bodies mirror the old executes
  * (SI base units; toScalar unwrapping preserved); real results come back as
  * plain numbers.

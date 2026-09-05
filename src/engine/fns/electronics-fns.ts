@@ -1,14 +1,14 @@
 /**
- * Context fn definitions migrated from src/tools/electronics-tools.ts —
+ * Engine fn definitions migrated from src/tools/electronics-tools.ts —
  * one FnDef per legacy defineJsonTool. run bodies mirror the old executes
  * (SI base units; toScalar unwrapping preserved); real results come back as
  * plain numbers, complex ones (op-amp gain/output) as rect complex values,
- * which the context types against `returns`.
+ * which the engine types against `returns`.
  *
  * Migration notes (documented deviations from the legacy tool surface):
  * - opamp_configurations: the legacy 'summing' configuration returned only
  *   { configuration, outputVoltage } (a summing amplifier has no single gain),
- *   while every other configuration also returned gain. A context returns
+ *   while every other configuration also returned gain. An engine returns
  *   object has one exact shape per fn, so the migrated fn keeps the six
  *   single-input configurations (each returning gain + outputVoltage) and
  *   drops 'summing' from the enum.
@@ -33,7 +33,7 @@ import { toScalar, serializeComplex, type ValuePayload } from '../../math/conver
 import { QuantityKind } from '../../math/quantity-kind.ts'
 import type { FnDef } from '../registry.ts'
 
-/** Kernel complex value → context-native rect (finite-checked, -0 folded). */
+/** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
   const snapshot = serializeComplex(value, QuantityKind.None)
   return { re: snapshot.re, im: snapshot.im }

@@ -19,7 +19,7 @@ import { serializeComplex, toComplex, toScalar, type ValuePayload } from '../../
 import { QuantityKind } from '../../math/quantity-kind.ts'
 import type { FnDef } from '../registry.ts'
 
-/** Kernel complex value → context-native rect (finite-checked, -0 folded). */
+/** Kernel complex value → engine-native rect (finite-checked, -0 folded). */
 function rectOf(value: Complex): { re: number; im: number } {
   const snapshot = serializeComplex(value, QuantityKind.None)
   return { re: snapshot.re, im: snapshot.im }

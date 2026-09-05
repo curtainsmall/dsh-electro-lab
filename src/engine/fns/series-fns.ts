@@ -2,7 +2,7 @@
  * Series fns (migrated from tools/series-tools.ts): series_sum with an
  * arithmetic / geometric / power kind discriminator.
  *
- * Context object returns are closed and require every declared field, so the
+ * Engine object returns are closed and require every declared field, so the
  * old per-branch output shapes ({kind,sum,lastTerm} / {kind,sum,converges} /
  * {kind,power,sum}) are unified into the full five-key object: power is an
  * empty string when no exponent applies; converges is always truthful (finite

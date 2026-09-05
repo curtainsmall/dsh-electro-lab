@@ -1,6 +1,6 @@
 /**
  * 内核 fn 全集（蓝图 §8「fn 全集」）：math/* 全部内核以 registerFn 注册。
- * 各领域文件由旧工具模块迁移而来；聚合后由宿主注册进语境注册表。
+ * 各领域文件由旧工具模块迁移而来；聚合后由宿主注册进引擎注册表。
  */
 import type { FnDef } from '../registry.ts'
 import { expressionFns } from './expression-fns.ts'

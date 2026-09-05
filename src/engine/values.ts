@@ -1,5 +1,5 @@
 /**
- * 值宇宙（语境 value universe）——蓝图 §1。
+ * 值宇宙（引擎 value universe）——蓝图 §1。
  *
  * 类型化值：{type, value, kind, variant?, prefix?}。kind 是 quantity 类型的
  * 一部分；variant/prefix 字段不存在即基准/乘数 1；词表一律 ASCII 短词；

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compileExternalFn } from '../../src/machine/external-fns.ts'
+import { compileExternalFn } from '../../src/engine/external-fns.ts'
 import { QuantityKind } from '../../src/math/quantity-kind.ts'
 import { DeclarationHttpMethod, DeclarationParamType, DeclarationTransport, type ToolDeclaration } from '../../src/tool.ts'
 

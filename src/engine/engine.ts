@@ -1,5 +1,5 @@
 /**
- * 语境（context）——蓝图 §0/§2/§4/§5。
+ * 引擎（engine）——蓝图 §0/§2/§4/§5。
  * 全局单实例：变量表 + fn 注册表 + 记录存储 + 单一 open 生命周期。
  * 原语（set/get/call）与 markers 经此执行；每步落一行轨迹（含输入输出）。
  */
@@ -22,7 +22,7 @@ interface OpenState {
   openedAt: number
 }
 
-export class Context {
+export class Engine {
   readonly table = new VariableTable()
   readonly registry = new FnRegistry()
   readonly store: RecordStore
@@ -55,7 +55,7 @@ export class Context {
     return this.open?.id ?? null
   }
 
-  /** 重建语境状态：set/call/set-null 按行应用，marker 跳过。 */
+  /** 重建引擎状态：set/call/set-null 按行应用，marker 跳过。 */
   private replayInto(rows: TraceRow[]): void {
     for (const row of rows) {
       if (row.ok !== true) continue
@@ -77,7 +77,7 @@ export class Context {
   }
 
   private requireOpen(): OpenState {
-    if (this.open === null) throw new ToolError('no open record — call record_question first', ToolErrorCode.ContextUndeclared)
+    if (this.open === null) throw new ToolError('no open record — call record_question first', ToolErrorCode.EngineUndeclared)
     return this.open
   }
 
@@ -141,7 +141,7 @@ export class Context {
         return { ok: true, name, deleted }
       }
       const error = validateValue(value)
-      if (error !== undefined) throw new ToolError(`set: ${error}`, ToolErrorCode.ContextArgs)
+      if (error !== undefined) throw new ToolError(`set: ${error}`, ToolErrorCode.EngineArgs)
       const typed = value as TypedValue
       const slot = this.table.set(name, typed)
       this.trace({ tool: 'set', ok: true, name, value: typed, rev: slot.rev })
@@ -154,7 +154,7 @@ export class Context {
   opGet(name: string): Receipt {
     try {
       const slot = this.table.get(name)
-      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.ContextUndeclared)
+      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.EngineUndeclared)
       this.trace({ tool: 'get', ok: true, name, value: slot.value })
       return { ok: true, name, value: slot.value }
     } catch (error) {
@@ -168,12 +168,12 @@ export class Context {
       const fn = this.registry.require(fnId)
       const { resolved, native } = this.resolveArgs(fn, args)
       if (fn.returns === null) {
-        if (target !== null) throw new ToolError(`fn "${fnId}" returns void — target must be null`, ToolErrorCode.ContextVoidTarget)
+        if (target !== null) throw new ToolError(`fn "${fnId}" returns void — target must be null`, ToolErrorCode.EngineVoidTarget)
         await this.runVoid(fn, resolved, native)
         this.trace({ tool: 'call', ok: true, fn: fnId, args, resolved, result: null, target: null })
         return { ok: true, target: null }
       }
-      if (target === null) throw new ToolError(`fn "${fnId}" returns a value — a named target is required`, ToolErrorCode.ContextTargetRequired)
+      if (target === null) throw new ToolError(`fn "${fnId}" returns a value — a named target is required`, ToolErrorCode.EngineTargetRequired)
       const result = await this.execute(fn, resolved, native)
       const slot = this.table.set(target, result)
       this.trace({ tool: 'call', ok: true, fn: fnId, args, resolved, result, target, rev: slot.rev })
@@ -193,7 +193,7 @@ export class Context {
       await fn.run(native)
     } catch (error) {
       if (error instanceof ToolError) throw error
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.ContextFnFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineFnFailed)
     }
   }
 
@@ -205,11 +205,11 @@ export class Context {
       const raw = args[name]
       if (raw === undefined) {
         if (spec.optional === true) continue
-        throw new ToolError(`fn "${fn.id}" is missing argument "${name}"`, ToolErrorCode.ContextArgs)
+        throw new ToolError(`fn "${fn.id}" is missing argument "${name}"`, ToolErrorCode.EngineArgs)
       }
       const typed = this.resolveValue(raw)
       const error = validateAgainstSpec(spec, typed, `argument "${name}"`)
-      if (error !== undefined) throw new ToolError(`fn "${fn.id}": ${error}`, ToolErrorCode.ContextKindMismatch)
+      if (error !== undefined) throw new ToolError(`fn "${fn.id}": ${error}`, ToolErrorCode.EngineKindMismatch)
       const canonical = toCanonical(typed)
       resolved[name] = canonical
       native[name] = nativeValue(spec, canonical)
@@ -225,18 +225,18 @@ export class Context {
       const name = dot === -1 ? reference : reference.slice(0, dot)
       const path = dot === -1 ? undefined : reference.slice(dot + 1)
       const slot = this.table.get(name)
-      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.ContextUndeclared)
+      if (slot === undefined) throw new ToolError(`slot "${name}" is not declared`, ToolErrorCode.EngineUndeclared)
       return refPath(slot.value, path)
     }
     const error = validateValue(raw)
-    if (error !== undefined) throw new ToolError(`argument value: ${error}`, ToolErrorCode.ContextArgs)
+    if (error !== undefined) throw new ToolError(`argument value: ${error}`, ToolErrorCode.EngineArgs)
     return raw as TypedValue
   }
 
   /** 执行非 void fn（本地 run 或外部传输）；结果按 returns 定型。 */
   private async execute(fn: FnDef, resolved: Record<string, TypedValue>, native: Record<string, unknown>): Promise<TypedValue> {
     const spec = fn.returns
-    if (spec === null) throw new ToolError(`fn "${fn.id}" is void`, ToolErrorCode.ContextArgs)
+    if (spec === null) throw new ToolError(`fn "${fn.id}" is void`, ToolErrorCode.EngineArgs)
     let raw: unknown
     try {
       if (fn.external !== undefined) {
@@ -249,17 +249,17 @@ export class Context {
       raw = await fn.run(native)
     } catch (error) {
       if (error instanceof ToolError) throw error
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.ContextFnFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineFnFailed)
     }
     try {
       return fromNative(spec, raw, `fn "${fn.id}" result`)
     } catch (error) {
-      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.ContextFnFailed)
+      throw new ToolError(error instanceof Error ? error.message : String(error), ToolErrorCode.EngineFnFailed)
     }
   }
 
   private validateName(name: string): void {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new ToolError(`slot name "${name}" must match ^[A-Za-z_][A-Za-z0-9_]*$`, ToolErrorCode.ContextArgs)
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new ToolError(`slot name "${name}" must match ^[A-Za-z_][A-Za-z0-9_]*$`, ToolErrorCode.EngineArgs)
   }
 
   private failure(tool: string, error: unknown): Receipt {

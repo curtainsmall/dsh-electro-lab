@@ -1,19 +1,19 @@
 /**
- * Host half of dsh-electro-lab（语境时代）。
+ * Host half of dsh-electro-lab（引擎时代）。
  *
- * 一台进程级全局语境（Context）：变量表 + fn 注册表 + 记录存储。
+ * 一台进程级全局引擎（Engine）：变量表 + fn 注册表 + 记录存储。
  * apply 装配：注册内核 fn 与外部 fn、注册 LLM 工具面（set/get/call +
  * markers）与声明管理工具（external_tool_add/update/delete）、挂两个
  * 端点（记录索引、外部工具档案管理）。
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { Context as CordisContext } from 'cordis'
-import { Context } from './machine/machine.ts'
-import { createMachineTools } from './tools/machine-tools.ts'
+import type { Context } from 'cordis'
+import { Engine } from './engine/engine.ts'
+import { createEngineTools } from './tools/engine-tools.ts'
 import { createDeclarationTools } from './tools/declaration-tools.ts'
-import { compileExternalFn } from './machine/external-fns.ts'
-import { registerKernelFns } from './machine/fns/index.ts'
+import { compileExternalFn } from './engine/external-fns.ts'
+import { registerKernelFns } from './engine/fns/index.ts'
 import { clearRestartRequired, deleteDeclaration, readDeclarations, restartRequired, upsertDeclaration, validateDeclaration } from './tool.ts'
 import { registerSkills } from './skill.ts'
 import { installPresets } from './preset.ts'
@@ -51,26 +51,26 @@ interface RequestLike {
 /** The records home: records/ + record-index.jsonl live here. */
 const recordsHome = process.env.DSH_ELECTRO_LAB_HOME ?? join(homedir(), '.dsh-electro-lab')
 
-/** 全局单语境（蓝图 §10）：一个进程一个语境，任何会话的 marker 都作用于它。 */
-export const context = new Context(recordsHome)
+/** 全局单引擎（蓝图 §10）：一个进程一个引擎，任何会话的 marker 都作用于它。 */
+export const engine = new Engine(recordsHome)
 
 const RECORDS_INDEX_PATH = '/api/dsh-electro-lab/records-index'
 const EXTERNAL_PATH = '/api/dsh-electro-lab/external-tools'
 
-export function apply(ctx: CordisContext): void {
+export function apply(ctx: Context): void {
   ctx.effect(() => {
     const disposers: Array<() => void> = []
 
-    // 语境装配：恢复 open 记录（清孤儿 + 重建表）、注册全部内核 fn 与外部 fn。
-    context.start()
+    // 引擎装配：恢复 open 记录（清孤儿 + 重建表）、注册全部内核 fn 与外部 fn。
+    engine.start()
     for (const fn of registerKernelFns()) {
-      if (context.registry.get(fn.id) === undefined) context.registry.register(fn)
+      if (engine.registry.get(fn.id) === undefined) engine.registry.register(fn)
     }
     for (const declaration of readDeclarations(recordsHome)) {
       if (declaration.enabled === false) continue
       try {
         const fn = compileExternalFn(declaration)
-        if (fn !== null && context.registry.get(fn.id) === undefined) context.registry.register(fn)
+        if (fn !== null && engine.registry.get(fn.id) === undefined) engine.registry.register(fn)
       } catch (error) {
         ctx.logger?.warn(`[dsh-electro-lab] failed to register declaration fn "${declaration.name}": ${error instanceof Error ? error.message : String(error)}`)
       }
@@ -78,11 +78,11 @@ export function apply(ctx: CordisContext): void {
     // 声明档案刚注册完：重启 dirty 位清掉。
     clearRestartRequired(recordsHome)
 
-    // LLM 工具面：语境原语 + markers。
-    for (const tool of createMachineTools(context)) {
+    // LLM 工具面：引擎原语 + markers。
+    for (const tool of createEngineTools(engine)) {
       disposers.push(ctx.tools.register(tool))
     }
-    // 声明管理工具（管理面在语境外）。
+    // 声明管理工具（管理面在引擎外）。
     for (const tool of createDeclarationTools(recordsHome)) {
       disposers.push(ctx.tools.register(tool))
     }
@@ -90,7 +90,7 @@ export function apply(ctx: CordisContext): void {
     return () => {
       for (const off of disposers) off()
     }
-  }, 'dsh-electro-lab: context')
+  }, 'dsh-electro-lab: engine')
 
   ctx.effect(() => registerSkills(ctx), 'dsh-electro-lab: skills')
 
@@ -109,7 +109,7 @@ export function apply(ctx: CordisContext): void {
           return
         }
         res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ rows: context.indexRows() }))
+        res.end(JSON.stringify({ rows: engine.indexRows() }))
       },
     }))
 

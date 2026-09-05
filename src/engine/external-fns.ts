@@ -22,7 +22,7 @@ function specFromParam(param: DeclarationParamSpec, path: string): Spec {
   }
 }
 
-/** returns → 语境 spec；null = void（显式）；缺失或 any 无法映射 → 抛错跳过。 */
+/** returns → 引擎 spec；null = void（显式）；缺失或 any 无法映射 → 抛错跳过。 */
 function specFromReturns(returns: ToolReturns | null | undefined, path: string): Spec | null {
   if (returns === null) return null
   if (returns === undefined) throw new Error(`${path}: a declaration needs an explicit returns (a spec, or null for void)`)

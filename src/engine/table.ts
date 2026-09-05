@@ -1,5 +1,5 @@
 /**
- * 变量表（语境 variable table）——蓝图 §4。
+ * 变量表（引擎 variable table）——蓝图 §4。
  * 槽 = { name, 类型化值, rev }：kind 首次钉死后不可变，覆盖须同 kind；
  * rev 从 1 起，每次同 kind 覆盖 +1；删除（set null）后重建 = rev 1。
  */
@@ -37,7 +37,7 @@ export class VariableTable {
       return slot
     }
     if (VariableTable.identity(existing.value) !== VariableTable.identity(value)) {
-      throw new ToolError(`slot "${name}" is pinned to ${VariableTable.identity(existing.value)}, got ${VariableTable.identity(value)}`, ToolErrorCode.ContextKindMismatch)
+      throw new ToolError(`slot "${name}" is pinned to ${VariableTable.identity(existing.value)}, got ${VariableTable.identity(value)}`, ToolErrorCode.EngineKindMismatch)
     }
     const slot = { value, rev: existing.rev + 1 }
     this.slots.set(name, slot)
